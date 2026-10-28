@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://firstdue.game/schemas/equipment.schema.json",
+  "title": "equipment.json - ACM kit inventory",
+  "description": "Every physical item in the kit. Sizes matter and are modeled. Skeleton holds placeholders only.",
+  "type": "object",
+  "required": ["_meta", "equipment"],
+  "properties": {
+    "_meta": {
+      "type": "object",
+      "required": ["version", "status"],
+      "properties": {
+        "version": { "type": "string" },
+        "status": { "type": "string" }
+      }
+    },
+    "equipment": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/item" }
+    }
+  },
+  "$defs": {
+    "item": {
+      "type": "object",
+      "required": ["id", "name", "category", "location", "quantity"],
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "category": { "type": "string" },
+        "location": { "type": "string" },
+        "quantity": {
+          "anyOf": [{ "type": "integer" }, { "type": "string" }]
+        },
+        "sizes": { "type": "array", "items": { "type": "string" } },
+        "sizeEffects": { "type": "object" },
+        "consumable": { "type": "boolean" },
+        "notes": { "type": "string" }
+      }
+    }
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "_meta": {
+    "version": "0.0.1",
+    "status": "SKELETON - Dispatch Engine v1 lands Oct 31",
+    "sourceNote": "WEIGHT_EST - weights estimated"
+  },
+  "archetypes": [
+    {
+      "id": "placeholder_panicked_spouse",
+      "label": "TODO - first real entry: panicked spouse",
+      "behavior": "TODO - panics, hovers, answers in fragments",
+      "helpsWith": [],
+      "obstructsWith": ["TODO"],
+      "sampleLines": ["TODO - sample line"],
+      "weight": "WEIGHT_EST"
+    }
+  ]
+}

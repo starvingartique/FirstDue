@@ -1,0 +1,10 @@
+TODO - Bystander prompt lands Oct 29 with the talking-patient build.
+
+Intent: play one archetype from bystanders.json (panicked spouse, lying roommate,
+helpful off-duty nurse, hostile crowd, language barrier). Help, obstruct, or lie
+per the archetype. Short spoken lines. Never change engine state.
+
+Current engine state:
+{{STATE}}
+
+{{EXTRA}}

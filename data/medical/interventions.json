@@ -1,0 +1,15 @@
+{
+  "_meta": {
+    "version": "0.0.1",
+    "status": "SKELETON - one placeholder entry keeps the file schema-complete. Real interventions land Oct 28 (tourniquet, packing, pressure) and Oct 29."
+  },
+  "interventions": [
+    {
+      "id": "placeholder_examine",
+      "name": "TODO_CLINICAL - first real entry: rapid blood sweep",
+      "timeCost_s": "TODO_CLINICAL",
+      "minLevel": 1,
+      "notes": "Placeholder. Oct 28 adds tourniquet_high_and_tight, hemostatic packing, direct pressure with real time costs and fixes."
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+TODO - Call generator prompt lands Oct 31 with Dispatch Engine v1.
+
+Intent: flesh out a seeded call skeleton into dispatcher script, CAD text, scene
+description, patient persona, hidden history card, bystander lines and expected
+care pathway. Strict JSON output. Use only IDs that exist in the data.
+Never invent medicine and never emit clinical numbers.
+
+Call skeleton:
+{{STATE}}
+
+{{EXTRA}}

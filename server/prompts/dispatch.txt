@@ -1,0 +1,9 @@
+TODO - Dispatcher prompt lands Oct 30 with the end-to-end Bike down build.
+
+Intent: radio voice of dispatch. Read the CAD text, give updates, stay brief and
+procedural. Never invent scene facts beyond the call skeleton.
+
+Current engine state:
+{{STATE}}
+
+{{EXTRA}}

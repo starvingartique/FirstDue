@@ -1,0 +1,2174 @@
+{
+  "_meta": {
+    "version": "0.1.0",
+    "status": "DRAFT — medic review required. All probabilities WEIGHT_EST; bleed/progression rates are classes mapped to numbers in physiology.json (TUNE).",
+    "sources": [
+      "ACS NTDB Annual Report 2016 (mechanism %, body region %, case fatality)",
+      "Joint Trauma System / CoERCCC Joint En Route Care Guidelines FY26 (TCCC-aligned management)",
+      "Eastridge et al. 2012, Death on the Battlefield 2001–2011 (potentially survivable deaths: hemorrhage dominant)",
+      "Morel-Lavallée / closed degloving case literature (Eplasty, PMC4364262)",
+      "Standard EMS references (PHTLS, NREMT, NASEMSO) for findings and field care"
+    ],
+    "fieldKeys": {
+      "march": "Which MARCH-PAWS step this injury primarily tests: M, A, R, C, H, P, A2 (antibiotics), W, S",
+      "bleed": "none | capillary | venous_minor | venous_major | arterial_minor | arterial_major | junctional | internal_slow | internal_fast | internal_massive",
+      "spawns": "Associated/occult injuries: [id, probability, delay_s]. Hidden until assessed.",
+      "fix": "Correct field interventions (ids map to interventions.json / equipment.json)",
+      "traps": "Plausible wrong actions with modeled consequences",
+      "infection": "If present, seeds the infectionModel in conditions.json"
+    },
+    "bleedClassAnchors_mL_per_min_TUNE": {
+      "capillary": 2,
+      "venous_minor": 10,
+      "venous_major": 40,
+      "arterial_minor": 80,
+      "arterial_major": 400,
+      "junctional": 400,
+      "internal_slow": 15,
+      "internal_fast": 60,
+      "internal_massive": 250
+    }
+  },
+  "injuries": [
+    {
+      "id": "femoral_arterial_bleed",
+      "name": "Femoral/popliteal arterial bleed",
+      "cat": "hemorrhage",
+      "region": "thigh|knee",
+      "march": "M",
+      "bleed": "arterial_major",
+      "findings": {
+        "inspect": [
+          "bright red pulsatile spurting",
+          "blood pool expanding",
+          "soaked clothing"
+        ]
+      },
+      "fix": [
+        "tourniquet_high_and_tight",
+        "second_tourniquet_proximal",
+        "hemostatic_packing_if_not_tourniquetable"
+      ],
+      "traps": [
+        "venous_tourniquet_too_loose",
+        "tourniquet_over_knee_joint",
+        "pressure_dressing_only_on_arterial"
+      ],
+      "minLevel": 1
+    },
+    {
+      "id": "junctional_bleed",
+      "name": "Junctional hemorrhage (groin/axilla/neck base)",
+      "cat": "hemorrhage",
+      "region": "groin|axilla|neck",
+      "march": "M",
+      "bleed": "junctional",
+      "findings": {
+        "inspect": [
+          "massive bleeding from groin/axilla — no room for a tourniquet"
+        ]
+      },
+      "fix": [
+        "hemostatic_packing_firm_3min_pressure",
+        "junctional_tourniquet",
+        "knee_on_wound_direct_pressure"
+      ],
+      "traps": [
+        "limb_tourniquet_attempt_wastes_time",
+        "removing_packing_to_check"
+      ],
+      "minLevel": 2
+    },
+    {
+      "id": "scalp_laceration",
+      "name": "Scalp laceration",
+      "cat": "hemorrhage",
+      "region": "head",
+      "march": "M",
+      "bleed": "venous_major",
+      "findings": {
+        "inspect": [
+          "very bloody scalp wound — looks worse than it is, but CAN cause shock if ignored"
+        ],
+        "palpate": [
+          "check for step-off underneath (depressed skull fracture)"
+        ]
+      },
+      "spawns": [
+        [
+          "depressed_skull_fracture",
+          0.1,
+          0
+        ],
+        [
+          "tbi_concussion",
+          0.4,
+          0
+        ]
+      ],
+      "fix": [
+        "direct_pressure",
+        "pressure_dressing"
+      ],
+      "traps": [
+        "firm_pressure_over_depressed_fracture"
+      ],
+      "minLevel": 1
+    },
+    {
+      "id": "traumatic_amputation_limb",
+      "name": "Traumatic limb amputation",
+      "cat": "hemorrhage",
+      "region": "any_limb",
+      "march": "M",
+      "bleed": "arterial_major",
+      "findings": {
+        "inspect": [
+          "partial or complete amputation; vessels may spasm and bleed less than expected at first"
+        ]
+      },
+      "fix": [
+        "tourniquet_2_3in_above",
+        "dress_stump",
+        "amputated_part_care_moist_gauze_bag_on_ice_not_direct"
+      ],
+      "traps": [
+        "part_directly_on_ice_frostbite",
+        "no_tourniquet_because_not_bleeding_now"
+      ],
+      "infection": {
+        "source": "wound",
+        "initialLoad": 15
+      },
+      "minLevel": 1
+    },
+    {
+      "id": "digit_amputation_saw",
+      "name": "Finger amputation (table saw / snowblower)",
+      "cat": "soft_tissue",
+      "region": "hand",
+      "march": "W",
+      "bleed": "arterial_minor",
+      "findings": {
+        "inspect": [
+          "missing digit(s), part may be in the sawdust or the machine"
+        ]
+      },
+      "fix": [
+        "direct_pressure_elevation",
+        "find_and_preserve_part",
+        "hand_surgery_capable_destination"
+      ],
+      "traps": [
+        "hand_in_snowblower_chute_reaching_again",
+        "tourniquet_on_arm_for_finger"
+      ],
+      "minLevel": 1
+    },
+    {
+      "id": "ring_avulsion",
+      "name": "Ring avulsion (ring degloving)",
+      "cat": "degloving",
+      "region": "finger",
+      "march": "W",
+      "bleed": "venous_minor",
+      "mechanisms": [
+        "ring_caught_on_fence_or_truck_or_hoop_during_fall"
+      ],
+      "classes": "Urbaniak I: circulation intact · II: inadequate circulation · III: complete degloving/amputation",
+      "findings": {
+        "inspect": [
+          "skin and soft tissue stripped off the finger like a glove; bone/tendon exposed (class III)"
+        ],
+        "patient": [
+          "'I jumped off the truck and my ring caught'"
+        ]
+      },
+      "fix": [
+        "remove_other_rings_now_swelling",
+        "moist_sterile_dressing",
+        "preserve_degloved_tissue",
+        "hand_surgery_center"
+      ],
+      "traps": [
+        "leaving_rings_on_other_fingers"
+      ],
+      "infection": {
+        "source": "wound",
+        "initialLoad": 10
+      },
+      "minLevel": 1
+    },
+    {
+      "id": "limb_degloving_open",
+      "name": "Open degloving (limb)",
+      "cat": "degloving",
+      "region": "leg|arm|foot",
+      "march": "M",
+      "bleed": "venous_major",
+      "mechanisms": [
+        "run_over_by_wheel",
+        "motorcycle_road_slide",
+        "industrial_roller_or_conveyor",
+        "lawnmower"
+      ],
+      "findings": {
+        "inspect": [
+          "skin + subcutaneous fat torn off muscle in a flap or sleeve; dirt/road debris embedded",
+          "flap may look pale/blue (non-viable)"
+        ]
+      },
+      "spawns": [
+        [
+          "open_fracture",
+          0.35,
+          0
+        ],
+        [
+          "compartment_syndrome",
+          0.1,
+          1800
+        ]
+      ],
+      "fix": [
+        "control_bleeding",
+        "irrigate_gross_contamination",
+        "replace_flap_in_anatomic_position",
+        "moist_sterile_dressing",
+        "splint",
+        "antibiotics_long_transport",
+        "pain_management"
+      ],
+      "traps": [
+        "trimming_or_removing_flap",
+        "dry_dressing_adhering"
+      ],
+      "infection": {
+        "source": "wound",
+        "initialLoad": 25,
+        "organismProfile": {
+          "gramPositive": 0.6,
+          "gramNegative": 0.5,
+          "anaerobes": 0.4
+        }
+      },
+      "minLevel": 2
+    },
+    {
+      "id": "morel_lavallee",
+      "name": "Closed degloving (Morel-Lavallée lesion)",
+      "cat": "degloving",
+      "region": "hip|thigh|flank|knee",
+      "march": "C",
+      "bleed": "internal_slow",
+      "mechanisms": [
+        "crush_or_shear_over_greater_trochanter",
+        "run_over",
+        "motorcycle_slide"
+      ],
+      "findings": {
+        "inspect": [
+          "skin intact but bruised, abraded or friction-burned over the hip"
+        ],
+        "palpate": [
+          "soft fluctuant 'water balloon' feel; skin moves over the underlying tissue",
+          "decreased sensation over the area"
+        ]
+      },
+      "spawns": [
+        [
+          "pelvic_fracture",
+          0.5,
+          0
+        ],
+        [
+          "acetabular_fracture",
+          0.3,
+          0
+        ]
+      ],
+      "fix": [
+        "recognize_and_report",
+        "pelvic_binder_if_pelvic_fracture_suspected",
+        "pain_management"
+      ],
+      "traps": [
+        "calling_it_just_a_bruise"
+      ],
+      "teachingPoint": "The skin looks fine. The hematoma underneath can hold liters.",
+      "minLevel": 4
+    },
+    {
+      "id": "scalp_avulsion",
+      "name": "Scalp avulsion (hair caught in machinery)",
+      "cat": "degloving",
+      "region": "head",
+      "march": "M",
+      "bleed": "venous_major",
+      "findings": {
+        "inspect": [
+          "large part of the scalp torn off at the galea; heavy bleeding"
+        ]
+      },
+      "spawns": [
+        [
+          "cervical_spine_injury",
+          0.15,
+          0
+        ]
+      ],
+      "fix": [
+        "direct_pressure_bulky_dressing",
+        "preserve_avulsed_scalp_like_amputated_part",
+        "treat_for_shock"
+      ],
+      "minLevel": 2
+    },
+    {
+      "id": "road_rash",
+      "name": "Road rash (abrasion), deep",
+      "cat": "soft_tissue",
+      "region": "any",
+      "march": "W",
+      "bleed": "capillary",
+      "findings": {
+        "inspect": [
+          "large abraded areas with embedded gravel; can be full-thickness like a burn"
+        ]
+      },
+      "fix": [
+        "irrigate",
+        "moist_nonadherent_dressing",
+        "pain_management"
+      ],
+      "infection": {
+        "source": "wound",
+        "initialLoad": 10
+      },
+      "minLevel": 1
+    },
+    {
+      "id": "high_pressure_injection",
+      "name": "High-pressure injection injury (paint/grease gun)",
+      "cat": "soft_tissue",
+      "region": "hand|finger",
+      "march": "W",
+      "bleed": "none",
+      "findings": {
+        "inspect": [
+          "tiny pinhole wound on the finger — looks trivial"
+        ],
+        "patient": [
+          "'just a little poke from the paint sprayer'",
+          "pain increasing, finger swelling"
+        ]
+      },
+      "fix": [
+        "splint_elevate",
+        "no_ice",
+        "hand_surgery_center_urgent",
+        "do_not_accept_refusal_lightly"
+      ],
+      "traps": [
+        "treat_as_minor_cleared_on_scene"
+      ],
+      "teachingPoint": "A pinhole that looks like nothing: high amputation risk without surgery within hours.",
+      "minLevel": 2
+    },
+    {
+      "id": "dog_bite",
+      "name": "Dog bite (crush + puncture)",
+      "cat": "soft_tissue",
+      "region": "hand|arm|leg|face",
+      "march": "W",
+      "bleed": "venous_minor",
+      "findings": {
+        "inspect": [
+          "punctures + tearing/crush"
+        ],
+        "scene": [
+          "is the dog still loose? SCENE SAFETY first"
+        ]
+      },
+      "fix": [
+        "scene_safety_animal_control",
+        "irrigate",
+        "dress",
+        "antibiotics_if_long_transport_hand_or_face"
+      ],
+      "infection": {
+        "source": "wound",
+        "initialLoad": 20,
+        "organismProfile": {
+          "gramPositive": 0.6,
+          "gramNegative": 0.5,
+          "anaerobes": 0.6,
+          "_note": "Pasteurella, Capnocytophaga (asplenic: lethal)"
+        }
+      },
+      "minLevel": 1
+    },
+    {
+      "id": "fight_bite",
+      "name": "Fight bite (closed-fist injury)",
+      "cat": "soft_tissue",
+      "region": "hand_knuckle",
+      "march": "W",
+      "bleed": "capillary",
+      "findings": {
+        "inspect": [
+          "small laceration over the knuckle (MCP)"
+        ],
+        "history_card": [
+          "'I punched a guy in the mouth' — may lie at first"
+        ]
+      },
+      "fix": [
+        "irrigate",
+        "dress",
+        "hand_eval_urgent"
+      ],
+      "infection": {
+        "source": "wound",
+        "initialLoad": 25,
+        "organismProfile": {
+          "gramPositive": 0.5,
+          "anaerobes": 0.6,
+          "gramNegative": 0.4,
+          "_note": "Eikenella"
+        }
+      },
+      "minLevel": 1
+    },
+    {
+      "id": "impaled_object",
+      "name": "Impaled object (rebar, knife, branch)",
+      "cat": "penetrating",
+      "region": "any",
+      "march": "M",
+      "bleed": "variable (tamponaded by object)",
+      "findings": {
+        "inspect": [
+          "object still in place"
+        ]
+      },
+      "fix": [
+        "stabilize_in_place_bulky_dressing",
+        "cut_object_only_if_needed_for_transport",
+        "transport_with_object"
+      ],
+      "exceptions": [
+        "remove only if it obstructs the airway or prevents CPR"
+      ],
+      "traps": [
+        "removing_object_releases_tamponade_massive_bleed"
+      ],
+      "minLevel": 1
+    },
+    {
+      "id": "fishhook",
+      "name": "Fishhook embedded",
+      "cat": "soft_tissue",
+      "region": "finger|face|eye",
+      "march": "W",
+      "bleed": "capillary",
+      "findings": {
+        "inspect": [
+          "barbed hook embedded"
+        ]
+      },
+      "fix": [
+        "stabilize",
+        "transport_if_eye_involved",
+        "advance_and_cut_or_string_pull_per_protocol"
+      ],
+      "traps": [
+        "pulling_hook_from_eye"
+      ],
+      "minLevel": 1
+    },
+    {
+      "id": "lawnmower_injury",
+      "name": "Lawnmower injury (foot/hand)",
+      "cat": "soft_tissue",
+      "region": "foot|hand",
+      "march": "M",
+      "bleed": "arterial_minor",
+      "findings": {
+        "inspect": [
+          "mangled, grass- and soil-contaminated wound; partial amputation possible"
+        ]
+      },
+      "spawns": [
+        [
+          "open_fracture",
+          0.6,
+          0
+        ],
+        [
+          "traumatic_amputation_limb",
+          0.2,
+          0
+        ]
+      ],
+      "fix": [
+        "tourniquet_if_arterial",
+        "irrigate_gross_debris",
+        "splint",
+        "antibiotics"
+      ],
+      "infection": {
+        "source": "wound",
+        "initialLoad": 40,
+        "organismProfile": {
+          "gramNegative": 0.7,
+          "anaerobes": 0.6,
+          "gramPositive": 0.5,
+          "_note": "soil: Clostridium, Pseudomonas"
+        }
+      },
+      "minLevel": 2
+    },
+    {
+      "id": "firework_hand_blast",
+      "name": "Firework blast injury (hand)",
+      "cat": "blast",
+      "region": "hand|face|eye",
+      "march": "M",
+      "bleed": "arterial_minor",
+      "findings": {
+        "inspect": [
+          "mangled hand, partial digit amputations, burns, powder tattooing"
+        ]
+      },
+      "spawns": [
+        [
+          "globe_rupture",
+          0.2,
+          0
+        ],
+        [
+          "burn_partial_thickness",
+          0.8,
+          0
+        ],
+        [
+          "tympanic_membrane_rupture",
+          0.3,
+          0
+        ]
+      ],
+      "fix": [
+        "tourniquet_if_needed",
+        "moist_dressing",
+        "eye_shield_if_eye_involved",
+        "pain_management"
+      ],
+      "minLevel": 2
+    },
+    {
+      "id": "gsw_extremity",
+      "name": "GSW extremity",
+      "cat": "penetrating",
+      "region": "any_limb",
+      "march": "M",
+      "bleed": "arterial_major_or_venous (by trajectory)",
+      "findings": {
+        "inspect": [
+          "entrance wound (small, round, abrasion ring)",
+          "exit wound may be larger/irregular — or absent (retained bullet)"
+        ]
+      },
+      "spawns": [
+        [
+          "open_fracture",
+          0.35,
+          0
+        ],
+        [
+          "compartment_syndrome",
+          0.08,
+          2700
+        ],
+        [
+          "nerve_injury",
+          0.2,
+          0
+        ]
+      ],
+      "fix": [
+        "tourniquet_if_arterial_or_unsure",
+        "packing",
+        "splint",
+        "pain_management"
+      ],
+      "traps": [
+        "assuming_one_wound_no_full_body_sweep"
+      ],
+      "infection": {
+        "source": "wound",
+        "initialLoad": 10
+      },
+      "minLevel": 1
+    },
+    {
+      "id": "gsw_chest",
+      "name": "GSW chest",
+      "cat": "penetrating",
+      "region": "chest_left|chest_right",
+      "march": "R",
+      "bleed": "internal_fast",
+      "findings": {
+        "inspect": [
+          "wound to the chest; check the back (log roll) for exit",
+          "bubbling/sucking wound if open"
+        ]
+      },
+      "spawns": [
+        [
+          "open_pneumothorax",
+          0.5,
+          0
+        ],
+        [
+          "tension_pneumothorax",
+          0.25,
+          360
+        ],
+        [
+          "massive_hemothorax",
+          0.25,
+          0
+        ],
+        [
+          "cardiac_tamponade",
+          0.08,
+          0,
+          "requires: wound in 'the box' (between nipples, clavicles to costal margin)"
+        ],
+        [
+          "penetrating_thoracoabdominal_wound",
+          0.2,
+          0,
+          "if below the nipple line"
+        ]
+      ],
+      "fix": [
+        "vented_chest_seal",
+        "monitor_for_tension",
+        "needle_decompression_if_tension",
+        "permissive_hypotension",
+        "trauma_center"
+      ],
+      "traps": [
+        "non_vented_seal_without_burping",
+        "aggressive_crystalloid"
+      ],
+      "minLevel": 2
+    },
+    {
+      "id": "gsw_abdomen",
+      "name": "GSW abdomen",
+      "cat": "penetrating",
+      "region": "abdomen|flank|back_lower",
+      "march": "C",
+      "bleed": "internal_fast",
+      "findings": {
+        "inspect": [
+          "entry wound; abdomen may be distending"
+        ],
+        "palpate": [
+          "rigidity, guarding, peritonitis"
+        ]
+      },
+      "spawns": [
+        [
+          "solid_organ_hemorrhage",
+          0.4,
+          0
+        ],
+        [
+          "hollow_viscus_injury",
+          0.6,
+          0
+        ],
+        [
+          "evisceration",
+          0.1,
+          0
+        ],
+        [
+          "spinal_cord_injury",
+          0.08,
+          0
+        ]
+      ],
+      "fix": [
+        "dress_wound",
+        "permissive_hypotension",
+        "txa_within_3h",
+        "blood_if_available",
+        "rapid_transport_trauma_center",
+        "antibiotics_long_transport"
+      ],
+      "traps": [
+        "oral_fluids_or_meds",
+        "fluid_to_normal_bp"
+      ],
+      "infection": {
+        "source": "intra_abdominal",
+        "initialLoad": 30,
+        "organismProfile": {
+          "gramNegative": 0.9,
+          "anaerobes": 0.9,
+          "gramPositive": 0.3
+        }
+      },
+      "minLevel": 2
+    },
+    {
+      "id": "gsw_head",
+      "name": "GSW head",
+      "cat": "penetrating",
+      "region": "head",
+      "march": "A",
+      "bleed": "venous_major",
+      "findings": {
+        "inspect": [
+          "entrance/exit wound, possible brain matter (gore setting)"
+        ],
+        "neuro": [
+          "GCS often ≤8",
+          "blown pupil(s)"
+        ]
+      },
+      "spawns": [
+        [
+          "tbi_severe",
+          0.95,
+          0
+        ]
+      ],
+      "fix": [
+        "airway_management",
+        "avoid_hypoxia_spo2_gt_93",
+        "avoid_hypotension_sbp_gt_110",
+        "etco2_35_40",
+        "head_up_30"
+      ],
+      "traps": [
+        "hyperventilation",
+        "hypotension_from_withholding_fluid"
+      ],
+      "outcomeRealism": "frequently non-survivable; triage implications in MCI",
+      "minLevel": 2
+    },
+    {
+      "id": "gsw_neck",
+      "name": "Penetrating neck wound (GSW/stab)",
+      "cat": "penetrating",
+      "region": "neck",
+      "march": "A",
+      "bleed": "arterial_major",
+      "findings": {
+        "inspect": [
+          "expanding hematoma",
+          "bubbling (airway injury)",
+          "hoarse voice, stridor"
+        ]
+      },
+      "spawns": [
+        [
+          "airway_compromise_expanding_hematoma",
+          0.4,
+          300
+        ],
+        [
+          "venous_air_embolism",
+          0.1,
+          0
+        ]
+      ],
+      "fix": [
+        "direct_pressure_or_packing",
+        "occlusive_dressing_venous",
+        "early_airway_plan",
+        "no_c_collar_if_neuro_intact_isolated_penetrating"
+      ],
+      "traps": [
+        "c_collar_hides_expanding_hematoma",
+        "circumferential_dressing"
+      ],
+      "minLevel": 2
+    },
+    {
+      "id": "stab_chest_the_box",
+      "name": "Stab wound to 'the box' (precordium)",
+      "cat": "penetrating",
+      "region": "chest_center",
+      "march": "C",
+      "bleed": "internal_fast",
+      "spawns": [
+        [
+          "cardiac_tamponade",
+          0.4,
+          0
+        ],
+        [
+          "tension_pneumothorax",
+          0.2,
+          300
+        ],
+        [
+          "massive_hemothorax",
+          0.2,
+          0
+        ]
+      ],
+      "fix": [
+        "chest_seal",
+        "rapid_transport",
+        "fluid_bolus_tamponade_temporizes"
+      ],
+      "minLevel": 2
+    },
+    {
+      "id": "evisceration",
+      "name": "Abdominal evisceration",
+      "cat": "penetrating",
+      "region": "abdomen",
+      "march": "W",
+      "bleed": "venous_minor",
+      "findings": {
+        "inspect": [
+          "bowel protruding through the wound (gore setting)"
+        ]
+      },
+      "fix": [
+        "moist_sterile_dressing",
+        "occlusive_cover",
+        "knees_flexed_position",
+        "keep_warm"
+      ],
+      "traps": [
+        "pushing_bowel_back_in",
+        "dry_dressing"
+      ],
+      "infection": {
+        "source": "intra_abdominal",
+        "initialLoad": 15
+      },
+      "minLevel": 1
+    },
+    {
+      "id": "tension_pneumothorax",
+      "name": "Tension pneumothorax",
+      "cat": "chest",
+      "region": "chest_left|chest_right",
+      "march": "R",
+      "bleed": "none",
+      "findings": {
+        "auscultate": [
+          "absent breath sounds on the affected side"
+        ],
+        "inspect": [
+          "respiratory distress",
+          "JVD (may be absent if hypovolemic)",
+          "tracheal deviation (LATE)"
+        ],
+        "monitor": [
+          "falling SpO2",
+          "tachycardia → hypotension",
+          "rising airway pressures with BVM"
+        ]
+      },
+      "fix": [
+        "needle_decompression_5th_ics_aal_or_2nd_ics_mcl_10_14g_3.25in",
+        "finger_thoracostomy_cc",
+        "reassess_recurrence"
+      ],
+      "traps": [
+        "waiting_for_tracheal_deviation",
+        "needle_too_short",
+        "missing_reaccumulation"
+      ],
+      "minLevel": 2
+    },
+    {
+      "id": "open_pneumothorax",
+      "name": "Open pneumothorax (sucking chest wound)",
+      "cat": "chest",
+      "region": "chest_left|chest_right",
+      "march": "R",
+      "bleed": "venous_minor",
+      "findings": {
+        "inspect": [
+          "bubbling wound",
+          "sucking sound on inspiration"
+        ]
+      },
+      "spawns": [
+        [
+          "tension_pneumothorax",
+          0.3,
+          300,
+          "higher if non-vented seal not burped"
+        ]
+      ],
+      "fix": [
+        "vented_chest_seal",
+        "burp_or_replace_if_tension"
+      ],
+      "minLevel": 1
+    },
+    {
+      "id": "massive_hemothorax",
+      "name": "Massive hemothorax (>1500 mL)",
+      "cat": "chest",
+      "region": "chest_left|chest_right",
+      "march": "C",
+      "bleed": "internal_massive",
+      "findings": {
+        "auscultate": [
+          "decreased breath sounds"
+        ],
+        "percuss": [
+          "DULL (vs hyperresonant in pneumo)"
+        ],
+        "inspect": [
+          "flat neck veins, shock"
+        ]
+      },
+      "fix": [
+        "blood_products",
+        "permissive_hypotension",
+        "trauma_center",
+        "chest_tube_cc"
+      ],
+      "traps": [
+        "needle_decompression_does_nothing"
+      ],
+      "minLevel": 4
+    },
+    {
+      "id": "cardiac_tamponade",
+      "name": "Cardiac tamponade",
+      "cat": "chest",
+      "region": "chest_center",
+      "march": "C",
+      "bleed": "internal_slow",
+      "findings": {
+        "inspect": [
+          "JVD"
+        ],
+        "auscultate": [
+          "muffled heart sounds"
+        ],
+        "monitor": [
+          "hypotension, narrow pulse pressure, electrical alternans, PEA"
+        ],
+        "_note": "Beck's triad present in a minority of cases"
+      },
+      "fix": [
+        "fluid_bolus_temporizes",
+        "rapid_transport",
+        "pericardiocentesis_cc_or_ed_thoracotomy"
+      ],
+      "traps": [
+        "treating_pea_as_medical_arrest_ignoring_cause"
+      ],
+      "minLevel": 4
+    },
+    {
+      "id": "flail_chest",
+      "ref": "conditions.json#flail_chest",
+      "march": "R"
+    },
+    {
+      "id": "sternal_fracture",
+      "ref": "conditions.json#sternal_fracture",
+      "march": "R"
+    },
+    {
+      "id": "rib_fractures_elderly",
+      "name": "Rib fractures (elderly)",
+      "cat": "chest",
+      "region": "chest_left|chest_right",
+      "march": "P",
+      "bleed": "none",
+      "findings": {
+        "palpate": [
+          "point tenderness, crepitus"
+        ],
+        "patient": [
+          "shallow breathing due to pain"
+        ]
+      },
+      "spawns": [
+        [
+          "pneumothorax_simple",
+          0.15,
+          0
+        ],
+        [
+          "pneumonia_sepsis",
+          0.15,
+          "outcome_projection"
+        ]
+      ],
+      "fix": [
+        "pain_management",
+        "o2_titrated"
+      ],
+      "teachingPoint": "Each rib fracture raises mortality in older adults; pain control prevents pneumonia.",
+      "minLevel": 2
+    },
+    {
+      "id": "commotio_cordis",
+      "name": "Commotio cordis",
+      "cat": "chest",
+      "region": "chest_center",
+      "march": "C",
+      "bleed": "none",
+      "mechanisms": [
+        "baseball/hockey puck/lacrosse ball to the chest"
+      ],
+      "effects": {
+        "rhythm": "VF immediately"
+      },
+      "findings": {
+        "scene": [
+          "young athlete collapsed after being hit in the chest"
+        ]
+      },
+      "fix": [
+        "immediate_cpr",
+        "aed_asap"
+      ],
+      "teachingPoint": "Survival depends almost entirely on time to defibrillation.",
+      "minLevel": 1
+    },
+    {
+      "id": "traumatic_aortic_injury",
+      "name": "Blunt aortic injury",
+      "cat": "chest",
+      "region": "chest_center",
+      "march": "C",
+      "bleed": "internal_massive",
+      "mechanisms": [
+        "high_speed_deceleration",
+        "fall_from_height"
+      ],
+      "findings": {
+        "bp": [
+          "different BPs between the arms",
+          "upper extremity hypertension"
+        ],
+        "inspect": [
+          "steering wheel deformity"
+        ]
+      },
+      "fix": [
+        "avoid_hypertension_and_tachycardia",
+        "trauma_center"
+      ],
+      "outcomeRealism": "most die on scene; survivors are a 'contained' tear",
+      "minLevel": 4
+    },
+    {
+      "id": "traumatic_diaphragmatic_rupture",
+      "ref": "conditions.json#traumatic_diaphragmatic_rupture",
+      "march": "R"
+    },
+    {
+      "id": "esophageal_perforation_mediastinitis",
+      "ref": "conditions.json#esophageal_perforation_mediastinitis",
+      "march": "C"
+    },
+    {
+      "id": "solid_organ_hemorrhage",
+      "name": "Liver/spleen laceration",
+      "cat": "abdominal",
+      "region": "RUQ (liver)|LUQ (spleen)",
+      "march": "C",
+      "bleed": "internal_fast",
+      "findings": {
+        "palpate": [
+          "RUQ/LUQ tenderness",
+          "distension (late)"
+        ],
+        "patient": [
+          "left shoulder pain (Kehr's sign) in splenic injury"
+        ],
+        "inspect": [
+          "seatbelt sign, flank bruising"
+        ]
+      },
+      "fix": [
+        "permissive_hypotension",
+        "txa",
+        "blood",
+        "trauma_center_surgery"
+      ],
+      "traps": [
+        "normal_bp_reassurance_early"
+      ],
+      "minLevel": 2
+    },
+    {
+      "id": "hollow_viscus_injury",
+      "name": "Bowel/mesenteric injury",
+      "cat": "abdominal",
+      "region": "abdomen",
+      "march": "A2",
+      "bleed": "internal_slow",
+      "findings": {
+        "inspect": [
+          "seatbelt sign across the lower abdomen"
+        ],
+        "palpate": [
+          "peritonitis develops over hours"
+        ]
+      },
+      "spawns": [
+        [
+          "chance_fracture",
+          0.3,
+          0
+        ]
+      ],
+      "fix": [
+        "recognize_mechanism",
+        "npo",
+        "antibiotics_long_transport",
+        "trauma_center"
+      ],
+      "infection": {
+        "source": "intra_abdominal",
+        "initialLoad": 20,
+        "organismProfile": {
+          "gramNegative": 0.9,
+          "anaerobes": 0.9
+        }
+      },
+      "minLevel": 4
+    },
+    {
+      "id": "pelvic_fracture",
+      "name": "Pelvic fracture (open-book / lateral compression / vertical shear)",
+      "cat": "orthopedic",
+      "region": "pelvis",
+      "march": "M",
+      "bleed": "internal_massive",
+      "findings": {
+        "inspect": [
+          "leg length discrepancy",
+          "perineal/scrotal bruising",
+          "blood at the urethral meatus"
+        ],
+        "palpate": [
+          "DO NOT rock or spring the pelvis — gentle palpation once at most"
+        ]
+      },
+      "spawns": [
+        [
+          "morel_lavallee",
+          0.15,
+          0
+        ],
+        [
+          "bladder_urethral_injury",
+          0.15,
+          0
+        ]
+      ],
+      "fix": [
+        "pelvic_binder_at_greater_trochanters",
+        "legs_together_and_bound",
+        "permissive_hypotension",
+        "blood",
+        "trauma_center"
+      ],
+      "traps": [
+        "binder_over_iliac_crests",
+        "rocking_pelvis_dislodges_clot",
+        "repeated_pelvic_exam"
+      ],
+      "minLevel": 2
+    },
+    {
+      "id": "femur_fracture",
+      "name": "Femur fracture (closed)",
+      "cat": "orthopedic",
+      "region": "thigh",
+      "march": "S",
+      "bleed": "internal_fast",
+      "findings": {
+        "inspect": [
+          "thigh swelling, shortening, deformity"
+        ],
+        "palpate": [
+          "crepitus, instability"
+        ]
+      },
+      "bloodLoss_mL": "up to ~1000–1500 into the thigh (TUNE)",
+      "fix": [
+        "traction_splint_if_isolated",
+        "pain_management",
+        "check_pms_before_after"
+      ],
+      "traps": [
+        "traction_splint_with_pelvic_hip_knee_or_ankle_injury"
+      ],
+      "minLevel": 2
+    },
+    {
+      "id": "open_fracture",
+      "name": "Open fracture",
+      "cat": "orthopedic",
+      "region": "any_limb",
+      "march": "S",
+      "bleed": "venous_major",
+      "grades": "Gustilo I–III (wound size, contamination, vascular injury)",
+      "findings": {
+        "inspect": [
+          "bone through skin or wound over a fracture"
+        ]
+      },
+      "fix": [
+        "control_bleeding",
+        "irrigate_gross_debris",
+        "moist_sterile_dressing",
+        "splint_as_found_unless_pulseless",
+        "antibiotics_early_cefazolin_or_ceftriaxone"
+      ],
+      "traps": [
+        "pushing_bone_back",
+        "splinting_without_pms_check"
+      ],
+      "infection": {
+        "source": "wound",
+        "initialLoad": 15,
+        "organismProfile": {
+          "gramPositive": 0.8,
+          "gramNegative": 0.3
+        }
+      },
+      "minLevel": 2
+    },
+    {
+      "id": "hip_fracture_elderly",
+      "name": "Hip fracture (ground-level fall)",
+      "cat": "orthopedic",
+      "region": "hip",
+      "march": "S",
+      "bleed": "internal_slow",
+      "findings": {
+        "inspect": [
+          "leg SHORTENED and EXTERNALLY rotated"
+        ],
+        "patient": [
+          "can't bear weight; may have been on the floor for hours"
+        ]
+      },
+      "spawns": [
+        [
+          "tbi_subdural_delayed",
+          0.1,
+          0,
+          "if anticoagulated"
+        ],
+        [
+          "rhabdomyolysis_long_lie",
+          0.3,
+          0,
+          "if long lie"
+        ],
+        [
+          "pressure_injury_hypothermia",
+          0.3,
+          0
+        ]
+      ],
+      "fix": [
+        "pain_management_fentanyl_or_fascia_iliaca_cc",
+        "padding_splint_position_of_comfort",
+        "ask_why_they_fell_syncope_workup",
+        "glucose_12lead"
+      ],
+      "traps": [
+        "forgetting_syncope_cause",
+        "morphine_hypotension_elderly"
+      ],
+      "minLevel": 2
+    },
+    {
+      "id": "posterior_hip_dislocation",
+      "name": "Posterior hip dislocation (dashboard)",
+      "cat": "orthopedic",
+      "region": "hip",
+      "march": "S",
+      "bleed": "none",
+      "findings": {
+        "inspect": [
+          "leg SHORTENED, INTERNALLY rotated, flexed and adducted"
+        ]
+      },
+      "spawns": [
+        [
+          "sciatic_nerve_injury",
+          0.1,
+          0
+        ],
+        [
+          "patella_fracture",
+          0.3,
+          0
+        ]
+      ],
+      "fix": [
+        "splint_as_found_with_pillows",
+        "pain_management",
+        "time_critical_avascular_necrosis"
+      ],
+      "minLevel": 2
+    },
+    {
+      "id": "distal_radius_fracture",
+      "name": "Distal radius fracture (FOOSH)",
+      "cat": "orthopedic",
+      "region": "wrist",
+      "march": "S",
+      "bleed": "none",
+      "findings": {
+        "inspect": [
+          "'dinner fork' deformity"
+        ]
+      },
+      "fix": [
+        "splint",
+        "sling",
+        "ice",
+        "pain_management"
+      ],
+      "minLevel": 1
+    },
+    {
+      "id": "calcaneus_fracture",
+      "name": "Calcaneus fracture (fall landing on feet)",
+      "cat": "orthopedic",
+      "region": "heel",
+      "march": "S",
+      "bleed": "none",
+      "spawns": [
+        [
+          "lumbar_burst_fracture",
+          0.1,
+          0
+        ]
+      ],
+      "teachingPoint": "Heels broken from a fall: check the spine — axial load travels up.",
+      "fix": [
+        "splint",
+        "spinal_assessment"
+      ],
+      "minLevel": 2
+    },
+    {
+      "id": "compartment_syndrome",
+      "name": "Compartment syndrome",
+      "cat": "orthopedic",
+      "region": "lower_leg|forearm",
+      "march": "S",
+      "bleed": "none",
+      "findings": {
+        "patient": [
+          "pain out of proportion; pain on passive stretch"
+        ],
+        "palpate": [
+          "tense, wooden compartment"
+        ],
+        "late": [
+          "paresthesia, pallor, pulselessness (very late)"
+        ]
+      },
+      "fix": [
+        "remove_constrictive_splints_dressings",
+        "limb_at_heart_level_not_elevated",
+        "rapid_surgical_eval"
+      ],
+      "traps": [
+        "elevating_limb",
+        "circumferential_splint"
+      ],
+      "minLevel": 2
+    },
+    {
+      "id": "crush_syndrome",
+      "name": "Crush injury/syndrome",
+      "cat": "crush",
+      "region": "any_limb|torso",
+      "march": "C",
+      "bleed": "none",
+      "findings": {
+        "scene": [
+          "limb pinned under a heavy object > ~1 h"
+        ]
+      },
+      "effects_on_release": {
+        "potassium": "+++ (hyperkalemia: peaked T → wide QRS → VF)",
+        "sbp": "-- (third spacing)",
+        "rhabdomyolysis": true
+      },
+      "fix": [
+        "iv_before_release_2L_bolus_then_1L_per_hr",
+        "monitor_before_release",
+        "calcium_bicarb_albuterol_on_release_if_peaked_t",
+        "tourniquet_before_release_if_no_iv"
+      ],
+      "traps": [
+        "releasing_without_prep_sudden_arrest"
+      ],
+      "minLevel": 4
+    },
+    {
+      "id": "traumatic_asphyxia",
+      "name": "Traumatic asphyxia",
+      "cat": "crush",
+      "region": "chest",
+      "march": "R",
+      "bleed": "none",
+      "findings": {
+        "inspect": [
+          "purple face/neck, petechiae, subconjunctival hemorrhage above the compression line"
+        ]
+      },
+      "fix": [
+        "remove_compression",
+        "ventilate",
+        "assess_chest_injuries"
+      ],
+      "minLevel": 2
+    },
+    {
+      "id": "tbi_concussion",
+      "name": "Mild TBI / concussion",
+      "cat": "head",
+      "region": "head",
+      "march": "H",
+      "bleed": "none",
+      "findings": {
+        "patient": [
+          "repeats questions",
+          "brief LOC",
+          "headache, nausea"
+        ]
+      },
+      "fix": [
+        "serial_gcs",
+        "transport_if_anticoagulated_or_red_flags"
+      ],
+      "minLevel": 1
+    },
+    {
+      "id": "tbi_epidural",
+      "name": "Epidural hematoma",
+      "cat": "head",
+      "region": "head_temporal",
+      "march": "H",
+      "bleed": "internal_fast",
+      "findings": {
+        "patient": [
+          "LUCID INTERVAL: knocked out, wakes up and talks normally, then crashes"
+        ],
+        "neuro": [
+          "ipsilateral blown pupil, contralateral weakness"
+        ]
+      },
+      "fix": [
+        "serial_gcs",
+        "neurosurgical_trauma_center",
+        "herniation_management"
+      ],
+      "traps": [
+        "patient_refusal_during_lucid_interval_accepted"
+      ],
+      "minLevel": 2
+    },
+    {
+      "id": "tbi_subdural_delayed",
+      "name": "Subdural hematoma (elderly, anticoagulated)",
+      "cat": "head",
+      "region": "head",
+      "march": "H",
+      "bleed": "internal_slow",
+      "findings": {
+        "history_card": [
+          "on apixaban/warfarin",
+          "'I just bumped my head'"
+        ],
+        "neuro": [
+          "slow decline over hours"
+        ]
+      },
+      "fix": [
+        "transport_all_anticoagulated_head_strikes",
+        "serial_gcs"
+      ],
+      "traps": [
+        "refusal_accepted_normal_initial_exam"
+      ],
+      "minLevel": 2
+    },
+    {
+      "id": "tbi_severe",
+      "name": "Severe TBI with herniation risk",
+      "cat": "head",
+      "region": "head",
+      "march": "H",
+      "bleed": "internal",
+      "findings": {
+        "neuro": [
+          "GCS ≤8",
+          "posturing",
+          "unequal pupils"
+        ],
+        "monitor": [
+          "Cushing's triad: bradycardia, hypertension with wide pulse pressure, irregular respirations"
+        ]
+      },
+      "fix": [
+        "spo2_gt_93",
+        "sbp_gt_110",
+        "etco2_35_40",
+        "head_up_30",
+        "loosen_collar",
+        "hypertonic_saline_if_herniating",
+        "brief_hyperventilation_etco2_30_35_only_with_herniation"
+      ],
+      "traps": [
+        "routine_hyperventilation",
+        "single_hypotension_episode_doubles_mortality",
+        "single_hypoxia_episode_doubles_mortality",
+        "mannitol_in_hypotension"
+      ],
+      "minLevel": 4
+    },
+    {
+      "id": "basilar_skull_fracture",
+      "name": "Basilar skull fracture",
+      "cat": "head",
+      "region": "head",
+      "march": "A",
+      "bleed": "none",
+      "findings": {
+        "inspect": [
+          "raccoon eyes, Battle's sign (often LATE)",
+          "CSF from nose/ears (halo sign)"
+        ]
+      },
+      "fix": [
+        "avoid_npa_and_ng"
+      ],
+      "traps": [
+        "npa_intracranial_placement"
+      ],
+      "minLevel": 2
+    },
+    {
+      "id": "depressed_skull_fracture",
+      "name": "Depressed skull fracture",
+      "cat": "head",
+      "region": "head",
+      "march": "H",
+      "bleed": "venous_minor",
+      "fix": [
+        "bulky_dressing_no_direct_pressure_on_depression"
+      ],
+      "minLevel": 2
+    },
+    {
+      "id": "le_fort_mandible",
+      "name": "Facial fractures (LeFort / bilateral mandible)",
+      "cat": "face",
+      "region": "face",
+      "march": "A",
+      "bleed": "venous_major",
+      "findings": {
+        "inspect": [
+          "midface mobile",
+          "blood in the airway",
+          "malocclusion"
+        ]
+      },
+      "fix": [
+        "sit_up_lean_forward_if_conscious",
+        "suction",
+        "early_definitive_airway_or_cric"
+      ],
+      "traps": [
+        "supine_on_backboard_drowning_in_blood",
+        "npa_with_midface_fracture"
+      ],
+      "minLevel": 2
+    },
+    {
+      "id": "globe_rupture",
+      "name": "Open globe / globe rupture",
+      "cat": "eye",
+      "region": "eye",
+      "march": "W",
+      "bleed": "none",
+      "findings": {
+        "inspect": [
+          "teardrop-shaped pupil",
+          "flat anterior chamber, extruded contents"
+        ]
+      },
+      "fix": [
+        "rigid_eye_shield_no_pressure",
+        "antiemetic",
+        "ceftriaxone_or_tccc_regimen"
+      ],
+      "traps": [
+        "pressure_patch",
+        "irrigating",
+        "tetracaine_then_pressing"
+      ],
+      "minLevel": 2
+    },
+    {
+      "id": "chemical_eye",
+      "name": "Chemical eye exposure",
+      "cat": "eye",
+      "region": "eye",
+      "march": "W",
+      "bleed": "none",
+      "findings": {
+        "scene": [
+          "alkali (drain cleaner, cement) worse than acid"
+        ]
+      },
+      "fix": [
+        "immediate_copious_irrigation_morgan_lens",
+        "tetracaine_for_irrigation"
+      ],
+      "minLevel": 1
+    },
+    {
+      "id": "orbital_compartment_syndrome",
+      "name": "Orbital compartment syndrome",
+      "cat": "eye",
+      "region": "eye",
+      "march": "W",
+      "bleed": "internal_slow",
+      "findings": {
+        "inspect": [
+          "proptosis, rock-hard eyelids",
+          "vision loss, afferent pupillary defect"
+        ]
+      },
+      "fix": [
+        "lateral_canthotomy_cantholysis_cc"
+      ],
+      "minLevel": 5
+    },
+    {
+      "id": "tympanic_membrane_rupture",
+      "name": "Ruptured eardrum",
+      "cat": "blast",
+      "region": "ear",
+      "march": "W",
+      "bleed": "capillary",
+      "teachingPoint": "Marker of blast exposure — look for blast lung and bowel injury.",
+      "minLevel": 1
+    },
+    {
+      "id": "dental_avulsion",
+      "name": "Avulsed tooth",
+      "cat": "face",
+      "region": "mouth",
+      "march": "W",
+      "bleed": "capillary",
+      "fix": [
+        "handle_by_crown",
+        "store_in_milk_or_saline",
+        "aspirated_tooth_check_airway"
+      ],
+      "minLevel": 1
+    },
+    {
+      "id": "cervical_spine_injury",
+      "name": "Cervical spine injury",
+      "cat": "spine",
+      "region": "neck",
+      "march": "A",
+      "bleed": "none",
+      "findings": {
+        "palpate": [
+          "midline tenderness"
+        ],
+        "neuro": [
+          "weakness/numbness",
+          "priapism"
+        ],
+        "C3-5": [
+          "diaphragmatic breathing failure"
+        ]
+      },
+      "spawns": [
+        [
+          "neurogenic_shock",
+          0.2,
+          0,
+          "if cord injury ≥T6"
+        ]
+      ],
+      "fix": [
+        "spinal_motion_restriction_per_criteria",
+        "airway_jaw_thrust",
+        "ventilatory_support_high_cord"
+      ],
+      "traps": [
+        "c_collar_for_isolated_penetrating_neck",
+        "rigid_backboard_long_transport"
+      ],
+      "minLevel": 1
+    },
+    {
+      "id": "neurogenic_shock",
+      "name": "Neurogenic shock",
+      "cat": "spine",
+      "region": "systemic",
+      "march": "C",
+      "bleed": "none",
+      "effects": {
+        "sbp": "--",
+        "heartRate": "- (bradycardic despite hypotension)",
+        "skin": "WARM, dry, pink below the injury"
+      },
+      "fix": [
+        "rule_out_hemorrhage_first",
+        "fluids_cautious",
+        "atropine_for_brady",
+        "vasopressor_norepinephrine_cc"
+      ],
+      "traps": [
+        "assume_neurogenic_and_miss_bleeding"
+      ],
+      "minLevel": 4
+    },
+    {
+      "id": "chance_fracture",
+      "name": "Chance (flexion-distraction) fracture",
+      "cat": "spine",
+      "region": "lumbar",
+      "march": "S",
+      "spawns": [
+        [
+          "hollow_viscus_injury",
+          0.4,
+          0
+        ]
+      ],
+      "fix": [
+        "smr"
+      ],
+      "minLevel": 4
+    },
+    {
+      "id": "lumbar_burst_fracture",
+      "name": "Lumbar burst fracture (axial load)",
+      "cat": "spine",
+      "region": "lumbar",
+      "march": "S",
+      "fix": [
+        "smr",
+        "neuro_checks"
+      ],
+      "minLevel": 2
+    },
+    {
+      "id": "diving_injury",
+      "name": "Shallow-water diving injury",
+      "cat": "spine",
+      "region": "neck",
+      "march": "A",
+      "spawns": [
+        [
+          "cervical_spine_injury",
+          0.7,
+          0
+        ],
+        [
+          "drowning_hypoxia",
+          0.5,
+          0
+        ]
+      ],
+      "fix": [
+        "in_water_spinal_stabilization_backboard_extraction",
+        "ventilate"
+      ],
+      "minLevel": 2
+    },
+    {
+      "id": "burn_partial_thickness",
+      "name": "Partial-thickness burn",
+      "cat": "burn",
+      "region": "any",
+      "march": "W",
+      "bleed": "none",
+      "findings": {
+        "inspect": [
+          "blisters, moist, very painful"
+        ]
+      },
+      "tbsa": "rule of nines / patient's palm ≈1%",
+      "fix": [
+        "stop_burning",
+        "remove_jewelry_constrictive",
+        "dry_sterile_dressing",
+        "keep_warm",
+        "pain_management",
+        "fluids_if_gt_20pct_rule_of_10"
+      ],
+      "traps": [
+        "ice_on_burn",
+        "wet_dressings_large_tbsa_hypothermia",
+        "overestimating_tbsa_with_superficial"
+      ],
+      "infection": {
+        "source": "skin_soft_tissue",
+        "initialLoad": 5
+      },
+      "minLevel": 1
+    },
+    {
+      "id": "burn_full_thickness_circumferential",
+      "name": "Full-thickness circumferential burn",
+      "cat": "burn",
+      "region": "chest|limb",
+      "march": "R",
+      "bleed": "none",
+      "findings": {
+        "inspect": [
+          "leathery, white/charred, painless center"
+        ],
+        "chest": [
+          "rising ventilation pressures"
+        ],
+        "limb": [
+          "distal pulses fading"
+        ]
+      },
+      "fix": [
+        "fluids_rule_of_10",
+        "escharotomy_cc"
+      ],
+      "minLevel": 4
+    },
+    {
+      "id": "inhalation_injury",
+      "name": "Inhalation injury + CO/cyanide",
+      "cat": "burn",
+      "region": "airway",
+      "march": "A",
+      "findings": {
+        "inspect": [
+          "singed nasal hair, soot in mouth, carbonaceous sputum"
+        ],
+        "patient": [
+          "hoarse voice, stridor"
+        ],
+        "monitor": [
+          "SpO2 FALSELY NORMAL with CO"
+        ]
+      },
+      "fix": [
+        "100pct_o2_nrb",
+        "early_definitive_airway",
+        "hydroxocobalamin_if_ams_or_shock"
+      ],
+      "traps": [
+        "trusting_spo2",
+        "waiting_until_stridor_to_intubate"
+      ],
+      "minLevel": 2
+    },
+    {
+      "id": "electrical_injury",
+      "name": "High-voltage electrical injury",
+      "cat": "burn",
+      "region": "entry/exit",
+      "march": "C",
+      "findings": {
+        "inspect": [
+          "small entry/exit wounds hiding massive deep tissue damage"
+        ],
+        "monitor": [
+          "arrhythmias"
+        ]
+      },
+      "spawns": [
+        [
+          "rhabdomyolysis",
+          0.4,
+          0
+        ],
+        [
+          "compartment_syndrome",
+          0.2,
+          3600
+        ],
+        [
+          "cervical_spine_injury",
+          0.1,
+          0,
+          "thrown"
+        ]
+      ],
+      "fix": [
+        "scene_safety_power_off",
+        "cardiac_monitoring",
+        "fluids_higher_uop_target"
+      ],
+      "traps": [
+        "touching_patient_before_power_off",
+        "tbsa_underestimates_damage"
+      ],
+      "minLevel": 2
+    },
+    {
+      "id": "chemical_burn",
+      "name": "Chemical burn (skin)",
+      "cat": "burn",
+      "region": "any",
+      "march": "W",
+      "fix": [
+        "ppe",
+        "brush_off_dry_powder_first",
+        "copious_irrigation"
+      ],
+      "traps": [
+        "water_on_dry_lime_before_brushing"
+      ],
+      "minLevel": 1
+    },
+    {
+      "id": "blast_lung",
+      "name": "Primary blast lung",
+      "cat": "blast",
+      "region": "lungs",
+      "march": "R",
+      "findings": {
+        "patient": [
+          "dyspnea, hemoptysis"
+        ],
+        "monitor": [
+          "hypoxia; may present delayed"
+        ]
+      },
+      "fix": [
+        "o2",
+        "cautious_fluids",
+        "avoid_high_pressure_ventilation"
+      ],
+      "minLevel": 4
+    },
+    {
+      "id": "hypothermia_trauma",
+      "name": "Trauma-induced hypothermia",
+      "cat": "environmental",
+      "region": "systemic",
+      "march": "H",
+      "effects": {
+        "coreTemp": "falls with exposure, wet clothing, cold fluids, cold blood (TUNE)",
+        "coagulation": "- (lethal triad)"
+      },
+      "fix": [
+        "insulate_from_ground",
+        "remove_wet_clothing",
+        "hypothermia_wrap",
+        "active_warming_torso_axillae_with_barrier",
+        "warm_fluids_38c",
+        "warm_ambulance"
+      ],
+      "traps": [
+        "leaving_patient_exposed_after_exam",
+        "room_temp_fluids_large_volume"
+      ],
+      "teachingPoint": "Hypothermia happens even in Florida summer. It's part of every major trauma.",
+      "minLevel": 1
+    },
+    {
+      "id": "acetabular_fracture",
+      "name": "Acetabular fracture",
+      "cat": "orthopedic",
+      "march": "S",
+      "stub": true,
+      "findings": {
+        "summary": [
+          "Hip pain, often with pelvic fracture."
+        ]
+      },
+      "minLevel": 2
+    },
+    {
+      "id": "airway_compromise_expanding_hematoma",
+      "name": "Expanding neck hematoma airway compromise",
+      "cat": "penetrating",
+      "march": "A",
+      "stub": true,
+      "findings": {
+        "summary": [
+          "Stridor, voice change; early definitive airway/cric."
+        ]
+      },
+      "minLevel": 2
+    },
+    {
+      "id": "bladder_urethral_injury",
+      "name": "Bladder/urethral injury",
+      "cat": "abdominal",
+      "march": "C",
+      "stub": true,
+      "findings": {
+        "summary": [
+          "Blood at the meatus; no Foley (CC)."
+        ]
+      },
+      "minLevel": 2
+    },
+    {
+      "id": "drowning_hypoxia",
+      "name": "Submersion hypoxia",
+      "cat": "environmental",
+      "march": "A",
+      "stub": true,
+      "findings": {
+        "summary": [
+          "Ventilate early; O2; expect vomiting."
+        ]
+      },
+      "minLevel": 2
+    },
+    {
+      "id": "nerve_injury",
+      "name": "Peripheral nerve injury",
+      "cat": "orthopedic",
+      "march": "S",
+      "stub": true,
+      "findings": {
+        "summary": [
+          "Distal motor/sensory deficit; document PMS."
+        ]
+      },
+      "minLevel": 2
+    },
+    {
+      "id": "patella_fracture",
+      "name": "Patella fracture",
+      "cat": "orthopedic",
+      "march": "S",
+      "stub": true,
+      "findings": {
+        "summary": [
+          "Dashboard knee; check the hip."
+        ]
+      },
+      "minLevel": 2
+    },
+    {
+      "id": "pneumothorax_simple",
+      "name": "Simple pneumothorax",
+      "cat": "chest",
+      "march": "R",
+      "stub": true,
+      "findings": {
+        "summary": [
+          "Decreased breath sounds; can progress to tension under positive pressure."
+        ]
+      },
+      "minLevel": 2
+    },
+    {
+      "id": "pressure_injury_hypothermia",
+      "name": "Long-lie pressure injury + hypothermia",
+      "cat": "environmental",
+      "march": "H",
+      "stub": true,
+      "findings": {
+        "summary": [
+          "Warm, pad, check skin."
+        ]
+      },
+      "minLevel": 2
+    },
+    {
+      "id": "rhabdomyolysis",
+      "name": "Rhabdomyolysis",
+      "cat": "crush",
+      "march": "C",
+      "stub": true,
+      "findings": {
+        "summary": [
+          "Hyperkalemia, dark urine, renal failure; fluids."
+        ]
+      },
+      "minLevel": 2
+    },
+    {
+      "id": "rhabdomyolysis_long_lie",
+      "name": "Rhabdomyolysis (long lie)",
+      "cat": "crush",
+      "march": "C",
+      "stub": true,
+      "findings": {
+        "summary": [
+          "Elderly down for hours; fluids, check K+ effects on ECG."
+        ]
+      },
+      "minLevel": 2
+    },
+    {
+      "id": "sciatic_nerve_injury",
+      "name": "Sciatic nerve injury",
+      "cat": "orthopedic",
+      "march": "S",
+      "stub": true,
+      "findings": {
+        "summary": [
+          "Foot drop after posterior hip dislocation."
+        ]
+      },
+      "minLevel": 2
+    },
+    {
+      "id": "spinal_cord_injury",
+      "name": "Spinal cord injury (penetrating)",
+      "cat": "spine",
+      "march": "A",
+      "stub": true,
+      "findings": {
+        "summary": [
+          "Deficit below the level; neurogenic shock possible."
+        ]
+      },
+      "minLevel": 2
+    },
+    {
+      "id": "venous_air_embolism",
+      "name": "Venous air embolism",
+      "cat": "penetrating",
+      "march": "C",
+      "stub": true,
+      "findings": {
+        "summary": [
+          "Neck wound: occlusive dressing; left lateral/Trendelenburg; sudden collapse."
+        ]
+      },
+      "minLevel": 2
+    }
+  ]
+}

@@ -1,0 +1,5501 @@
+{
+  "_meta": {
+    "version": "0.4.0",
+    "basis": "Adult dosing. AHA 2025 Guidelines for CPR & ECC (ACLS), NASEMSO National Model EMS Clinical Guidelines, TCCC. Fictional county protocol.",
+    "status": "DRAFT — requires review by a paramedic/EMS educator before release. Effect magnitudes marked TUNE are gameplay-tuned, not clinical values.",
+    "rules": [
+      "Every drug is physically in the box at every cert level. Nothing is hidden or locked.",
+      "Vials show only what a real vial shows: name, concentration, volume. No indications in-game.",
+      "scopeLevel = the minimum cert level legally allowed to give it. Giving it below scope is ALLOWED but logged as a scope-of-practice violation in the debrief.",
+      "Dose math: player draws up mL. mL = dose_mg / concentration_mg_per_mL. Wrong concentration = wrong dose, with real consequences.",
+      "Effects apply over onset -> peak -> duration curves, never instantly (except adenosine, which is near-instant and brief).",
+      "scopeLevel key: 2=EMT, 3=AEMT, 4=Paramedic, 5=Critical Care",
+      "pk_s: route -> [onset_s, peak_s, duration_s]. Engine curve anchors (approximate adult values). 0 duration = continuous while running.",
+      "controlled: DEA schedule. Controlled drugs live in narcotics_safe: sign-out, count and waste are logged; discrepancies are flagged in the debrief.",
+      "location: which bag/box the item is physically stored in (jump_bag, airway_bag, drug_box, narcotics_safe, rsi_kit, iv_cabinet, cc_box, blood_cooler, cbrn_kit, ob_kit, onboard).",
+      "Pediatric dosing beyond the few noted entries is NOT yet included; slice patients are adults.",
+      "coverage: antibiotic activity 0-3 per organism class. Engine multiplies infection growth by (1 - coverage match vs the infection's organismProfile). Time-to-first-antibiotic is logged."
+    ],
+    "effectScale": "Effect tokens: '+', '++', '+++' / '-', '--', '---' = relative magnitude. Engine maps tokens to numbers in physiology.json (TUNE).",
+    "count": 104
+  },
+  "drugs": [
+    {
+      "id": "epinephrine",
+      "name": "Epinephrine",
+      "class": "Catecholamine / alpha + beta agonist",
+      "presentations": [
+        {
+          "label": "Epinephrine 1 mg/10 mL (0.1 mg/mL) prefilled syringe",
+          "mg_per_mL": 0.1,
+          "volume_mL": 10,
+          "form": "prefilled_syringe"
+        },
+        {
+          "label": "Epinephrine 1 mg/mL ampule",
+          "mg_per_mL": 1.0,
+          "volume_mL": 1,
+          "form": "ampule"
+        },
+        {
+          "label": "Epinephrine auto-injector 0.3 mg",
+          "mg_per_mL": null,
+          "fixedDose_mg": 0.3,
+          "form": "auto_injector"
+        },
+        {
+          "label": "Epinephrine auto-injector 0.15 mg (Jr)",
+          "fixedDose_mg": 0.15,
+          "form": "auto_injector"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "cardiac_arrest_all_rhythms",
+          "dose_mg": 1,
+          "route": [
+            "IV",
+            "IO"
+          ],
+          "repeat": "q3-5 min",
+          "max": "no ceiling in AHA (local protocols may cap)",
+          "notes": "Shockable: give after first failed defibrillation. Nonshockable: give as early as possible. IV preferred over IO. Use the 0.1 mg/mL concentration."
+        },
+        {
+          "indication": "anaphylaxis",
+          "dose_mg": 0.5,
+          "route": [
+            "IM"
+          ],
+          "repeat": "q5-15 min",
+          "notes": "1 mg/mL concentration, anterolateral thigh. 0.3 mg via auto-injector."
+        },
+        {
+          "indication": "push_dose_pressor_hypotension_or_brady",
+          "dose_mcg": "10-20",
+          "route": [
+            "IV",
+            "IO"
+          ],
+          "repeat": "q2-5 min",
+          "notes": "Requires dilution to 10 mcg/mL. Paramedic/CC skill."
+        },
+        {
+          "indication": "symptomatic_bradycardia_infusion",
+          "dose_mcg_per_min": "2-10",
+          "route": [
+            "IV infusion"
+          ],
+          "notes": "Titrate to effect when atropine fails."
+        },
+        {
+          "indication": "stridor_croup_or_upper_airway_edema",
+          "dose_mg": 5,
+          "route": [
+            "NEB"
+          ],
+          "notes": "1 mg/mL x 5 mL nebulized (alternative to racemic). Observe for rebound."
+        }
+      ],
+      "onset": {
+        "IV": "~30-60 s",
+        "IM": "~3-5 min"
+      },
+      "duration": {
+        "IV": "~5-10 min",
+        "IM": "~15-20 min"
+      },
+      "effects": {
+        "heartRate": "++",
+        "sbp": "++",
+        "bronchodilation": "++",
+        "rosc_chance": "+ (arrest only)",
+        "myocardial_O2_demand": "++"
+      },
+      "contraindications": [],
+      "dangers": [
+        "CLASSIC ERROR: pushing 1 mg/mL IV in a patient WITH a pulse = severe hypertension, VT/VF, MI, stroke. Model this.",
+        "Tachyarrhythmias, hypertension, myocardial ischemia."
+      ],
+      "scopeLevel": {
+        "auto_injector_IM": 2,
+        "IM_ampule": 3,
+        "IV_IO": 4,
+        "push_dose_or_infusion": 4
+      },
+      "brand": "Adrenalin / EpiPen",
+      "controlled": "none",
+      "location": "drug_box (auto-injector: jump_bag)",
+      "pk_s": {
+        "IV": [
+          30,
+          120,
+          600
+        ],
+        "IO": [
+          30,
+          120,
+          600
+        ],
+        "IM": [
+          180,
+          600,
+          1200
+        ],
+        "NEB": [
+          60,
+          300,
+          3600
+        ]
+      }
+    },
+    {
+      "id": "amiodarone",
+      "name": "Amiodarone",
+      "class": "Class III antiarrhythmic",
+      "presentations": [
+        {
+          "label": "Amiodarone 150 mg/3 mL (50 mg/mL) vial",
+          "mg_per_mL": 50,
+          "volume_mL": 3,
+          "form": "vial"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "refractory_vf_pvt_arrest",
+          "dose_mg": 300,
+          "route": [
+            "IV",
+            "IO"
+          ],
+          "repeat": "one second dose of 150 mg",
+          "notes": "IV push in arrest. Alternative to lidocaine (AHA 2025 treats them as reasonable alternatives)."
+        },
+        {
+          "indication": "stable_wide_complex_tachycardia",
+          "dose_mg": 150,
+          "route": [
+            "IV over 10 min"
+          ],
+          "repeat": "may repeat once",
+          "notes": "Then infusion 1 mg/min. Requires a pulse — DO NOT push rapidly in a patient with a pulse."
+        }
+      ],
+      "onset": {
+        "IV": "minutes"
+      },
+      "duration": {
+        "IV": "long (hours+)"
+      },
+      "effects": {
+        "arrhythmia_suppression": "++",
+        "sbp": "- (vasodilation, esp. rapid infusion)",
+        "heartRate": "-",
+        "qt_interval": "+"
+      },
+      "contraindications": [
+        "Cardiogenic shock",
+        "Marked sinus bradycardia or high-degree AV block without pacemaker",
+        "Known allergy"
+      ],
+      "dangers": [
+        "Hypotension with rapid infusion in a perfusing patient",
+        "Bradycardia",
+        "QT prolongation / torsades"
+      ],
+      "scopeLevel": 4,
+      "brand": "Nexterone / Cordarone",
+      "controlled": "none",
+      "location": "drug_box",
+      "pk_s": {
+        "IV": [
+          60,
+          600,
+          10800
+        ],
+        "IO": [
+          60,
+          600,
+          10800
+        ]
+      }
+    },
+    {
+      "id": "lidocaine",
+      "name": "Lidocaine",
+      "class": "Class IB antiarrhythmic",
+      "presentations": [
+        {
+          "label": "Lidocaine 100 mg/5 mL (20 mg/mL) prefilled syringe",
+          "mg_per_mL": 20,
+          "volume_mL": 5,
+          "form": "prefilled_syringe"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "refractory_vf_pvt_arrest",
+          "dose_mg_per_kg": "1-1.5",
+          "route": [
+            "IV",
+            "IO"
+          ],
+          "repeat": "0.5-0.75 mg/kg q5-10 min",
+          "max_mg_per_kg": 3,
+          "notes": "Alternative to amiodarone."
+        },
+        {
+          "indication": "post_rosc_maintenance",
+          "dose_mg_per_min": "1-4",
+          "route": [
+            "IV infusion"
+          ]
+        },
+        {
+          "indication": "io_infusion_pain_conscious_patient",
+          "dose_mg": 40,
+          "route": [
+            "IO slow over 2 min before flush"
+          ],
+          "repeat": "20 mg after flush",
+          "notes": "0.5 mg/kg max 40 mg. Conscious patients find IO infusion extremely painful — the AI patient should scream without it."
+        }
+      ],
+      "onset": {
+        "IV": "~1-2 min"
+      },
+      "duration": {
+        "IV": "~10-20 min (bolus)"
+      },
+      "effects": {
+        "ventricular_ectopy_suppression": "++"
+      },
+      "contraindications": [
+        "High-degree AV block",
+        "Known allergy to amide anesthetics"
+      ],
+      "dangers": [
+        "Toxicity >3 mg/kg: altered mental status, seizures, bradycardia, arrest",
+        "Reduce in elderly / liver failure"
+      ],
+      "scopeLevel": 4,
+      "brand": "Xylocaine",
+      "controlled": "none",
+      "location": "drug_box",
+      "pk_s": {
+        "IV": [
+          60,
+          180,
+          1200
+        ],
+        "IO": [
+          60,
+          180,
+          1200
+        ]
+      }
+    },
+    {
+      "id": "adenosine",
+      "name": "Adenosine",
+      "class": "Endogenous nucleoside / AV nodal blocker",
+      "presentations": [
+        {
+          "label": "Adenosine 6 mg/2 mL (3 mg/mL) vial",
+          "mg_per_mL": 3,
+          "volume_mL": 2,
+          "form": "vial"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "stable_narrow_regular_svt",
+          "dose_mg": 6,
+          "route": [
+            "IV rapid push + 20 mL NS flush"
+          ],
+          "repeat": "12 mg if no conversion in 1-2 min",
+          "notes": "Most proximal large-bore IV (AC). Run a rhythm strip. Patient will feel 'impending doom' — the AI patient should react."
+        },
+        {
+          "indication": "stable_regular_monomorphic_wide_complex_tachy_undifferentiated",
+          "dose_mg": 6,
+          "route": [
+            "IV rapid push"
+          ],
+          "repeat": "12 mg",
+          "notes": "Only if regular AND monomorphic."
+        }
+      ],
+      "onset": {
+        "IV": "<10 s"
+      },
+      "duration": {
+        "IV": "<10-20 s (half-life ~10 s)"
+      },
+      "effects": {
+        "av_node_block": "+++ (transient)",
+        "rhythm": "brief asystole/pause then conversion if reentrant SVT"
+      },
+      "contraindications": [
+        "Irregular wide-complex tachycardia (AFib with WPW) — can trigger VF",
+        "Polymorphic VT",
+        "2nd/3rd degree AV block or sick sinus without pacemaker",
+        "Severe reactive airway disease (relative)"
+      ],
+      "dangers": [
+        "Slow push or distal IV = drug degrades before heart, no effect",
+        "Bronchospasm in asthmatics",
+        "Reduce dose: heart transplant, dipyridamole, carbamazepine, central line",
+        "Caffeine/theophylline blunt effect"
+      ],
+      "scopeLevel": 4,
+      "brand": "Adenocard",
+      "controlled": "none",
+      "location": "drug_box",
+      "pk_s": {
+        "IV": [
+          5,
+          15,
+          20
+        ]
+      }
+    },
+    {
+      "id": "atropine",
+      "name": "Atropine",
+      "class": "Anticholinergic / parasympatholytic",
+      "presentations": [
+        {
+          "label": "Atropine 1 mg/10 mL (0.1 mg/mL) prefilled syringe",
+          "mg_per_mL": 0.1,
+          "volume_mL": 10,
+          "form": "prefilled_syringe"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "symptomatic_bradycardia",
+          "dose_mg": 1,
+          "route": [
+            "IV",
+            "IO"
+          ],
+          "repeat": "q3-5 min",
+          "max_mg": 3,
+          "notes": "If ineffective: pacing, or epinephrine/dopamine infusion. Will NOT work on denervated (transplanted) heart. Less effective in Mobitz II / 3rd-degree with wide QRS."
+        },
+        {
+          "indication": "organophosphate_nerve_agent_poisoning",
+          "dose_mg": "2-4+",
+          "route": [
+            "IV",
+            "IM"
+          ],
+          "repeat": "double q5 min until secretions dry",
+          "notes": "Large doses expected. Endpoint = drying of bronchial secretions, not HR."
+        },
+        {
+          "indication": "rsi_premedication_pediatric_brady_risk",
+          "dose_mg_per_kg": 0.02,
+          "route": [
+            "IV"
+          ],
+          "notes": "Peds only, selective use."
+        }
+      ],
+      "onset": {
+        "IV": "~1 min"
+      },
+      "duration": {
+        "IV": "~30-60 min"
+      },
+      "effects": {
+        "heartRate": "++",
+        "secretions": "--",
+        "pupils": "dilate"
+      },
+      "contraindications": [
+        "NOT for PEA/asystole (removed from arrest algorithm)"
+      ],
+      "dangers": [
+        "Doses <0.5 mg may cause paradoxical bradycardia",
+        "Tachycardia increases O2 demand in ACS"
+      ],
+      "scopeLevel": 4,
+      "brand": "AtroPen",
+      "controlled": "none",
+      "location": "drug_box",
+      "pk_s": {
+        "IV": [
+          60,
+          120,
+          3600
+        ],
+        "IO": [
+          60,
+          120,
+          3600
+        ],
+        "IM": [
+          300,
+          1800,
+          7200
+        ]
+      }
+    },
+    {
+      "id": "dopamine",
+      "name": "Dopamine",
+      "class": "Catecholamine / vasopressor-inotrope",
+      "presentations": [
+        {
+          "label": "Dopamine 400 mg/250 mL premix (1600 mcg/mL)",
+          "mg_per_mL": 1.6,
+          "volume_mL": 250,
+          "form": "premix_bag"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "symptomatic_bradycardia_after_atropine",
+          "dose_mcg_per_kg_per_min": "5-20",
+          "route": [
+            "IV infusion"
+          ]
+        },
+        {
+          "indication": "cardiogenic_shock",
+          "dose_mcg_per_kg_per_min": "5-20",
+          "route": [
+            "IV infusion"
+          ]
+        }
+      ],
+      "onset": {
+        "IV": "~5 min"
+      },
+      "duration": {
+        "IV": "<10 min after stopping"
+      },
+      "effects": {
+        "heartRate": "++",
+        "sbp": "++",
+        "arrhythmia_risk": "+"
+      },
+      "contraindications": [
+        "Uncorrected hypovolemia",
+        "Pheochromocytoma",
+        "VF/VT"
+      ],
+      "dangers": [
+        "Tachyarrhythmias",
+        "Extravasation tissue necrosis"
+      ],
+      "scopeLevel": 4,
+      "brand": "Intropin",
+      "controlled": "none",
+      "location": "drug_box (premix)",
+      "pk_s": {
+        "IV": [
+          300,
+          600,
+          600
+        ]
+      }
+    },
+    {
+      "id": "norepinephrine",
+      "name": "Norepinephrine",
+      "class": "Vasopressor (alpha >> beta1)",
+      "presentations": [
+        {
+          "label": "Norepinephrine 4 mg/250 mL premix (16 mcg/mL)",
+          "mg_per_mL": 0.016,
+          "volume_mL": 250,
+          "form": "premix_bag"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "post_rosc_hypotension_or_cardiogenic_or_septic_shock",
+          "dose_mcg_per_kg_per_min": "0.1-0.5",
+          "route": [
+            "IV infusion"
+          ],
+          "notes": "Titrate to MAP ≥65 (post-ROSC target SBP ≥90 / MAP ≥65)."
+        }
+      ],
+      "onset": {
+        "IV": "~1-2 min"
+      },
+      "duration": {
+        "IV": "1-2 min after stopping"
+      },
+      "effects": {
+        "sbp": "+++",
+        "heartRate": "+/0 (reflex brady possible)"
+      },
+      "contraindications": [
+        "Uncorrected hypovolemia (fill the tank first)"
+      ],
+      "dangers": [
+        "Extravasation necrosis",
+        "Masks hemorrhagic shock if used instead of volume/blood"
+      ],
+      "scopeLevel": 5,
+      "brand": "Levophed",
+      "controlled": "none",
+      "location": "cc_box (premix)",
+      "pk_s": {
+        "IV": [
+          60,
+          120,
+          120
+        ]
+      }
+    },
+    {
+      "id": "vasopressin",
+      "name": "Vasopressin",
+      "class": "Non-adrenergic vasopressor",
+      "presentations": [
+        {
+          "label": "Vasopressin 20 units/mL vial",
+          "units_per_mL": 20,
+          "volume_mL": 1,
+          "form": "vial"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "refractory_vasodilatory_shock",
+          "dose_units_per_min": "0.03",
+          "route": [
+            "IV infusion"
+          ],
+          "notes": "Critical care only."
+        }
+      ],
+      "effects": {
+        "sbp": "++"
+      },
+      "contraindications": [],
+      "dangers": [
+        "NOT part of the 2025 AHA cardiac arrest algorithm — epinephrine is the only vasopressor. Giving it in arrest is logged as non-guideline."
+      ],
+      "scopeLevel": 5,
+      "gameRole": "Realistic distractor for the arrest scenario.",
+      "brand": "Vasostrict",
+      "controlled": "none",
+      "location": "cc_box",
+      "pk_s": {
+        "IV": [
+          60,
+          300,
+          1200
+        ]
+      }
+    },
+    {
+      "id": "diltiazem",
+      "name": "Diltiazem",
+      "class": "Non-dihydropyridine calcium channel blocker",
+      "presentations": [
+        {
+          "label": "Diltiazem 25 mg/5 mL (5 mg/mL) vial",
+          "mg_per_mL": 5,
+          "volume_mL": 5,
+          "form": "vial"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "afib_aflutter_rvr_stable_or_narrow_svt_after_adenosine",
+          "dose_mg_per_kg": 0.25,
+          "route": [
+            "IV over 2 min"
+          ],
+          "repeat": "0.35 mg/kg after 15 min if needed",
+          "notes": "Typical adult ~15-20 mg, then ~20-25 mg."
+        }
+      ],
+      "onset": {
+        "IV": "~3 min"
+      },
+      "duration": {
+        "IV": "~1-3 h"
+      },
+      "effects": {
+        "heartRate": "--",
+        "sbp": "-",
+        "av_conduction": "--"
+      },
+      "contraindications": [
+        "Hypotension (SBP <90)",
+        "Decompensated heart failure / cardiogenic shock",
+        "AFib with WPW (pre-excitation)",
+        "Wide-complex tachycardia of unknown origin",
+        "Sick sinus / 2nd-3rd degree block"
+      ],
+      "dangers": [
+        "Profound hypotension",
+        "Bradycardia; reversal: calcium"
+      ],
+      "scopeLevel": 4,
+      "brand": "Cardizem",
+      "controlled": "none",
+      "location": "drug_box (refrigerate or 1 month room temp)",
+      "pk_s": {
+        "IV": [
+          180,
+          600,
+          7200
+        ]
+      }
+    },
+    {
+      "id": "metoprolol",
+      "name": "Metoprolol",
+      "class": "Beta-1 selective blocker",
+      "presentations": [
+        {
+          "label": "Metoprolol 5 mg/5 mL (1 mg/mL) vial",
+          "mg_per_mL": 1,
+          "volume_mL": 5,
+          "form": "vial"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "rate_control_afib_rvr_or_svt",
+          "dose_mg": 5,
+          "route": [
+            "IV over 1-2 min"
+          ],
+          "repeat": "q5 min",
+          "max_mg": 15
+        }
+      ],
+      "onset": {
+        "IV": "~5 min"
+      },
+      "duration": {
+        "IV": "~3-6 h"
+      },
+      "effects": {
+        "heartRate": "--",
+        "sbp": "-",
+        "bronchospasm_risk": "+"
+      },
+      "contraindications": [
+        "Hypotension",
+        "Bradycardia / heart block",
+        "Decompensated heart failure",
+        "Cocaine/meth-associated chest pain (relative)",
+        "Severe asthma/COPD (relative)"
+      ],
+      "dangers": [
+        "Hypotension, bradycardia, bronchospasm; reversal: glucagon"
+      ],
+      "scopeLevel": 4,
+      "brand": "Lopressor",
+      "controlled": "none",
+      "location": "drug_box",
+      "pk_s": {
+        "IV": [
+          300,
+          1200,
+          14400
+        ]
+      }
+    },
+    {
+      "id": "verapamil",
+      "name": "Verapamil",
+      "class": "Non-dihydropyridine calcium channel blocker",
+      "presentations": [
+        {
+          "label": "Verapamil 5 mg/2 mL (2.5 mg/mL) vial",
+          "mg_per_mL": 2.5,
+          "volume_mL": 2,
+          "form": "vial"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "narrow_regular_svt_after_adenosine",
+          "dose_mg": "2.5-5",
+          "route": [
+            "IV over 2 min"
+          ],
+          "repeat": "5-10 mg after 15-30 min",
+          "max_mg": 20
+        }
+      ],
+      "effects": {
+        "heartRate": "--",
+        "sbp": "--"
+      },
+      "contraindications": [
+        "Same as diltiazem; never in wide-complex tachycardia or WPW",
+        "Heart failure"
+      ],
+      "dangers": [
+        "More negative inotropy than diltiazem; reversal: calcium"
+      ],
+      "scopeLevel": 4,
+      "gameRole": "Present as an alternative; most EMS boxes carry diltiazem instead.",
+      "brand": "Calan / Isoptin",
+      "controlled": "none",
+      "location": "drug_box",
+      "pk_s": {
+        "IV": [
+          120,
+          300,
+          7200
+        ]
+      }
+    },
+    {
+      "id": "procainamide",
+      "name": "Procainamide",
+      "class": "Class IA antiarrhythmic",
+      "presentations": [
+        {
+          "label": "Procainamide 1 g/10 mL (100 mg/mL) vial",
+          "mg_per_mL": 100,
+          "volume_mL": 10,
+          "form": "vial"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "stable_wide_complex_tachy_or_wpw_afib",
+          "dose_mg_per_min": "20-50",
+          "route": [
+            "IV infusion"
+          ],
+          "max_mg_per_kg": 17,
+          "notes": "Stop when: arrhythmia suppressed, hypotension, QRS widens >50%, or max dose reached. Maintenance 1-4 mg/min."
+        }
+      ],
+      "effects": {
+        "arrhythmia_suppression": "++",
+        "sbp": "-",
+        "qrs_width": "+",
+        "qt_interval": "+"
+      },
+      "contraindications": [
+        "Prolonged QT",
+        "Torsades",
+        "Heart failure (relative)",
+        "Do not combine with amiodarone"
+      ],
+      "dangers": [
+        "Hypotension",
+        "QRS/QT widening → torsades"
+      ],
+      "scopeLevel": 4,
+      "brand": "Pronestyl",
+      "controlled": "none",
+      "location": "drug_box",
+      "pk_s": {
+        "IV": [
+          600,
+          1800,
+          10800
+        ]
+      }
+    },
+    {
+      "id": "magnesium_sulfate",
+      "name": "Magnesium Sulfate",
+      "class": "Electrolyte",
+      "presentations": [
+        {
+          "label": "Magnesium sulfate 50% 1 g/2 mL (500 mg/mL) vial",
+          "mg_per_mL": 500,
+          "volume_mL": 2,
+          "form": "vial"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "torsades_de_pointes_arrest",
+          "dose_g": "1-2",
+          "route": [
+            "IV/IO push, diluted in 10 mL"
+          ]
+        },
+        {
+          "indication": "torsades_with_pulse",
+          "dose_g": "1-2",
+          "route": [
+            "IV over 5-60 min"
+          ]
+        },
+        {
+          "indication": "severe_asthma",
+          "dose_g": 2,
+          "route": [
+            "IV over 10-20 min"
+          ]
+        },
+        {
+          "indication": "eclampsia_seizure",
+          "dose_g": 4,
+          "route": [
+            "IV over 10-20 min"
+          ],
+          "notes": "Some protocols 4-6 g load."
+        }
+      ],
+      "effects": {
+        "torsades_suppression": "++",
+        "sbp": "-",
+        "respiratory_depression": "+ (overdose)",
+        "deep_tendon_reflexes": "-"
+      },
+      "contraindications": [
+        "Heart block",
+        "Renal failure (relative)"
+      ],
+      "dangers": [
+        "Rapid push in perfusing patient = hypotension, flushing",
+        "Toxicity: loss of reflexes → respiratory depression; reversal: calcium"
+      ],
+      "scopeLevel": 4,
+      "controlled": "none",
+      "location": "drug_box",
+      "pk_s": {
+        "IV": [
+          60,
+          300,
+          1800
+        ],
+        "IO": [
+          60,
+          300,
+          1800
+        ]
+      }
+    },
+    {
+      "id": "sodium_bicarbonate",
+      "name": "Sodium Bicarbonate",
+      "class": "Alkalinizing agent",
+      "presentations": [
+        {
+          "label": "Sodium bicarbonate 8.4% 50 mEq/50 mL prefilled syringe",
+          "mEq_per_mL": 1,
+          "volume_mL": 50,
+          "form": "prefilled_syringe"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "hyperkalemia_arrest_or_tca_overdose_wide_qrs",
+          "dose_mEq_per_kg": 1,
+          "route": [
+            "IV",
+            "IO"
+          ],
+          "repeat": "per QRS response (TCA)"
+        },
+        {
+          "indication": "salicylate_overdose",
+          "dose_mEq_per_kg": "1-2",
+          "route": [
+            "IV"
+          ],
+          "notes": "Then infusion; target urine alkalinization. CC."
+        }
+      ],
+      "effects": {
+        "serum_pH": "+",
+        "potassium": "- (shifts intracellular)",
+        "qrs_width": "- (TCA)"
+      },
+      "contraindications": [
+        "Routine use in cardiac arrest — NOT recommended"
+      ],
+      "dangers": [
+        "Precipitates with calcium in same line (flush between)",
+        "Inactivates catecholamines in same line",
+        "Hypernatremia, alkalosis"
+      ],
+      "scopeLevel": 4,
+      "gameRole": "Routine use in arrest without hyperkalemia/TCA cause is logged as non-guideline.",
+      "controlled": "none",
+      "location": "drug_box",
+      "pk_s": {
+        "IV": [
+          60,
+          300,
+          3600
+        ],
+        "IO": [
+          60,
+          300,
+          3600
+        ]
+      }
+    },
+    {
+      "id": "calcium_chloride",
+      "name": "Calcium Chloride 10%",
+      "class": "Electrolyte",
+      "presentations": [
+        {
+          "label": "Calcium chloride 10% 1 g/10 mL (100 mg/mL) prefilled syringe",
+          "mg_per_mL": 100,
+          "volume_mL": 10,
+          "form": "prefilled_syringe"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "hyperkalemia_or_ccb_overdose_or_hypermagnesemia",
+          "dose_g": 1,
+          "route": [
+            "IV/IO slow push (fast in arrest)"
+          ],
+          "repeat": "per protocol"
+        },
+        {
+          "indication": "blood_product_transfusion_citrate",
+          "dose_g": 1,
+          "route": [
+            "IV/IO slow"
+          ],
+          "notes": "FY26 JTS: after the first unit of blood, then every 4 units. Or calcium gluconate 3 g."
+        }
+      ],
+      "effects": {
+        "myocardial_membrane_stabilization": "++",
+        "sbp": "+"
+      },
+      "contraindications": [
+        "Digoxin toxicity (relative)",
+        "Hypercalcemia"
+      ],
+      "dangers": [
+        "Severe tissue necrosis if extravasated — large proximal vein",
+        "Precipitates with bicarbonate"
+      ],
+      "scopeLevel": 4,
+      "controlled": "none",
+      "location": "drug_box",
+      "pk_s": {
+        "IV": [
+          30,
+          120,
+          1800
+        ],
+        "IO": [
+          30,
+          120,
+          1800
+        ]
+      }
+    },
+    {
+      "id": "calcium_gluconate",
+      "name": "Calcium Gluconate 10%",
+      "class": "Electrolyte",
+      "presentations": [
+        {
+          "label": "Calcium gluconate 10% 1 g/10 mL (100 mg/mL) vial",
+          "mg_per_mL": 100,
+          "volume_mL": 10,
+          "form": "vial"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "hyperkalemia_or_ccb_overdose",
+          "dose_g": 3,
+          "route": [
+            "IV/IO"
+          ],
+          "notes": "~1/3 the elemental calcium of chloride; safer peripherally."
+        }
+      ],
+      "effects": {
+        "myocardial_membrane_stabilization": "++"
+      },
+      "contraindications": [
+        "Same as calcium chloride"
+      ],
+      "dangers": [
+        "Under-dosing if treated as equivalent to chloride"
+      ],
+      "scopeLevel": 4,
+      "controlled": "none",
+      "location": "drug_box",
+      "pk_s": {
+        "IV": [
+          30,
+          120,
+          1800
+        ],
+        "IO": [
+          30,
+          120,
+          1800
+        ]
+      }
+    },
+    {
+      "id": "aspirin",
+      "name": "Aspirin (chewable)",
+      "class": "Antiplatelet",
+      "presentations": [
+        {
+          "label": "Aspirin 81 mg chewable tablet",
+          "mg_per_tab": 81,
+          "form": "tablet"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "suspected_acs",
+          "dose_mg": 324,
+          "route": [
+            "PO chewed"
+          ],
+          "notes": "4 x 81 mg. Range 162-325 mg."
+        }
+      ],
+      "effects": {
+        "acs_outcome": "+ (mortality benefit)",
+        "bleeding_risk": "+"
+      },
+      "contraindications": [
+        "Aspirin/NSAID allergy",
+        "Active GI bleed",
+        "Suspected aortic dissection",
+        "Can't swallow/protect airway"
+      ],
+      "dangers": [
+        "Bleeding"
+      ],
+      "scopeLevel": 2,
+      "brand": "Bayer (chewable 81 mg)",
+      "controlled": "none",
+      "location": "jump_bag",
+      "pk_s": {
+        "PO": [
+          900,
+          3600,
+          604800
+        ]
+      }
+    },
+    {
+      "id": "nitroglycerin",
+      "name": "Nitroglycerin",
+      "class": "Vasodilator (venous >> arterial)",
+      "presentations": [
+        {
+          "label": "Nitroglycerin 0.4 mg SL tablet",
+          "mg_per_tab": 0.4,
+          "form": "tablet"
+        },
+        {
+          "label": "Nitroglycerin 0.4 mg/spray",
+          "mg_per_dose": 0.4,
+          "form": "spray"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "ischemic_chest_pain",
+          "dose_mg": 0.4,
+          "route": [
+            "SL"
+          ],
+          "repeat": "q5 min",
+          "max": "3 doses",
+          "notes": "Get IV access first if possible (Paramedic). 12-lead before first dose (check right-sided V4R in inferior STEMI)."
+        },
+        {
+          "indication": "acute_pulmonary_edema_hypertensive",
+          "dose_mg": "0.4-0.8",
+          "route": [
+            "SL"
+          ],
+          "repeat": "q3-5 min"
+        }
+      ],
+      "onset": {
+        "SL": "~1-3 min"
+      },
+      "duration": {
+        "SL": "~20-30 min"
+      },
+      "effects": {
+        "sbp": "--",
+        "preload": "--",
+        "chest_pain": "-",
+        "heartRate": "+ (reflex)"
+      },
+      "contraindications": [
+        "SBP <90 or >30 below baseline",
+        "HR <50 or >100 without cause",
+        "PDE5 inhibitor: sildenafil/vardenafil within 24 h, tadalafil within 48 h",
+        "RIGHT VENTRICULAR INFARCT (inferior STEMI with ST elevation V4R)"
+      ],
+      "dangers": [
+        "RV infarct + nitro = preload-dependent heart loses preload → profound hypotension/crash. Model this — it's the signature trap.",
+        "Headache"
+      ],
+      "scopeLevel": {
+        "assist_patient_own": 2,
+        "from_ambulance_stock": 3
+      },
+      "brand": "Nitrostat / Nitrolingual",
+      "controlled": "none",
+      "location": "jump_bag",
+      "pk_s": {
+        "SL": [
+          60,
+          300,
+          1800
+        ]
+      }
+    },
+    {
+      "id": "morphine",
+      "name": "Morphine",
+      "class": "Opioid analgesic",
+      "presentations": [
+        {
+          "label": "Morphine 10 mg/1 mL vial",
+          "mg_per_mL": 10,
+          "volume_mL": 1,
+          "form": "vial"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "severe_pain_or_refractory_acs_pain",
+          "dose_mg": "2-4",
+          "route": [
+            "IV",
+            "IO"
+          ],
+          "repeat": "q5-10 min",
+          "notes": "Weight/protocol max ~0.1 mg/kg."
+        }
+      ],
+      "onset": {
+        "IV": "~5 min"
+      },
+      "duration": {
+        "IV": "~2-4 h"
+      },
+      "effects": {
+        "painScore": "--",
+        "respRate": "-",
+        "sbp": "- (histamine release)",
+        "gcs": "- (high dose)"
+      },
+      "contraindications": [
+        "Hypotension",
+        "Respiratory depression",
+        "Head injury with AMS (relative)",
+        "Allergy"
+      ],
+      "dangers": [
+        "Respiratory depression; reversal: naloxone",
+        "Hypotension worse than fentanyl"
+      ],
+      "scopeLevel": 4,
+      "brand": "Duramorph",
+      "controlled": "CII",
+      "location": "narcotics_safe",
+      "pk_s": {
+        "IV": [
+          300,
+          1200,
+          10800
+        ],
+        "IO": [
+          300,
+          1200,
+          10800
+        ],
+        "IM": [
+          900,
+          2700,
+          14400
+        ]
+      }
+    },
+    {
+      "id": "fentanyl",
+      "name": "Fentanyl",
+      "class": "Synthetic opioid analgesic",
+      "presentations": [
+        {
+          "label": "Fentanyl 100 mcg/2 mL (50 mcg/mL) vial",
+          "mcg_per_mL": 50,
+          "volume_mL": 2,
+          "form": "vial"
+        },
+        {
+          "label": "Fentanyl OTFC lozenge 800 mcg (TCCC)",
+          "fixedDose_mcg": 800,
+          "form": "lozenge",
+          "notes": "OTFC was removed from TCCC guidelines; some kits still carry it. Do not re-dose without direction."
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "severe_pain_trauma_or_acs",
+          "dose_mcg_per_kg": 1,
+          "route": [
+            "IV",
+            "IO",
+            "IM",
+            "IN"
+          ],
+          "repeat": "0.5 mcg/kg q5-10 min",
+          "notes": "Typical adult 25-100 mcg. IN via atomizer. Preferred over morphine in hypotension-risk patients."
+        }
+      ],
+      "onset": {
+        "IV": "~1-2 min",
+        "IN": "~5-10 min"
+      },
+      "duration": {
+        "IV": "~30-60 min"
+      },
+      "effects": {
+        "painScore": "---",
+        "respRate": "-",
+        "sbp": "-/0"
+      },
+      "contraindications": [
+        "Respiratory depression",
+        "Hypotension (relative)",
+        "Allergy"
+      ],
+      "dangers": [
+        "Rapid high-dose IV: chest wall rigidity",
+        "Respiratory depression; reversal: naloxone"
+      ],
+      "scopeLevel": 4,
+      "brand": "Sublimaze / Actiq (OTFC)",
+      "controlled": "CII",
+      "location": "narcotics_safe",
+      "pk_s": {
+        "IV": [
+          60,
+          300,
+          2400
+        ],
+        "IO": [
+          60,
+          300,
+          2400
+        ],
+        "IN": [
+          300,
+          900,
+          3600
+        ],
+        "IM": [
+          420,
+          1200,
+          3600
+        ],
+        "OTFC": [
+          900,
+          1800,
+          3600
+        ]
+      }
+    },
+    {
+      "id": "ketamine",
+      "name": "Ketamine",
+      "class": "Dissociative anesthetic / NMDA antagonist",
+      "presentations": [
+        {
+          "label": "Ketamine 500 mg/10 mL (50 mg/mL) vial",
+          "mg_per_mL": 50,
+          "volume_mL": 10,
+          "form": "vial"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "analgesia",
+          "dose_mg_per_kg": "0.1-0.3",
+          "route": [
+            "IV over 1 min (slow)",
+            "IN"
+          ],
+          "notes": "TCCC favors for casualties in shock — no BP drop."
+        },
+        {
+          "indication": "rsi_induction",
+          "dose_mg_per_kg": "1-2",
+          "route": [
+            "IV"
+          ]
+        },
+        {
+          "indication": "severe_agitation_excited_delirium",
+          "dose_mg_per_kg": "4",
+          "route": [
+            "IM"
+          ],
+          "notes": "Some protocols 2-4 mg/kg IM. Requires monitoring and airway readiness."
+        }
+      ],
+      "onset": {
+        "IV": "~30-60 s",
+        "IM": "~3-5 min"
+      },
+      "duration": {
+        "IV": "~10-20 min"
+      },
+      "effects": {
+        "painScore": "---",
+        "sbp": "+/0",
+        "heartRate": "+",
+        "airway_reflexes": "preserved (mostly)",
+        "gcs": "dissociated at dissociative dose"
+      },
+      "contraindications": [
+        "Allergy"
+      ],
+      "dangers": [
+        "Emergence reactions (AI patient dialogue goes weird — good feature)",
+        "Laryngospasm (rare)",
+        "Hypersalivation"
+      ],
+      "scopeLevel": 4,
+      "brand": "Ketalar",
+      "controlled": "CIII",
+      "location": "narcotics_safe",
+      "pk_s": {
+        "IV": [
+          30,
+          60,
+          900
+        ],
+        "IO": [
+          30,
+          60,
+          900
+        ],
+        "IM": [
+          180,
+          600,
+          1800
+        ],
+        "IN": [
+          300,
+          900,
+          2400
+        ]
+      }
+    },
+    {
+      "id": "midazolam",
+      "name": "Midazolam",
+      "class": "Benzodiazepine",
+      "presentations": [
+        {
+          "label": "Midazolam 10 mg/2 mL (5 mg/mL) vial",
+          "mg_per_mL": 5,
+          "volume_mL": 2,
+          "form": "vial"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "status_seizure",
+          "dose_mg": 10,
+          "route": [
+            "IM"
+          ],
+          "notes": "Adults >40 kg. 5 mg if 13-40 kg. IV 0.1 mg/kg alt. Repeat once if still seizing after 5-10 min."
+        },
+        {
+          "indication": "sedation_post_intubation_or_cardioversion",
+          "dose_mg": "2-5",
+          "route": [
+            "IV"
+          ],
+          "repeat": "titrate"
+        }
+      ],
+      "onset": {
+        "IV": "~2-3 min",
+        "IM": "~5-15 min"
+      },
+      "duration": {
+        "IV": "~30-60 min"
+      },
+      "effects": {
+        "seizure_stop": "++",
+        "gcs": "--",
+        "respRate": "--",
+        "sbp": "-"
+      },
+      "contraindications": [
+        "Hypotension (relative)",
+        "Respiratory depression without airway control"
+      ],
+      "dangers": [
+        "Respiratory depression, especially combined with opioids/alcohol"
+      ],
+      "scopeLevel": 4,
+      "brand": "Versed",
+      "controlled": "CIV",
+      "location": "narcotics_safe",
+      "pk_s": {
+        "IV": [
+          120,
+          300,
+          2700
+        ],
+        "IM": [
+          300,
+          900,
+          3600
+        ],
+        "IN": [
+          180,
+          600,
+          2700
+        ]
+      }
+    },
+    {
+      "id": "etomidate",
+      "name": "Etomidate",
+      "class": "Sedative-hypnotic (induction agent)",
+      "presentations": [
+        {
+          "label": "Etomidate 40 mg/20 mL (2 mg/mL) vial",
+          "mg_per_mL": 2,
+          "volume_mL": 20,
+          "form": "vial"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "rsi_induction",
+          "dose_mg_per_kg": 0.3,
+          "route": [
+            "IV"
+          ]
+        }
+      ],
+      "onset": {
+        "IV": "~30-60 s"
+      },
+      "duration": {
+        "IV": "~3-5 min"
+      },
+      "effects": {
+        "gcs": "--- (to 3)",
+        "sbp": "0 (hemodynamically neutral)"
+      },
+      "contraindications": [],
+      "dangers": [
+        "Myoclonus",
+        "No analgesia — need post-intubation analgesia/sedation"
+      ],
+      "scopeLevel": 4,
+      "brand": "Amidate",
+      "controlled": "none",
+      "location": "rsi_kit",
+      "pk_s": {
+        "IV": [
+          30,
+          60,
+          300
+        ]
+      }
+    },
+    {
+      "id": "rocuronium",
+      "name": "Rocuronium",
+      "class": "Non-depolarizing neuromuscular blocker",
+      "presentations": [
+        {
+          "label": "Rocuronium 50 mg/5 mL (10 mg/mL) vial",
+          "mg_per_mL": 10,
+          "volume_mL": 5,
+          "form": "vial"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "rsi_paralysis",
+          "dose_mg_per_kg": "1-1.2",
+          "route": [
+            "IV"
+          ]
+        }
+      ],
+      "onset": {
+        "IV": "~45-60 s"
+      },
+      "duration": {
+        "IV": "~45-60 min"
+      },
+      "effects": {
+        "respRate": "→ 0 (apnea)",
+        "muscle_tone": "→ 0"
+      },
+      "contraindications": [
+        "No airway plan / cannot intubate-cannot oxygenate risk"
+      ],
+      "dangers": [
+        "PARALYTIC WITHOUT SEDATION = awake paralysis (major error)",
+        "Paralyzing without being able to ventilate = death. Model this.",
+        "Long duration — no spontaneous recovery in a failed airway"
+      ],
+      "scopeLevel": 4,
+      "brand": "Zemuron",
+      "controlled": "none",
+      "location": "rsi_kit (refrigerate; 60 days room temp)",
+      "pk_s": {
+        "IV": [
+          60,
+          90,
+          2700
+        ]
+      }
+    },
+    {
+      "id": "succinylcholine",
+      "name": "Succinylcholine",
+      "class": "Depolarizing neuromuscular blocker",
+      "presentations": [
+        {
+          "label": "Succinylcholine 200 mg/10 mL (20 mg/mL) vial",
+          "mg_per_mL": 20,
+          "volume_mL": 10,
+          "form": "vial",
+          "storage": "refrigerated"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "rsi_paralysis",
+          "dose_mg_per_kg": 1.5,
+          "route": [
+            "IV"
+          ]
+        }
+      ],
+      "onset": {
+        "IV": "~30-60 s"
+      },
+      "duration": {
+        "IV": "~5-10 min"
+      },
+      "effects": {
+        "respRate": "→ 0 (apnea)",
+        "potassium": "+"
+      },
+      "contraindications": [
+        "Hyperkalemia or suspected (renal failure, crush injury)",
+        "Burns or crush >24-72 h old",
+        "Neuromuscular disease",
+        "Malignant hyperthermia history"
+      ],
+      "dangers": [
+        "Hyperkalemic arrest in contraindicated patients",
+        "Bradycardia (repeat dosing)"
+      ],
+      "scopeLevel": 4,
+      "brand": "Anectine / Quelicin",
+      "controlled": "none",
+      "location": "rsi_kit (refrigerated)",
+      "pk_s": {
+        "IV": [
+          45,
+          60,
+          480
+        ],
+        "IM": [
+          180,
+          240,
+          1200
+        ]
+      }
+    },
+    {
+      "id": "naloxone",
+      "name": "Naloxone",
+      "class": "Opioid antagonist",
+      "presentations": [
+        {
+          "label": "Naloxone 4 mg nasal spray",
+          "fixedDose_mg": 4,
+          "form": "nasal_spray"
+        },
+        {
+          "label": "Naloxone 2 mg/2 mL (1 mg/mL) prefilled syringe",
+          "mg_per_mL": 1,
+          "volume_mL": 2,
+          "form": "prefilled_syringe"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "opioid_overdose_respiratory_depression",
+          "dose_mg": "0.4-2",
+          "route": [
+            "IV",
+            "IO",
+            "IM"
+          ],
+          "repeat": "q2-3 min",
+          "notes": "TITRATE TO RESPIRATORY DRIVE (RR ≥10, adequate ventilation), NOT full wake-up. Ventilate with BVM first."
+        },
+        {
+          "indication": "opioid_overdose_nasal",
+          "dose_mg": 4,
+          "route": [
+            "IN"
+          ],
+          "repeat": "q2-3 min alternating nostrils"
+        }
+      ],
+      "onset": {
+        "IV": "~1-2 min",
+        "IN": "~2-5 min"
+      },
+      "duration": {
+        "all": "~30-90 min — SHORTER than many opioids. Re-sedation is real."
+      },
+      "effects": {
+        "respRate": "+++ (if opioid)",
+        "gcs": "++ (if opioid)",
+        "withdrawal": "+ (dose-dependent)"
+      },
+      "contraindications": [
+        "Allergy"
+      ],
+      "dangers": [
+        "Over-dosing → acute withdrawal: vomiting, agitation, combativeness, refusal of transport (AI patient should do this)",
+        "Re-sedation after it wears off",
+        "No effect on non-opioid causes"
+      ],
+      "scopeLevel": {
+        "IN_IM": 2,
+        "IV": 3
+      },
+      "brand": "Narcan",
+      "controlled": "none",
+      "location": "jump_bag + drug_box",
+      "pk_s": {
+        "IV": [
+          60,
+          120,
+          2700
+        ],
+        "IO": [
+          60,
+          120,
+          2700
+        ],
+        "IM": [
+          180,
+          600,
+          3600
+        ],
+        "IN": [
+          180,
+          600,
+          3600
+        ]
+      }
+    },
+    {
+      "id": "dextrose_10",
+      "name": "Dextrose 10% (D10)",
+      "class": "Carbohydrate",
+      "presentations": [
+        {
+          "label": "D10W 25 g/250 mL (0.1 g/mL) bag",
+          "g_per_mL": 0.1,
+          "volume_mL": 250,
+          "form": "bag"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "hypoglycemia_glucose_lt_60_with_ams",
+          "dose_g": "10-25",
+          "route": [
+            "IV",
+            "IO"
+          ],
+          "repeat": "recheck glucose in 5-10 min; repeat 10 g aliquots"
+        }
+      ],
+      "onset": {
+        "IV": "~1-3 min"
+      },
+      "effects": {
+        "glucose": "+++",
+        "gcs": "++ (if hypoglycemic)"
+      },
+      "contraindications": [],
+      "dangers": [
+        "Extravasation (less than D50)"
+      ],
+      "scopeLevel": 3,
+      "brand": "D10W",
+      "controlled": "none",
+      "location": "iv_cabinet",
+      "pk_s": {
+        "IV": [
+          60,
+          300,
+          1800
+        ],
+        "IO": [
+          60,
+          300,
+          1800
+        ]
+      }
+    },
+    {
+      "id": "dextrose_50",
+      "name": "Dextrose 50% (D50)",
+      "class": "Carbohydrate",
+      "presentations": [
+        {
+          "label": "D50W 25 g/50 mL (0.5 g/mL) prefilled syringe",
+          "g_per_mL": 0.5,
+          "volume_mL": 50,
+          "form": "prefilled_syringe"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "hypoglycemia",
+          "dose_g": 25,
+          "route": [
+            "IV large-bore"
+          ]
+        }
+      ],
+      "effects": {
+        "glucose": "+++"
+      },
+      "contraindications": [],
+      "dangers": [
+        "Severe tissue necrosis on extravasation — why many systems switched to D10"
+      ],
+      "scopeLevel": 3,
+      "brand": "D50W",
+      "controlled": "none",
+      "location": "drug_box",
+      "pk_s": {
+        "IV": [
+          60,
+          300,
+          1800
+        ]
+      }
+    },
+    {
+      "id": "oral_glucose",
+      "name": "Oral Glucose Gel",
+      "class": "Carbohydrate",
+      "presentations": [
+        {
+          "label": "Oral glucose gel 15 g tube",
+          "fixedDose_g": 15,
+          "form": "tube"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "hypoglycemia_awake_can_swallow",
+          "dose_g": 15,
+          "route": [
+            "PO/buccal"
+          ]
+        }
+      ],
+      "onset": {
+        "PO": "~10-15 min"
+      },
+      "effects": {
+        "glucose": "+"
+      },
+      "contraindications": [
+        "Cannot protect airway / cannot swallow / unresponsive"
+      ],
+      "dangers": [
+        "Aspiration if given to a patient who can't protect airway"
+      ],
+      "scopeLevel": 2,
+      "brand": "Insta-Glucose",
+      "controlled": "none",
+      "location": "jump_bag",
+      "pk_s": {
+        "PO": [
+          600,
+          1200,
+          3600
+        ]
+      }
+    },
+    {
+      "id": "glucagon",
+      "name": "Glucagon",
+      "class": "Hormone",
+      "presentations": [
+        {
+          "label": "Glucagon 1 mg kit (powder + diluent)",
+          "fixedDose_mg": 1,
+          "form": "reconstitution_kit"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "hypoglycemia_no_iv_access",
+          "dose_mg": 1,
+          "route": [
+            "IM"
+          ]
+        },
+        {
+          "indication": "beta_blocker_overdose",
+          "dose_mg": "3-5",
+          "route": [
+            "IV"
+          ],
+          "notes": "Paramedic/CC. Often causes vomiting."
+        }
+      ],
+      "onset": {
+        "IM": "~10-15 min"
+      },
+      "effects": {
+        "glucose": "++ (needs liver glycogen — weak in alcoholics/malnourished)",
+        "heartRate": "+ (BB OD)"
+      },
+      "contraindications": [
+        "Pheochromocytoma"
+      ],
+      "dangers": [
+        "Nausea/vomiting",
+        "Ineffective if glycogen depleted"
+      ],
+      "scopeLevel": 3,
+      "brand": "GlucaGen / Gvoke",
+      "controlled": "none",
+      "location": "drug_box",
+      "pk_s": {
+        "IM": [
+          600,
+          1200,
+          5400
+        ],
+        "IV": [
+          60,
+          300,
+          1800
+        ],
+        "IN": [
+          600,
+          1200,
+          5400
+        ]
+      }
+    },
+    {
+      "id": "ondansetron",
+      "name": "Ondansetron",
+      "class": "5-HT3 antagonist antiemetic",
+      "presentations": [
+        {
+          "label": "Ondansetron 4 mg/2 mL (2 mg/mL) vial",
+          "mg_per_mL": 2,
+          "volume_mL": 2,
+          "form": "vial"
+        },
+        {
+          "label": "Ondansetron 4 mg ODT",
+          "mg_per_tab": 4,
+          "form": "odt"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "nausea_vomiting",
+          "dose_mg": 4,
+          "route": [
+            "IV",
+            "IM",
+            "ODT"
+          ],
+          "repeat": "once after 10-15 min"
+        }
+      ],
+      "effects": {
+        "nausea": "--",
+        "qt_interval": "+"
+      },
+      "contraindications": [
+        "Known prolonged QT"
+      ],
+      "dangers": [
+        "QT prolongation"
+      ],
+      "scopeLevel": 4,
+      "brand": "Zofran",
+      "controlled": "none",
+      "location": "drug_box",
+      "pk_s": {
+        "IV": [
+          120,
+          600,
+          14400
+        ],
+        "IM": [
+          600,
+          1800,
+          14400
+        ],
+        "ODT": [
+          900,
+          3600,
+          14400
+        ]
+      }
+    },
+    {
+      "id": "diphenhydramine",
+      "name": "Diphenhydramine",
+      "class": "H1 antihistamine",
+      "presentations": [
+        {
+          "label": "Diphenhydramine 50 mg/1 mL vial",
+          "mg_per_mL": 50,
+          "volume_mL": 1,
+          "form": "vial"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "allergic_reaction_adjunct",
+          "dose_mg": "25-50",
+          "route": [
+            "IV",
+            "IM"
+          ],
+          "notes": "Adjunct only — does NOT replace epinephrine in anaphylaxis."
+        }
+      ],
+      "effects": {
+        "urticaria_itching": "--",
+        "gcs": "- (sedation)"
+      },
+      "contraindications": [],
+      "dangers": [
+        "Using this INSTEAD of epi in anaphylaxis is a critical error"
+      ],
+      "scopeLevel": 4,
+      "brand": "Benadryl",
+      "controlled": "none",
+      "location": "drug_box",
+      "pk_s": {
+        "IV": [
+          120,
+          900,
+          14400
+        ],
+        "IM": [
+          900,
+          3600,
+          14400
+        ]
+      }
+    },
+    {
+      "id": "methylprednisolone",
+      "name": "Methylprednisolone",
+      "class": "Corticosteroid",
+      "presentations": [
+        {
+          "label": "Methylprednisolone 125 mg Act-O-Vial",
+          "fixedDose_mg": 125,
+          "form": "mix_o_vial"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "asthma_copd_exacerbation_or_anaphylaxis_adjunct",
+          "dose_mg": 125,
+          "route": [
+            "IV",
+            "IM"
+          ]
+        }
+      ],
+      "onset": {
+        "IV": "hours (no immediate effect in-game)"
+      },
+      "effects": {
+        "inflammation": "- (delayed)"
+      },
+      "contraindications": [],
+      "dangers": [
+        "No acute effect — player shouldn't expect improvement on scene"
+      ],
+      "scopeLevel": 4,
+      "brand": "Solu-Medrol",
+      "controlled": "none",
+      "location": "drug_box",
+      "pk_s": {
+        "IV": [
+          3600,
+          14400,
+          129600
+        ],
+        "IM": [
+          3600,
+          14400,
+          129600
+        ]
+      }
+    },
+    {
+      "id": "albuterol",
+      "name": "Albuterol",
+      "class": "Beta-2 agonist bronchodilator",
+      "presentations": [
+        {
+          "label": "Albuterol 2.5 mg/3 mL nebulizer ampule",
+          "mg_per_mL": 0.83,
+          "volume_mL": 3,
+          "form": "neb_ampule"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "bronchospasm_asthma_copd_or_hyperkalemia_adjunct",
+          "dose_mg": 2.5,
+          "route": [
+            "NEB"
+          ],
+          "repeat": "q5-20 min or continuous"
+        }
+      ],
+      "onset": {
+        "NEB": "~5 min"
+      },
+      "effects": {
+        "bronchodilation": "++",
+        "heartRate": "+",
+        "potassium": "- (mild)"
+      },
+      "contraindications": [],
+      "dangers": [
+        "Tachycardia, tremor"
+      ],
+      "scopeLevel": {
+        "assist_patient_MDI": 2,
+        "neb": 3
+      },
+      "brand": "Ventolin / ProAir",
+      "controlled": "none",
+      "location": "airway_bag",
+      "pk_s": {
+        "NEB": [
+          300,
+          1800,
+          14400
+        ],
+        "MDI": [
+          300,
+          1800,
+          14400
+        ]
+      }
+    },
+    {
+      "id": "ipratropium",
+      "name": "Ipratropium",
+      "class": "Anticholinergic bronchodilator",
+      "presentations": [
+        {
+          "label": "Ipratropium 0.5 mg/2.5 mL nebulizer ampule",
+          "mg_per_mL": 0.2,
+          "volume_mL": 2.5,
+          "form": "neb_ampule"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "bronchospasm_with_albuterol",
+          "dose_mg": 0.5,
+          "route": [
+            "NEB with albuterol"
+          ],
+          "repeat": "up to 3 doses"
+        }
+      ],
+      "effects": {
+        "bronchodilation": "+"
+      },
+      "contraindications": [
+        "Peanut/soy allergy (some formulations)"
+      ],
+      "dangers": [],
+      "scopeLevel": 4,
+      "brand": "Atrovent / DuoNeb (combo)",
+      "controlled": "none",
+      "location": "airway_bag",
+      "pk_s": {
+        "NEB": [
+          900,
+          3600,
+          14400
+        ]
+      }
+    },
+    {
+      "id": "tranexamic_acid",
+      "name": "Tranexamic Acid (TXA)",
+      "class": "Antifibrinolytic",
+      "presentations": [
+        {
+          "label": "TXA 1 g/10 mL (100 mg/mL) vial",
+          "mg_per_mL": 100,
+          "volume_mL": 10,
+          "form": "vial"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "hemorrhagic_shock_trauma_within_3h",
+          "dose_g": 1,
+          "route": [
+            "IV/IO in 100 mL NS over 10 min"
+          ],
+          "notes": "TCCC: 2 g slow IV/IO push acceptable. Must be within 3 h of injury. FY26 JTS ERC: 2 g IV/IO if not already given and within 3 h."
+        },
+        {
+          "indication": "postpartum_hemorrhage_within_3h",
+          "dose_g": 1,
+          "route": [
+            "IV over 10 min"
+          ],
+          "repeat": "1 g after 30 min if bleeding continues"
+        }
+      ],
+      "effects": {
+        "bleedRate_noncompressible": "- (modest)",
+        "clot_stability": "+"
+      },
+      "contraindications": [
+        ">3 h since injury (harm)",
+        "Known thromboembolic event"
+      ],
+      "dangers": [
+        "Rapid push → hypotension",
+        "Giving >3 h post-injury logged as error"
+      ],
+      "scopeLevel": 4,
+      "brand": "Cyklokapron",
+      "controlled": "none",
+      "location": "drug_box",
+      "pk_s": {
+        "IV": [
+          300,
+          600,
+          10800
+        ],
+        "IO": [
+          300,
+          600,
+          10800
+        ]
+      }
+    },
+    {
+      "id": "ketorolac",
+      "name": "Ketorolac",
+      "class": "NSAID analgesic",
+      "presentations": [
+        {
+          "label": "Ketorolac 30 mg/1 mL vial",
+          "mg_per_mL": 30,
+          "volume_mL": 1,
+          "form": "vial"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "moderate_pain_non_trauma_bleeding",
+          "dose_mg": 15,
+          "route": [
+            "IV",
+            "IM"
+          ]
+        }
+      ],
+      "effects": {
+        "painScore": "-"
+      },
+      "contraindications": [
+        "Active bleeding / trauma with hemorrhage",
+        "Renal failure",
+        "Pregnancy",
+        "NSAID allergy",
+        "Anticoagulated"
+      ],
+      "dangers": [
+        "Giving to a bleeding trauma patient worsens hemorrhage — trap"
+      ],
+      "scopeLevel": 4,
+      "brand": "Toradol",
+      "controlled": "none",
+      "location": "drug_box",
+      "pk_s": {
+        "IV": [
+          600,
+          3600,
+          21600
+        ],
+        "IM": [
+          1800,
+          3600,
+          21600
+        ]
+      }
+    },
+    {
+      "id": "acetaminophen_iv",
+      "name": "Acetaminophen IV",
+      "class": "Analgesic / antipyretic",
+      "presentations": [
+        {
+          "label": "Acetaminophen 1 g/100 mL bottle",
+          "mg_per_mL": 10,
+          "volume_mL": 100,
+          "form": "bottle"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "mild_moderate_pain_or_fever",
+          "dose_g": 1,
+          "route": [
+            "IV over 15 min"
+          ]
+        }
+      ],
+      "effects": {
+        "painScore": "-",
+        "coreTemp": "-"
+      },
+      "contraindications": [
+        "Severe liver disease"
+      ],
+      "dangers": [],
+      "scopeLevel": 4,
+      "brand": "Ofirmev",
+      "controlled": "none",
+      "location": "drug_box",
+      "pk_s": {
+        "IV": [
+          300,
+          3600,
+          21600
+        ]
+      }
+    },
+    {
+      "id": "normal_saline",
+      "name": "0.9% Sodium Chloride (Normal Saline)",
+      "class": "Isotonic crystalloid",
+      "presentations": [
+        {
+          "label": "0.9% NaCl 1000 mL bag",
+          "volume_mL": 1000,
+          "form": "bag"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "hypovolemia_medical_dehydration",
+          "dose_mL_per_kg": 20,
+          "route": [
+            "IV",
+            "IO"
+          ],
+          "notes": "Reassess lung sounds after each bolus."
+        },
+        {
+          "indication": "hemorrhagic_shock_trauma",
+          "dose_mL": "250-500 boluses",
+          "route": [
+            "IV",
+            "IO"
+          ],
+          "notes": "PERMISSIVE HYPOTENSION: titrate to palpable radial pulse / SBP ~80-90. EXCEPTION — TBI: avoid any SBP <90, target ≥110."
+        }
+      ],
+      "effects": {
+        "bloodVolume": "+ (transient — crystalloid redistributes)",
+        "sbp": "+",
+        "coreTemp": "- (if room temp)",
+        "coagulation": "- (dilution)",
+        "acidosis": "+ (large volumes, hyperchloremic)"
+      },
+      "contraindications": [
+        "Pulmonary edema / fluid overload"
+      ],
+      "dangers": [
+        "Over-resuscitation in trauma 'pops the clot' → re-bleeding",
+        "Feeds the lethal triad (hypothermia, acidosis, coagulopathy)"
+      ],
+      "scopeLevel": 3,
+      "controlled": "none",
+      "location": "iv_cabinet",
+      "pk_s": {
+        "IV": [
+          0,
+          0,
+          3600
+        ]
+      }
+    },
+    {
+      "id": "lactated_ringers",
+      "name": "Lactated Ringer's",
+      "class": "Balanced isotonic crystalloid",
+      "presentations": [
+        {
+          "label": "Lactated Ringer's 1000 mL bag",
+          "volume_mL": 1000,
+          "form": "bag"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "same_as_normal_saline",
+          "notes": "Same permissive hypotension rules. Less acidosis than NS. Do not run with blood in same line."
+        }
+      ],
+      "effects": {
+        "bloodVolume": "+ (transient)",
+        "sbp": "+",
+        "coreTemp": "-",
+        "coagulation": "- (dilution)"
+      },
+      "contraindications": [
+        "Fluid overload"
+      ],
+      "dangers": [
+        "Same over-resuscitation risks"
+      ],
+      "scopeLevel": 3,
+      "controlled": "none",
+      "location": "iv_cabinet",
+      "pk_s": {
+        "IV": [
+          0,
+          0,
+          3600
+        ]
+      }
+    },
+    {
+      "id": "whole_blood",
+      "name": "Low-Titer O Whole Blood (LTOWB)",
+      "class": "Blood product",
+      "presentations": [
+        {
+          "label": "LTOWB 1 unit (~500 mL)",
+          "volume_mL": 500,
+          "form": "blood_unit",
+          "storage": "refrigerated cooler"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "hemorrhagic_shock",
+          "dose_units": "1-2",
+          "route": [
+            "IV/IO via warmer"
+          ],
+          "notes": "TCCC preferred resuscitation fluid. Give calcium with/after first unit. Use a fluid warmer."
+        }
+      ],
+      "effects": {
+        "bloodVolume": "++ (stays intravascular)",
+        "sbp": "++",
+        "coagulation": "+",
+        "o2_carrying": "+"
+      },
+      "contraindications": [],
+      "dangers": [
+        "Transfusion reaction (rare, monitor)",
+        "Hypocalcemia (citrate)",
+        "Cold blood worsens hypothermia without warmer"
+      ],
+      "scopeLevel": 5,
+      "brand": "LTOWB",
+      "controlled": "none",
+      "location": "blood_cooler",
+      "pk_s": {
+        "IV": [
+          0,
+          0,
+          86400
+        ]
+      }
+    },
+    {
+      "id": "oxygen",
+      "name": "Oxygen",
+      "class": "Medical gas",
+      "presentations": [
+        {
+          "label": "O2 D-cylinder / onboard M-tank",
+          "form": "cylinder"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "hypoxia",
+          "device": "nasal_cannula",
+          "lpm": "1-6",
+          "notes": "Titrate SpO2 94-98% (88-92% in known COPD retainers)."
+        },
+        {
+          "indication": "severe_hypoxia_or_shock",
+          "device": "non_rebreather",
+          "lpm": "10-15"
+        },
+        {
+          "indication": "inadequate_ventilation_or_apnea",
+          "device": "BVM",
+          "lpm": "15",
+          "notes": "1 breath q6 s (10/min) with pulse; 30:2 or 1 q6 s with advanced airway during CPR."
+        }
+      ],
+      "effects": {
+        "spo2": "+ to +++"
+      },
+      "contraindications": [],
+      "dangers": [
+        "Hyperoxia in ACS/stroke/post-ROSC with SpO2 already normal (logged as overtreatment)",
+        "Running out of O2 — tank pressure is tracked"
+      ],
+      "scopeLevel": 1,
+      "controlled": "none",
+      "location": "onboard M-tank + portable D-cyl",
+      "pk_s": {
+        "INH": [
+          30,
+          120,
+          0
+        ]
+      }
+    },
+    {
+      "id": "dobutamine",
+      "name": "Dobutamine",
+      "brand": "Dobutrex",
+      "class": "Beta-1 agonist inotrope",
+      "presentations": [
+        {
+          "label": "Dobutamine 500 mg/250 mL premix (2000 mcg/mL)",
+          "mg_per_mL": 2,
+          "volume_mL": 250,
+          "form": "premix_bag"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "cardiogenic_shock_low_output_with_adequate_bp",
+          "dose_mcg_per_kg_per_min": "2-20",
+          "route": [
+            "IV infusion"
+          ]
+        }
+      ],
+      "pk_s": {
+        "IV": [
+          120,
+          600,
+          600
+        ]
+      },
+      "effects": {
+        "contractility": "++",
+        "heartRate": "+",
+        "sbp": "+/- (vasodilation can drop BP)"
+      },
+      "contraindications": [
+        "Hypovolemia uncorrected",
+        "HOCM / outflow obstruction",
+        "SBP <90 without a vasopressor"
+      ],
+      "dangers": [
+        "Tachyarrhythmias",
+        "Hypotension"
+      ],
+      "scopeLevel": 5,
+      "controlled": "none",
+      "location": "cc_box"
+    },
+    {
+      "id": "phenylephrine",
+      "name": "Phenylephrine",
+      "brand": "Neo-Synephrine",
+      "class": "Pure alpha-1 agonist",
+      "presentations": [
+        {
+          "label": "Phenylephrine 10 mg/1 mL vial (dilute to 100 mcg/mL for push dose)",
+          "mg_per_mL": 10,
+          "volume_mL": 1,
+          "form": "vial"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "push_dose_pressor_transient_hypotension",
+          "dose_mcg": "50-200",
+          "route": [
+            "IV"
+          ],
+          "repeat": "q2-5 min",
+          "notes": "Requires 1:100 dilution. Common post-induction hypotension rescue."
+        },
+        {
+          "indication": "vasodilatory_hypotension_infusion",
+          "dose_mcg_per_min": "100-180 initial, then 40-60",
+          "route": [
+            "IV infusion"
+          ]
+        }
+      ],
+      "pk_s": {
+        "IV": [
+          30,
+          60,
+          900
+        ]
+      },
+      "effects": {
+        "sbp": "++",
+        "heartRate": "- (reflex bradycardia)"
+      },
+      "contraindications": [
+        "Severe bradycardia",
+        "Cardiogenic shock (raises afterload)"
+      ],
+      "dangers": [
+        "Dilution error = 100x dose (10 mg/mL undiluted)",
+        "Reflex bradycardia"
+      ],
+      "scopeLevel": {
+        "push_dose": 4,
+        "infusion": 5
+      },
+      "controlled": "none",
+      "location": "drug_box"
+    },
+    {
+      "id": "nitroglycerin_iv",
+      "name": "Nitroglycerin IV",
+      "brand": "Tridil",
+      "class": "Vasodilator infusion",
+      "presentations": [
+        {
+          "label": "Nitroglycerin 50 mg/250 mL premix (200 mcg/mL)",
+          "mg_per_mL": 0.2,
+          "volume_mL": 250,
+          "form": "premix_bag"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "acs_refractory_pain_or_hypertension",
+          "dose_mcg_per_min": "10-200",
+          "route": [
+            "IV infusion"
+          ],
+          "notes": "Start 10-20, titrate q3-5 min."
+        },
+        {
+          "indication": "scape_sympathetic_crashing_pulmonary_edema",
+          "dose_mcg_per_min": "100-400+",
+          "route": [
+            "IV infusion"
+          ],
+          "notes": "High-dose nitro with CPAP. CC."
+        }
+      ],
+      "pk_s": {
+        "IV": [
+          60,
+          300,
+          600
+        ]
+      },
+      "effects": {
+        "sbp": "--",
+        "preload": "---",
+        "heartRate": "+ (reflex)"
+      },
+      "contraindications": [
+        "Same as SL nitroglycerin: hypotension, PDE5 inhibitors, RV infarct"
+      ],
+      "dangers": [
+        "Profound hypotension",
+        "Requires pump / non-PVC tubing"
+      ],
+      "scopeLevel": 5,
+      "controlled": "none",
+      "location": "cc_box"
+    },
+    {
+      "id": "labetalol",
+      "name": "Labetalol",
+      "brand": "Trandate",
+      "class": "Alpha-1 + nonselective beta blocker",
+      "presentations": [
+        {
+          "label": "Labetalol 100 mg/20 mL (5 mg/mL) vial",
+          "mg_per_mL": 5,
+          "volume_mL": 20,
+          "form": "vial"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "hypertensive_emergency_or_stroke_bp_control_or_preeclampsia",
+          "dose_mg": "10-20",
+          "route": [
+            "IV over 1-2 min"
+          ],
+          "repeat": "double q10 min (20, 40, 80)",
+          "max_mg": 300,
+          "notes": "Stroke lytic candidate target <185/110. Aortic dissection: HR <60 and SBP <120."
+        }
+      ],
+      "pk_s": {
+        "IV": [
+          120,
+          300,
+          14400
+        ]
+      },
+      "effects": {
+        "sbp": "--",
+        "heartRate": "-"
+      },
+      "contraindications": [
+        "Asthma / active bronchospasm",
+        "Bradycardia / heart block",
+        "Decompensated heart failure",
+        "Cocaine/meth toxicity (relative)"
+      ],
+      "dangers": [
+        "Overcorrection of BP in stroke = extended infarct"
+      ],
+      "scopeLevel": 5,
+      "controlled": "none",
+      "location": "cc_box"
+    },
+    {
+      "id": "esmolol",
+      "name": "Esmolol",
+      "brand": "Brevibloc",
+      "class": "Ultra-short beta-1 blocker",
+      "presentations": [
+        {
+          "label": "Esmolol 100 mg/10 mL (10 mg/mL) vial",
+          "mg_per_mL": 10,
+          "volume_mL": 10,
+          "form": "vial"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "aortic_dissection_hr_control_or_svt",
+          "dose_mcg_per_kg": 500,
+          "route": [
+            "IV over 1 min"
+          ],
+          "notes": "Then 50-300 mcg/kg/min infusion."
+        }
+      ],
+      "pk_s": {
+        "IV": [
+          60,
+          300,
+          1200
+        ]
+      },
+      "effects": {
+        "heartRate": "--",
+        "sbp": "-"
+      },
+      "contraindications": [
+        "Bradycardia",
+        "Heart block",
+        "Decompensated HF",
+        "Cardiogenic shock"
+      ],
+      "dangers": [
+        "Hypotension (wears off in ~10-20 min — forgiving)"
+      ],
+      "scopeLevel": 5,
+      "controlled": "none",
+      "location": "cc_box"
+    },
+    {
+      "id": "nicardipine",
+      "name": "Nicardipine",
+      "brand": "Cardene",
+      "class": "Dihydropyridine calcium channel blocker",
+      "presentations": [
+        {
+          "label": "Nicardipine 20 mg/200 mL premix (0.1 mg/mL)",
+          "mg_per_mL": 0.1,
+          "volume_mL": 200,
+          "form": "premix_bag"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "ich_or_stroke_or_hypertensive_emergency",
+          "dose_mg_per_hr": "5",
+          "route": [
+            "IV infusion"
+          ],
+          "repeat": "increase 2.5 mg/h q5-15 min",
+          "max_mg_per_hr": 15
+        }
+      ],
+      "pk_s": {
+        "IV": [
+          300,
+          1800,
+          7200
+        ]
+      },
+      "effects": {
+        "sbp": "--",
+        "heartRate": "+ (reflex)"
+      },
+      "contraindications": [
+        "Severe aortic stenosis"
+      ],
+      "dangers": [
+        "Reflex tachycardia",
+        "Overshoot hypotension"
+      ],
+      "scopeLevel": 5,
+      "controlled": "none",
+      "location": "cc_box"
+    },
+    {
+      "id": "heparin",
+      "name": "Heparin (unfractionated)",
+      "brand": null,
+      "class": "Anticoagulant",
+      "presentations": [
+        {
+          "label": "Heparin 5000 units/mL vial",
+          "units_per_mL": 5000,
+          "volume_mL": 1,
+          "form": "vial"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "stemi_per_cath_lab_or_lytic_adjunct",
+          "dose_units_per_kg": 60,
+          "route": [
+            "IV bolus"
+          ],
+          "max_units": 4000,
+          "notes": "Then 12 units/kg/h, max 1000 units/h."
+        }
+      ],
+      "pk_s": {
+        "IV": [
+          30,
+          300,
+          5400
+        ]
+      },
+      "effects": {
+        "coagulation": "-- (anticoagulated)",
+        "bleeding_risk": "++"
+      },
+      "contraindications": [
+        "Active bleeding",
+        "Recent ICH / neurosurgery",
+        "Heparin-induced thrombocytopenia",
+        "Trauma"
+      ],
+      "dangers": [
+        "Bleeding; reversal: protamine (hospital)",
+        "Giving to a trauma patient = catastrophic"
+      ],
+      "scopeLevel": 5,
+      "controlled": "none",
+      "location": "cc_box"
+    },
+    {
+      "id": "tenecteplase",
+      "name": "Tenecteplase",
+      "brand": "TNKase",
+      "class": "Fibrinolytic",
+      "presentations": [
+        {
+          "label": "Tenecteplase 50 mg vial (reconstitute to 5 mg/mL)",
+          "mg_per_mL": 5,
+          "volume_mL": 10,
+          "form": "reconstitution_kit"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "stemi_when_pci_delay_gt_120min",
+          "dose_mg": "30-50 weight-tiered",
+          "route": [
+            "IV single bolus over 5 s"
+          ],
+          "notes": "<60 kg 30 mg; 60-69 35; 70-79 40; 80-89 45; ≥90 50. Rural/CC protocols only."
+        },
+        {
+          "indication": "acute_ischemic_stroke",
+          "dose_mg_per_kg": 0.25,
+          "route": [
+            "IV bolus"
+          ],
+          "max_mg": 25,
+          "notes": "Hospital/MSU only. Requires CT."
+        }
+      ],
+      "pk_s": {
+        "IV": [
+          300,
+          1800,
+          3600
+        ]
+      },
+      "effects": {
+        "stemi_reperfusion": "+ (time-dependent)",
+        "bleeding_risk": "+++"
+      },
+      "contraindications": [
+        "Any prior ICH",
+        "Ischemic stroke within 3 months (except acute)",
+        "Active bleeding",
+        "Suspected aortic dissection",
+        "Significant head/face trauma within 3 months",
+        "Intracranial neoplasm/AVM",
+        "SBP >180 / DBP >110 (relative)"
+      ],
+      "dangers": [
+        "Intracranial hemorrhage",
+        "Reperfusion arrhythmias (expect accelerated idioventricular rhythm)"
+      ],
+      "scopeLevel": 5,
+      "controlled": "none",
+      "location": "cc_box"
+    },
+    {
+      "id": "ticagrelor",
+      "name": "Ticagrelor",
+      "brand": "Brilinta",
+      "class": "P2Y12 antiplatelet",
+      "presentations": [
+        {
+          "label": "Ticagrelor 90 mg tablet",
+          "mg_per_tab": 90,
+          "form": "tablet"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "stemi_load_per_protocol",
+          "dose_mg": 180,
+          "route": [
+            "PO"
+          ],
+          "notes": "Only where the receiving cath lab protocol requests it. Plus aspirin."
+        }
+      ],
+      "pk_s": {
+        "PO": [
+          1800,
+          7200,
+          259200
+        ]
+      },
+      "effects": {
+        "platelet_inhibition": "++",
+        "bleeding_risk": "+"
+      },
+      "contraindications": [
+        "History of ICH",
+        "Active bleeding",
+        "Severe hepatic impairment"
+      ],
+      "dangers": [
+        "Bleeding; dyspnea side effect"
+      ],
+      "scopeLevel": 4,
+      "controlled": "none",
+      "location": "drug_box"
+    },
+    {
+      "id": "furosemide",
+      "name": "Furosemide",
+      "brand": "Lasix",
+      "class": "Loop diuretic",
+      "presentations": [
+        {
+          "label": "Furosemide 40 mg/4 mL (10 mg/mL) vial",
+          "mg_per_mL": 10,
+          "volume_mL": 4,
+          "form": "vial"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "acute_pulmonary_edema_volume_overloaded",
+          "dose_mg_per_kg": "0.5-1",
+          "route": [
+            "IV slow"
+          ],
+          "notes": "Most modern protocols removed it: nitro + CPAP are first line."
+        }
+      ],
+      "pk_s": {
+        "IV": [
+          300,
+          1800,
+          7200
+        ]
+      },
+      "effects": {
+        "urine_output": "++",
+        "preload": "- (delayed)",
+        "potassium": "-",
+        "sbp": "-"
+      },
+      "contraindications": [
+        "Hypotension",
+        "Hypovolemia/dehydration",
+        "Sulfa allergy (relative)"
+      ],
+      "dangers": [
+        "Many 'CHF' patients are actually pneumonia/sepsis or not volume overloaded",
+        "Hypokalemia → arrhythmias"
+      ],
+      "scopeLevel": 4,
+      "controlled": "none",
+      "location": "drug_box",
+      "gameRole": "Realistic legacy drug. Using it before nitro/CPAP is logged as non-preferred."
+    },
+    {
+      "id": "digoxin_immune_fab",
+      "name": "Digoxin Immune Fab",
+      "brand": "DigiFab",
+      "class": "Antidote (antibody fragment)",
+      "presentations": [
+        {
+          "label": "DigiFab 40 mg vial",
+          "fixedDose_mg": 40,
+          "form": "reconstitution_kit"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "digoxin_toxicity_life_threatening",
+          "dose_vials": "10 (acute empiric) / 3-6 (chronic)",
+          "route": [
+            "IV over 30 min (bolus in arrest)"
+          ]
+        }
+      ],
+      "pk_s": {
+        "IV": [
+          1800,
+          3600,
+          86400
+        ]
+      },
+      "effects": {
+        "dig_toxicity": "---",
+        "potassium": "- (rebound hypokalemia)",
+        "heartRate": "+"
+      },
+      "contraindications": [],
+      "dangers": [
+        "Calcium in dig toxicity was historically feared ('stone heart') — model as controversial"
+      ],
+      "scopeLevel": 5,
+      "controlled": "none",
+      "location": "cc_box"
+    },
+    {
+      "id": "hydromorphone",
+      "name": "Hydromorphone",
+      "brand": "Dilaudid",
+      "class": "Opioid analgesic",
+      "presentations": [
+        {
+          "label": "Hydromorphone 2 mg/1 mL vial",
+          "mg_per_mL": 2,
+          "volume_mL": 1,
+          "form": "vial"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "severe_pain",
+          "dose_mg": "0.5-1",
+          "route": [
+            "IV",
+            "IM"
+          ],
+          "repeat": "q10-15 min",
+          "notes": "~5-7x morphine potency. 0.015 mg/kg."
+        }
+      ],
+      "pk_s": {
+        "IV": [
+          300,
+          1200,
+          14400
+        ],
+        "IM": [
+          900,
+          2700,
+          14400
+        ]
+      },
+      "effects": {
+        "painScore": "---",
+        "respRate": "--",
+        "sbp": "-"
+      },
+      "contraindications": [
+        "Respiratory depression",
+        "Hypotension"
+      ],
+      "dangers": [
+        "Potency confusion with morphine = overdose",
+        "Respiratory depression; reversal: naloxone"
+      ],
+      "scopeLevel": 4,
+      "controlled": "CII",
+      "location": "narcotics_safe"
+    },
+    {
+      "id": "nitrous_oxide",
+      "name": "Nitrous Oxide 50:50",
+      "brand": "Nitronox",
+      "class": "Inhaled analgesic",
+      "presentations": [
+        {
+          "label": "N2O/O2 50:50 blended, self-administered demand valve",
+          "form": "cylinder"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "moderate_pain_isolated_extremity_or_labor",
+          "route": [
+            "INH self-administered"
+          ],
+          "notes": "Patient must hold the mask themselves (safety: drops it when sedated)."
+        }
+      ],
+      "pk_s": {
+        "INH": [
+          60,
+          180,
+          300
+        ]
+      },
+      "effects": {
+        "painScore": "--",
+        "gcs": "- (mild)"
+      },
+      "contraindications": [
+        "PNEUMOTHORAX (N2O expands trapped gas → tension)",
+        "Bowel obstruction",
+        "Decompression sickness / diving",
+        "Head injury with AMS",
+        "Intoxication",
+        "First-trimester pregnancy",
+        "COPD with bullae"
+      ],
+      "dangers": [
+        "Giving to the bike-down patient with a developing pneumo makes it tension faster — trap",
+        "Must ventilate the ambulance (crew exposure)"
+      ],
+      "scopeLevel": {
+        "system_dependent": 3
+      },
+      "controlled": "none",
+      "location": "onboard"
+    },
+    {
+      "id": "lorazepam",
+      "name": "Lorazepam",
+      "brand": "Ativan",
+      "class": "Benzodiazepine",
+      "presentations": [
+        {
+          "label": "Lorazepam 2 mg/1 mL vial",
+          "mg_per_mL": 2,
+          "volume_mL": 1,
+          "form": "vial",
+          "storage": "refrigerated"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "status_seizure",
+          "dose_mg_per_kg": 0.1,
+          "route": [
+            "IV",
+            "IO"
+          ],
+          "max_mg": 4,
+          "repeat": "once after 5-10 min"
+        },
+        {
+          "indication": "anxiety_agitation_alcohol_withdrawal",
+          "dose_mg": "1-2",
+          "route": [
+            "IV",
+            "IM"
+          ]
+        }
+      ],
+      "pk_s": {
+        "IV": [
+          120,
+          600,
+          21600
+        ],
+        "IM": [
+          900,
+          3600,
+          21600
+        ]
+      },
+      "effects": {
+        "seizure_stop": "++",
+        "gcs": "--",
+        "respRate": "-"
+      },
+      "contraindications": [
+        "Respiratory depression without airway control"
+      ],
+      "dangers": [
+        "Slow IM absorption — midazolam preferred IM",
+        "Stacks with alcohol/opioids"
+      ],
+      "scopeLevel": 4,
+      "controlled": "CIV",
+      "location": "narcotics_safe"
+    },
+    {
+      "id": "diazepam",
+      "name": "Diazepam",
+      "brand": "Valium / Diastat",
+      "class": "Benzodiazepine",
+      "presentations": [
+        {
+          "label": "Diazepam 10 mg/2 mL (5 mg/mL) vial",
+          "mg_per_mL": 5,
+          "volume_mL": 2,
+          "form": "vial"
+        },
+        {
+          "label": "Diastat rectal gel 10 mg",
+          "fixedDose_mg": 10,
+          "form": "rectal_gel"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "status_seizure",
+          "dose_mg": "5-10",
+          "route": [
+            "IV"
+          ],
+          "repeat": "q10-15 min",
+          "max_mg": 30
+        },
+        {
+          "indication": "seizure_no_iv",
+          "dose_mg_per_kg": "0.2-0.5",
+          "route": [
+            "PR"
+          ]
+        }
+      ],
+      "pk_s": {
+        "IV": [
+          60,
+          300,
+          3600
+        ],
+        "PR": [
+          300,
+          900,
+          3600
+        ]
+      },
+      "effects": {
+        "seizure_stop": "++",
+        "gcs": "--",
+        "respRate": "-"
+      },
+      "contraindications": [
+        "Respiratory depression without airway control"
+      ],
+      "dangers": [
+        "IM absorption erratic — don't give IM",
+        "Phlebitis"
+      ],
+      "scopeLevel": 4,
+      "controlled": "CIV",
+      "location": "narcotics_safe"
+    },
+    {
+      "id": "propofol",
+      "name": "Propofol",
+      "brand": "Diprivan",
+      "class": "Sedative-hypnotic",
+      "presentations": [
+        {
+          "label": "Propofol 200 mg/20 mL (10 mg/mL) vial",
+          "mg_per_mL": 10,
+          "volume_mL": 20,
+          "form": "vial"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "post_intubation_sedation",
+          "dose_mcg_per_kg_per_min": "5-50",
+          "route": [
+            "IV infusion"
+          ]
+        },
+        {
+          "indication": "rsi_induction",
+          "dose_mg_per_kg": "1-2",
+          "route": [
+            "IV"
+          ],
+          "notes": "Rarely prehospital — hypotension."
+        }
+      ],
+      "pk_s": {
+        "IV": [
+          30,
+          90,
+          600
+        ]
+      },
+      "effects": {
+        "gcs": "---",
+        "sbp": "--",
+        "respRate": "--"
+      },
+      "contraindications": [
+        "Hypotension/shock"
+      ],
+      "dangers": [
+        "Profound hypotension in shocked patients — trap vs ketamine/etomidate",
+        "No analgesia"
+      ],
+      "scopeLevel": 5,
+      "controlled": "none",
+      "location": "cc_box"
+    },
+    {
+      "id": "dexmedetomidine",
+      "name": "Dexmedetomidine",
+      "brand": "Precedex",
+      "class": "Alpha-2 agonist sedative",
+      "presentations": [
+        {
+          "label": "Dexmedetomidine 400 mcg/100 mL premix (4 mcg/mL)",
+          "mcg_per_mL": 4,
+          "volume_mL": 100,
+          "form": "premix_bag"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "sedation_interfacility_or_agitation",
+          "dose_mcg_per_kg_per_hr": "0.2-1.5",
+          "route": [
+            "IV infusion"
+          ]
+        }
+      ],
+      "pk_s": {
+        "IV": [
+          900,
+          3600,
+          7200
+        ]
+      },
+      "effects": {
+        "gcs": "- (arousable)",
+        "heartRate": "--",
+        "sbp": "-"
+      },
+      "contraindications": [
+        "Bradycardia / heart block",
+        "Hypovolemia"
+      ],
+      "dangers": [
+        "Bradycardia, hypotension; slow onset — not for emergencies"
+      ],
+      "scopeLevel": 5,
+      "controlled": "none",
+      "location": "cc_box"
+    },
+    {
+      "id": "vecuronium",
+      "name": "Vecuronium",
+      "brand": null,
+      "class": "Non-depolarizing neuromuscular blocker",
+      "presentations": [
+        {
+          "label": "Vecuronium 10 mg powder vial (reconstitute 1 mg/mL)",
+          "mg_per_mL": 1,
+          "volume_mL": 10,
+          "form": "reconstitution_kit"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "maintenance_paralysis_post_intubation",
+          "dose_mg_per_kg": 0.1,
+          "route": [
+            "IV"
+          ],
+          "repeat": "0.01-0.05 mg/kg q30-60 min"
+        }
+      ],
+      "pk_s": {
+        "IV": [
+          180,
+          300,
+          3600
+        ]
+      },
+      "effects": {
+        "respRate": "→ 0",
+        "muscle_tone": "→ 0"
+      },
+      "contraindications": [
+        "No sedation running",
+        "No secured airway"
+      ],
+      "dangers": [
+        "Awake paralysis",
+        "Masks seizures"
+      ],
+      "scopeLevel": 5,
+      "controlled": "none",
+      "location": "cc_box"
+    },
+    {
+      "id": "sugammadex",
+      "name": "Sugammadex",
+      "brand": "Bridion",
+      "class": "Selective relaxant binding agent",
+      "presentations": [
+        {
+          "label": "Sugammadex 200 mg/2 mL (100 mg/mL) vial",
+          "mg_per_mL": 100,
+          "volume_mL": 2,
+          "form": "vial"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "immediate_reversal_rocuronium_cannot_intubate_cannot_oxygenate",
+          "dose_mg_per_kg": 16,
+          "route": [
+            "IV"
+          ]
+        }
+      ],
+      "pk_s": {
+        "IV": [
+          90,
+          180,
+          86400
+        ]
+      },
+      "effects": {
+        "rocuronium_effect": "--- (reversed)",
+        "respRate": "returns if not otherwise suppressed"
+      },
+      "contraindications": [
+        "Does NOT reverse succinylcholine or benzos/opioids"
+      ],
+      "dangers": [
+        "Anaphylaxis (rare); bradycardia",
+        "Reversing paralysis doesn't save you if sedation is still on board and the airway is lost"
+      ],
+      "scopeLevel": 5,
+      "controlled": "none",
+      "location": "cc_box",
+      "gameRole": "Rescue option for a failed RSI with rocuronium."
+    },
+    {
+      "id": "droperidol",
+      "name": "Droperidol",
+      "brand": "Inapsine",
+      "class": "Butyrophenone antipsychotic / antiemetic",
+      "presentations": [
+        {
+          "label": "Droperidol 5 mg/2 mL (2.5 mg/mL) vial",
+          "mg_per_mL": 2.5,
+          "volume_mL": 2,
+          "form": "vial"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "severe_agitation",
+          "dose_mg": "5-10",
+          "route": [
+            "IM",
+            "IV"
+          ]
+        },
+        {
+          "indication": "refractory_nausea_or_migraine",
+          "dose_mg": "0.625-1.25",
+          "route": [
+            "IV"
+          ]
+        }
+      ],
+      "pk_s": {
+        "IV": [
+          180,
+          600,
+          10800
+        ],
+        "IM": [
+          300,
+          1200,
+          10800
+        ]
+      },
+      "effects": {
+        "agitation": "---",
+        "gcs": "-",
+        "qt_interval": "+"
+      },
+      "contraindications": [
+        "Known prolonged QT"
+      ],
+      "dangers": [
+        "QT prolongation (boxed warning; clinically rare at EMS doses)",
+        "Akathisia, dystonia"
+      ],
+      "scopeLevel": 4,
+      "controlled": "none",
+      "location": "drug_box"
+    },
+    {
+      "id": "haloperidol",
+      "name": "Haloperidol",
+      "brand": "Haldol",
+      "class": "Butyrophenone antipsychotic",
+      "presentations": [
+        {
+          "label": "Haloperidol 5 mg/1 mL vial",
+          "mg_per_mL": 5,
+          "volume_mL": 1,
+          "form": "vial"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "agitation_psychosis",
+          "dose_mg": "5-10",
+          "route": [
+            "IM"
+          ],
+          "notes": "2-5 mg in elderly. Often combined with midazolam (B52 = haldol + benadryl)."
+        }
+      ],
+      "pk_s": {
+        "IM": [
+          900,
+          1800,
+          14400
+        ],
+        "IV": [
+          300,
+          900,
+          14400
+        ]
+      },
+      "effects": {
+        "agitation": "--",
+        "qt_interval": "+"
+      },
+      "contraindications": [
+        "Parkinson's disease",
+        "Lewy body dementia",
+        "Prolonged QT"
+      ],
+      "dangers": [
+        "Dystonia (treat with diphenhydramine)",
+        "NMS",
+        "Slow onset vs ketamine for excited delirium"
+      ],
+      "scopeLevel": 4,
+      "controlled": "none",
+      "location": "drug_box"
+    },
+    {
+      "id": "olanzapine",
+      "name": "Olanzapine ODT",
+      "brand": "Zyprexa Zydis",
+      "class": "Atypical antipsychotic",
+      "presentations": [
+        {
+          "label": "Olanzapine 10 mg ODT",
+          "mg_per_tab": 10,
+          "form": "odt"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "agitation_cooperative_patient",
+          "dose_mg": "5-10",
+          "route": [
+            "ODT"
+          ]
+        }
+      ],
+      "pk_s": {
+        "ODT": [
+          1200,
+          3600,
+          86400
+        ]
+      },
+      "effects": {
+        "agitation": "--",
+        "gcs": "-"
+      },
+      "contraindications": [
+        "Uncooperative patient (can't give ODT)"
+      ],
+      "dangers": [
+        "IM olanzapine + parenteral benzo = respiratory depression"
+      ],
+      "scopeLevel": 4,
+      "controlled": "none",
+      "location": "drug_box"
+    },
+    {
+      "id": "racemic_epinephrine",
+      "name": "Racemic Epinephrine 2.25%",
+      "brand": "Vaponefrin / S2",
+      "class": "Alpha/beta agonist (nebulized)",
+      "presentations": [
+        {
+          "label": "Racemic epinephrine 2.25% 0.5 mL vial",
+          "volume_mL": 0.5,
+          "form": "neb_ampule"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "croup_or_post_extubation_stridor",
+          "dose_mL": 0.5,
+          "route": [
+            "NEB in 3 mL NS"
+          ],
+          "repeat": "q20 min"
+        }
+      ],
+      "pk_s": {
+        "NEB": [
+          60,
+          600,
+          7200
+        ]
+      },
+      "effects": {
+        "stridor": "--",
+        "heartRate": "+"
+      },
+      "contraindications": [],
+      "dangers": [
+        "Rebound stridor 2-4 h later — must transport"
+      ],
+      "scopeLevel": 4,
+      "controlled": "none",
+      "location": "airway_bag"
+    },
+    {
+      "id": "terbutaline",
+      "name": "Terbutaline",
+      "brand": "Brethine",
+      "class": "Beta-2 agonist (parenteral)",
+      "presentations": [
+        {
+          "label": "Terbutaline 1 mg/1 mL vial",
+          "mg_per_mL": 1,
+          "volume_mL": 1,
+          "form": "vial"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "severe_asthma_cannot_nebulize",
+          "dose_mg": 0.25,
+          "route": [
+            "SQ"
+          ],
+          "repeat": "q15-30 min",
+          "max": "0.5 mg in 4 h"
+        }
+      ],
+      "pk_s": {
+        "SQ": [
+          300,
+          1800,
+          14400
+        ]
+      },
+      "effects": {
+        "bronchodilation": "++",
+        "heartRate": "++"
+      },
+      "contraindications": [
+        "Tachyarrhythmia",
+        "Cardiac ischemia"
+      ],
+      "dangers": [
+        "Tachycardia, hypokalemia, ischemia"
+      ],
+      "scopeLevel": 4,
+      "controlled": "none",
+      "location": "drug_box"
+    },
+    {
+      "id": "dexamethasone",
+      "name": "Dexamethasone",
+      "brand": "Decadron",
+      "class": "Corticosteroid",
+      "presentations": [
+        {
+          "label": "Dexamethasone 10 mg/1 mL vial",
+          "mg_per_mL": 10,
+          "volume_mL": 1,
+          "form": "vial"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "asthma_copd_exacerbation",
+          "dose_mg": "10-16",
+          "route": [
+            "IV",
+            "IM",
+            "PO"
+          ]
+        },
+        {
+          "indication": "croup_pediatric",
+          "dose_mg_per_kg": 0.6,
+          "route": [
+            "IM",
+            "PO"
+          ],
+          "max_mg": 16
+        }
+      ],
+      "pk_s": {
+        "IV": [
+          3600,
+          21600,
+          259200
+        ]
+      },
+      "effects": {
+        "inflammation": "- (delayed hours)"
+      },
+      "contraindications": [],
+      "dangers": [
+        "No acute effect on scene"
+      ],
+      "scopeLevel": 4,
+      "controlled": "none",
+      "location": "drug_box"
+    },
+    {
+      "id": "hydrocortisone",
+      "name": "Hydrocortisone",
+      "brand": "Solu-Cortef",
+      "class": "Corticosteroid (glucocorticoid + mineralocorticoid)",
+      "presentations": [
+        {
+          "label": "Hydrocortisone 100 mg Act-O-Vial",
+          "fixedDose_mg": 100,
+          "form": "mix_o_vial"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "adrenal_crisis_steroid_dependent_or_addisons",
+          "dose_mg": 100,
+          "route": [
+            "IV",
+            "IM"
+          ],
+          "notes": "Peds 2 mg/kg max 100. Patient/family often carries their own emergency kit — the AI family member should mention it if asked."
+        }
+      ],
+      "pk_s": {
+        "IV": [
+          1800,
+          7200,
+          28800
+        ]
+      },
+      "effects": {
+        "sbp": "++ (in adrenal crisis only, delayed)",
+        "glucose": "+"
+      },
+      "contraindications": [],
+      "dangers": [
+        "Missing adrenal crisis → refractory hypotension unresponsive to fluids/pressors — trap"
+      ],
+      "scopeLevel": 4,
+      "controlled": "none",
+      "location": "drug_box"
+    },
+    {
+      "id": "activated_charcoal",
+      "name": "Activated Charcoal",
+      "brand": "Actidose-Aqua",
+      "class": "Adsorbent",
+      "presentations": [
+        {
+          "label": "Activated charcoal 50 g/240 mL suspension",
+          "fixedDose_g": 50,
+          "form": "bottle"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "recent_toxic_ingestion_within_1h_awake",
+          "dose_g_per_kg": 1,
+          "route": [
+            "PO"
+          ],
+          "max_g": 50
+        }
+      ],
+      "pk_s": {
+        "PO": [
+          300,
+          1800,
+          14400
+        ]
+      },
+      "effects": {
+        "toxin_absorption": "--"
+      },
+      "contraindications": [
+        "Altered mental status / unprotected airway",
+        "Caustics (acids/alkalis)",
+        "Hydrocarbons",
+        "Iron, lithium, alcohols (don't bind)",
+        "Bowel obstruction"
+      ],
+      "dangers": [
+        "Aspiration pneumonitis if patient vomits with AMS",
+        "Usually poison-control directed"
+      ],
+      "scopeLevel": 3,
+      "controlled": "none",
+      "location": "drug_box"
+    },
+    {
+      "id": "hydroxocobalamin",
+      "name": "Hydroxocobalamin",
+      "brand": "Cyanokit",
+      "class": "Cyanide antidote",
+      "presentations": [
+        {
+          "label": "Cyanokit 5 g vial (reconstitute with 200 mL NS)",
+          "fixedDose_g": 5,
+          "form": "reconstitution_kit"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "suspected_cyanide_smoke_inhalation_with_ams_shock_or_lactate",
+          "dose_g": 5,
+          "route": [
+            "IV over 15 min"
+          ],
+          "repeat": "5 g once"
+        }
+      ],
+      "pk_s": {
+        "IV": [
+          300,
+          900,
+          86400
+        ]
+      },
+      "effects": {
+        "sbp": "+ (in cyanide toxicity)",
+        "cellular_oxygen_use": "++",
+        "skin_color": "red (cosmetic, days)"
+      },
+      "contraindications": [],
+      "dangers": [
+        "Turns skin, urine and plasma red — interferes with colorimetric labs",
+        "Hypertension"
+      ],
+      "scopeLevel": 4,
+      "controlled": "none",
+      "location": "cc_box",
+      "gameRole": "House-fire victim with normal SpO2 but crashing = cyanide (SpO2 reads normal). Also CO: SpO2 falsely normal."
+    },
+    {
+      "id": "duodote",
+      "name": "Atropine/Pralidoxime Auto-Injector",
+      "brand": "DuoDote / ATNAA",
+      "class": "Nerve agent / organophosphate antidote",
+      "presentations": [
+        {
+          "label": "DuoDote: atropine 2.1 mg + pralidoxime 600 mg auto-injector",
+          "form": "auto_injector"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "nerve_agent_or_organophosphate_poisoning",
+          "dose": "1 (mild) / 2 (moderate) / 3 rapid succession (severe)",
+          "route": [
+            "IM lateral thigh"
+          ],
+          "notes": "SLUDGEM/DUMBELS + miosis. Plus atropine IV titrated until secretions dry. Plus benzo for seizures."
+        }
+      ],
+      "pk_s": {
+        "IM": [
+          60,
+          300,
+          3600
+        ]
+      },
+      "effects": {
+        "secretions": "---",
+        "heartRate": "+",
+        "pupils": "dilate (slow)",
+        "muscle_weakness": "- (pralidoxime)"
+      },
+      "contraindications": [],
+      "dangers": [
+        "Scene safety: decon FIRST or the crew becomes patients"
+      ],
+      "scopeLevel": 2,
+      "controlled": "none",
+      "location": "cbrn_kit"
+    },
+    {
+      "id": "pralidoxime",
+      "name": "Pralidoxime",
+      "brand": "Protopam (2-PAM)",
+      "class": "Cholinesterase reactivator",
+      "presentations": [
+        {
+          "label": "Pralidoxime 1 g vial",
+          "fixedDose_g": 1,
+          "form": "reconstitution_kit"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "organophosphate_poisoning",
+          "dose_g": "1-2",
+          "route": [
+            "IV over 15-30 min"
+          ],
+          "notes": "Always with atropine. Time-sensitive (aging)."
+        }
+      ],
+      "pk_s": {
+        "IV": [
+          600,
+          1800,
+          10800
+        ]
+      },
+      "effects": {
+        "muscle_weakness": "--"
+      },
+      "contraindications": [],
+      "dangers": [
+        "Rapid push → laryngospasm, muscle rigidity, tachycardia"
+      ],
+      "scopeLevel": 4,
+      "controlled": "none",
+      "location": "cbrn_kit"
+    },
+    {
+      "id": "flumazenil",
+      "name": "Flumazenil",
+      "brand": "Romazicon",
+      "class": "Benzodiazepine antagonist",
+      "presentations": [
+        {
+          "label": "Flumazenil 0.5 mg/5 mL (0.1 mg/mL) vial",
+          "mg_per_mL": 0.1,
+          "volume_mL": 5,
+          "form": "vial"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "iatrogenic_benzo_oversedation_benzo_naive",
+          "dose_mg": 0.2,
+          "route": [
+            "IV over 30 s"
+          ],
+          "repeat": "0.2 mg q1 min",
+          "max_mg": 1
+        }
+      ],
+      "pk_s": {
+        "IV": [
+          60,
+          360,
+          3600
+        ]
+      },
+      "effects": {
+        "gcs": "++ (benzo only)",
+        "seizure_threshold": "--"
+      },
+      "contraindications": [
+        "Chronic benzodiazepine use",
+        "Seizure disorder",
+        "Tricyclic/mixed overdose",
+        "Unknown ingestion"
+      ],
+      "dangers": [
+        "Precipitates refractory seizures in benzo-dependent or TCA co-ingestion — classic trap",
+        "Re-sedation"
+      ],
+      "scopeLevel": 4,
+      "controlled": "none",
+      "location": "drug_box",
+      "gameRole": "Most EMS systems don't carry it. Giving it in an unknown overdose is logged as a critical error."
+    },
+    {
+      "id": "lipid_emulsion",
+      "name": "Lipid Emulsion 20%",
+      "brand": "Intralipid",
+      "class": "Lipid rescue",
+      "presentations": [
+        {
+          "label": "Lipid emulsion 20% 250 mL bag",
+          "volume_mL": 250,
+          "form": "bag"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "local_anesthetic_systemic_toxicity_or_refractory_lipophilic_od",
+          "dose_mL_per_kg": 1.5,
+          "route": [
+            "IV over 1 min"
+          ],
+          "notes": "Then 0.25 mL/kg/min. Repeat bolus x2 for persistent instability. LAST: lidocaine/bupivacaine toxicity."
+        }
+      ],
+      "pk_s": {
+        "IV": [
+          60,
+          300,
+          3600
+        ]
+      },
+      "effects": {
+        "lipophilic_drug_effect": "--"
+      },
+      "contraindications": [],
+      "dangers": [
+        "Interferes with labs; pancreatitis (rare)"
+      ],
+      "scopeLevel": 5,
+      "controlled": "none",
+      "location": "cc_box"
+    },
+    {
+      "id": "methylene_blue",
+      "name": "Methylene Blue 1%",
+      "brand": "ProvayBlue",
+      "class": "Methemoglobinemia antidote",
+      "presentations": [
+        {
+          "label": "Methylene blue 50 mg/10 mL (5 mg/mL) vial",
+          "mg_per_mL": 5,
+          "volume_mL": 10,
+          "form": "vial"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "methemoglobinemia_symptomatic",
+          "dose_mg_per_kg": "1-2",
+          "route": [
+            "IV over 5 min"
+          ]
+        }
+      ],
+      "pk_s": {
+        "IV": [
+          300,
+          1800,
+          14400
+        ]
+      },
+      "effects": {
+        "methemoglobin": "---",
+        "spo2": "+ (true value restored)"
+      },
+      "contraindications": [
+        "G6PD deficiency",
+        "Serotonergic drugs (SSRIs) → serotonin syndrome"
+      ],
+      "dangers": [
+        "Pulse ox reads ~85% regardless of O2 in metHb — model the lying pulse ox"
+      ],
+      "scopeLevel": 5,
+      "controlled": "none",
+      "location": "cc_box"
+    },
+    {
+      "id": "thiamine",
+      "name": "Thiamine",
+      "brand": "Vitamin B1",
+      "class": "Vitamin",
+      "presentations": [
+        {
+          "label": "Thiamine 100 mg/1 mL vial",
+          "mg_per_mL": 100,
+          "volume_mL": 1,
+          "form": "vial"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "suspected_wernicke_alcoholism_malnutrition",
+          "dose_mg": 100,
+          "route": [
+            "IV",
+            "IM"
+          ],
+          "notes": "Don't delay dextrose in hypoglycemia to give thiamine first."
+        }
+      ],
+      "pk_s": {
+        "IV": [
+          600,
+          3600,
+          86400
+        ]
+      },
+      "effects": {
+        "wernicke_risk": "--"
+      },
+      "contraindications": [],
+      "dangers": [
+        "Delaying dextrose to give thiamine = critical error"
+      ],
+      "scopeLevel": 4,
+      "controlled": "none",
+      "location": "drug_box"
+    },
+    {
+      "id": "prothrombin_complex",
+      "name": "4-Factor Prothrombin Complex Concentrate",
+      "brand": "Kcentra",
+      "class": "Anticoagulant reversal",
+      "presentations": [
+        {
+          "label": "4F-PCC ~1000 units vial",
+          "fixedDose_units": 1000,
+          "form": "reconstitution_kit"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "warfarin_or_factor_xa_life_threatening_bleed_or_ich",
+          "dose_units_per_kg": "25-50",
+          "route": [
+            "IV"
+          ],
+          "notes": "Plus vitamin K (hospital). Some flight programs carry."
+        }
+      ],
+      "pk_s": {
+        "IV": [
+          600,
+          1800,
+          43200
+        ]
+      },
+      "effects": {
+        "coagulation": "++"
+      },
+      "contraindications": [
+        "DIC",
+        "HIT history"
+      ],
+      "dangers": [
+        "Thrombosis"
+      ],
+      "scopeLevel": 5,
+      "controlled": "none",
+      "location": "cc_box"
+    },
+    {
+      "id": "prochlorperazine",
+      "name": "Prochlorperazine",
+      "brand": "Compazine",
+      "class": "Phenothiazine antiemetic",
+      "presentations": [
+        {
+          "label": "Prochlorperazine 10 mg/2 mL (5 mg/mL) vial",
+          "mg_per_mL": 5,
+          "volume_mL": 2,
+          "form": "vial"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "nausea_vomiting_or_migraine",
+          "dose_mg": "5-10",
+          "route": [
+            "IV slow",
+            "IM"
+          ]
+        }
+      ],
+      "pk_s": {
+        "IV": [
+          600,
+          1800,
+          14400
+        ]
+      },
+      "effects": {
+        "nausea": "--"
+      },
+      "contraindications": [
+        "Parkinson's"
+      ],
+      "dangers": [
+        "Akathisia, dystonia",
+        "QT"
+      ],
+      "scopeLevel": 4,
+      "controlled": "none",
+      "location": "drug_box"
+    },
+    {
+      "id": "promethazine",
+      "name": "Promethazine",
+      "brand": "Phenergan",
+      "class": "Phenothiazine antihistamine/antiemetic",
+      "presentations": [
+        {
+          "label": "Promethazine 25 mg/1 mL vial",
+          "mg_per_mL": 25,
+          "volume_mL": 1,
+          "form": "vial"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "nausea_vomiting",
+          "dose_mg": "12.5-25",
+          "route": [
+            "IM deep (preferred)",
+            "IV diluted, slow, large vein"
+          ]
+        }
+      ],
+      "pk_s": {
+        "IM": [
+          1200,
+          3600,
+          14400
+        ],
+        "IV": [
+          180,
+          600,
+          14400
+        ]
+      },
+      "effects": {
+        "nausea": "--",
+        "gcs": "-"
+      },
+      "contraindications": [
+        "Children <2 years (fatal respiratory depression)"
+      ],
+      "dangers": [
+        "Boxed warning: IV extravasation/intra-arterial → gangrene, amputation — trap",
+        "Sedation stacks with opioids"
+      ],
+      "scopeLevel": 4,
+      "controlled": "none",
+      "location": "drug_box"
+    },
+    {
+      "id": "famotidine",
+      "name": "Famotidine",
+      "brand": "Pepcid",
+      "class": "H2 blocker",
+      "presentations": [
+        {
+          "label": "Famotidine 20 mg/2 mL (10 mg/mL) vial",
+          "mg_per_mL": 10,
+          "volume_mL": 2,
+          "form": "vial"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "allergic_reaction_adjunct",
+          "dose_mg": 20,
+          "route": [
+            "IV over 2 min"
+          ]
+        }
+      ],
+      "pk_s": {
+        "IV": [
+          900,
+          3600,
+          43200
+        ]
+      },
+      "effects": {
+        "urticaria": "-"
+      },
+      "contraindications": [],
+      "dangers": [
+        "Adjunct only — never instead of epinephrine"
+      ],
+      "scopeLevel": 4,
+      "controlled": "none",
+      "location": "drug_box"
+    },
+    {
+      "id": "tetracaine_ophthalmic",
+      "name": "Tetracaine 0.5% Ophthalmic",
+      "brand": null,
+      "class": "Topical anesthetic",
+      "presentations": [
+        {
+          "label": "Tetracaine 0.5% eye drops 15 mL",
+          "form": "dropper"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "eye_pain_chemical_splash_before_irrigation",
+          "dose": "1-2 drops",
+          "route": [
+            "ophthalmic"
+          ],
+          "repeat": "q5-10 min"
+        }
+      ],
+      "pk_s": {
+        "OPH": [
+          20,
+          60,
+          1200
+        ]
+      },
+      "effects": {
+        "eye_pain": "---"
+      },
+      "contraindications": [
+        "Suspected open globe"
+      ],
+      "dangers": [
+        "Pressure on an open globe extrudes contents"
+      ],
+      "scopeLevel": 3,
+      "controlled": "none",
+      "location": "jump_bag"
+    },
+    {
+      "id": "ibuprofen",
+      "name": "Ibuprofen",
+      "brand": "Motrin / Advil",
+      "class": "NSAID",
+      "presentations": [
+        {
+          "label": "Ibuprofen 400 mg tablet",
+          "mg_per_tab": 400,
+          "form": "tablet"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "mild_moderate_pain_or_fever",
+          "dose_mg": "400-800",
+          "route": [
+            "PO"
+          ]
+        }
+      ],
+      "pk_s": {
+        "PO": [
+          1800,
+          5400,
+          21600
+        ]
+      },
+      "effects": {
+        "painScore": "-",
+        "coreTemp": "-"
+      },
+      "contraindications": [
+        "Active bleeding / trauma",
+        "Renal disease",
+        "Pregnancy 3rd trimester",
+        "Anticoagulated",
+        "GI bleed"
+      ],
+      "dangers": [
+        "Same bleeding trap as ketorolac"
+      ],
+      "scopeLevel": 3,
+      "controlled": "none",
+      "location": "jump_bag"
+    },
+    {
+      "id": "acetaminophen_po",
+      "name": "Acetaminophen PO (TCCC Combat Wound Pill Pack)",
+      "brand": "Tylenol 8 HR",
+      "class": "Analgesic",
+      "presentations": [
+        {
+          "label": "Acetaminophen 650 mg bilayer tablet",
+          "mg_per_tab": 650,
+          "form": "tablet"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "mild_moderate_pain_tccc",
+          "dose_mg": 1300,
+          "route": [
+            "PO"
+          ],
+          "notes": "2 tabs q8h. TCCC pairs with meloxicam 15 mg."
+        }
+      ],
+      "pk_s": {
+        "PO": [
+          1800,
+          3600,
+          28800
+        ]
+      },
+      "effects": {
+        "painScore": "-"
+      },
+      "contraindications": [
+        "Severe liver disease"
+      ],
+      "dangers": [
+        "Hepatotoxicity >4 g/day"
+      ],
+      "scopeLevel": 3,
+      "controlled": "none",
+      "location": "jump_bag"
+    },
+    {
+      "id": "meloxicam",
+      "name": "Meloxicam (TCCC)",
+      "brand": "Mobic",
+      "class": "COX-2-preferential NSAID",
+      "presentations": [
+        {
+          "label": "Meloxicam 15 mg tablet",
+          "mg_per_tab": 15,
+          "form": "tablet"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "mild_moderate_pain_tccc",
+          "dose_mg": 15,
+          "route": [
+            "PO"
+          ],
+          "notes": "Minimal platelet effect at this dose — why TCCC allows it in combat wounds."
+        }
+      ],
+      "pk_s": {
+        "PO": [
+          3600,
+          18000,
+          86400
+        ]
+      },
+      "effects": {
+        "painScore": "-"
+      },
+      "contraindications": [
+        "NSAID allergy",
+        "Renal failure"
+      ],
+      "dangers": [],
+      "scopeLevel": 4,
+      "controlled": "none",
+      "location": "jump_bag"
+    },
+    {
+      "id": "cefazolin",
+      "name": "Cefazolin",
+      "brand": "Ancef",
+      "class": "1st-gen cephalosporin",
+      "presentations": [
+        {
+          "label": "Cefazolin 2 g vial",
+          "fixedDose_g": 2,
+          "form": "reconstitution_kit"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "open_fracture_early_prophylaxis",
+          "dose_g": 2,
+          "route": [
+            "IV",
+            "IM"
+          ],
+          "notes": "3 g if >120 kg. Earlier = fewer infections."
+        }
+      ],
+      "pk_s": {
+        "IV": [
+          0,
+          300,
+          28800
+        ]
+      },
+      "effects": {
+        "infection_risk": "-"
+      },
+      "contraindications": [
+        "Cephalosporin anaphylaxis"
+      ],
+      "dangers": [
+        "Anaphylaxis (rare)"
+      ],
+      "scopeLevel": 5,
+      "controlled": "none",
+      "location": "cc_box",
+      "coverage": {
+        "gramPositive": 3,
+        "MRSA": 0,
+        "gramNegative": 1,
+        "pseudomonas": 0,
+        "anaerobes": 0,
+        "atypical": 0,
+        "neisseria": 0,
+        "toxinSuppression": 0
+      },
+      "notes": "No anaerobe coverage: wrong drug alone for fecal contamination."
+    },
+    {
+      "id": "ertapenem",
+      "name": "Ertapenem (TCCC)",
+      "brand": "Invanz",
+      "class": "Carbapenem",
+      "presentations": [
+        {
+          "label": "Ertapenem 1 g vial",
+          "fixedDose_g": 1,
+          "form": "reconstitution_kit"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "penetrating_wound_tccc_cannot_take_po",
+          "dose_g": 1,
+          "route": [
+            "IV",
+            "IM"
+          ]
+        }
+      ],
+      "pk_s": {
+        "IV": [
+          0,
+          1800,
+          86400
+        ]
+      },
+      "effects": {
+        "infection_risk": "-"
+      },
+      "contraindications": [
+        "Beta-lactam anaphylaxis"
+      ],
+      "dangers": [],
+      "scopeLevel": 5,
+      "controlled": "none",
+      "location": "cc_box",
+      "coverage": {
+        "gramPositive": 2,
+        "MRSA": 0,
+        "gramNegative": 3,
+        "pseudomonas": 0,
+        "anaerobes": 3,
+        "atypical": 0,
+        "neisseria": 2,
+        "toxinSuppression": 0
+      },
+      "notes": "FY26 JTS: post-surgical if not already given. Covers fecal flora (gram-negative + anaerobes)."
+    },
+    {
+      "id": "moxifloxacin",
+      "name": "Moxifloxacin (TCCC)",
+      "brand": "Avelox",
+      "class": "Fluoroquinolone",
+      "presentations": [
+        {
+          "label": "Moxifloxacin 400 mg tablet",
+          "mg_per_tab": 400,
+          "form": "tablet"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "open_combat_wound_able_to_swallow",
+          "dose_mg": 400,
+          "route": [
+            "PO"
+          ]
+        }
+      ],
+      "pk_s": {
+        "PO": [
+          3600,
+          7200,
+          86400
+        ]
+      },
+      "effects": {
+        "infection_risk": "-"
+      },
+      "contraindications": [
+        "Known prolonged QT"
+      ],
+      "dangers": [
+        "QT prolongation"
+      ],
+      "scopeLevel": 4,
+      "controlled": "none",
+      "location": "jump_bag",
+      "coverage": {
+        "gramPositive": 2,
+        "MRSA": 0,
+        "gramNegative": 2,
+        "pseudomonas": 0,
+        "anaerobes": 2,
+        "atypical": 3,
+        "neisseria": 1,
+        "toxinSuppression": 0
+      },
+      "notes": "Former TCCC combat-wound PO antibiotic. Superseded in TCCC by cefadroxil/cephalexin PO (FY26 JTS ERC). Still on some kits."
+    },
+    {
+      "id": "ceftriaxone",
+      "name": "Ceftriaxone",
+      "brand": "Rocephin",
+      "class": "3rd-gen cephalosporin",
+      "presentations": [
+        {
+          "label": "Ceftriaxone 2 g vial",
+          "fixedDose_g": 2,
+          "form": "reconstitution_kit"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "tccc_penetrating_wound_or_open_fracture_cannot_take_po",
+          "dose_g": 2,
+          "route": [
+            "IV",
+            "IM",
+            "IO"
+          ],
+          "repeat": "q24h",
+          "notes": "FY26 JTS ERC first line when unable to take PO. Also penetrating eye trauma."
+        },
+        {
+          "indication": "suspected_meningococcemia_or_septic_shock_long_transport",
+          "dose_g": 2,
+          "route": [
+            "IV",
+            "IM"
+          ]
+        }
+      ],
+      "pk_s": {
+        "IV": [
+          0,
+          1800,
+          86400
+        ]
+      },
+      "effects": {
+        "infection_progression": "-"
+      },
+      "contraindications": [
+        "Cephalosporin anaphylaxis"
+      ],
+      "dangers": [
+        "Precipitates with calcium-containing fluids (LR) in same line"
+      ],
+      "scopeLevel": 4,
+      "controlled": "none",
+      "location": "cc_box",
+      "coverage": {
+        "gramPositive": 2,
+        "MRSA": 0,
+        "gramNegative": 2,
+        "pseudomonas": 0,
+        "anaerobes": 0,
+        "atypical": 0,
+        "neisseria": 3,
+        "toxinSuppression": 0
+      }
+    },
+    {
+      "id": "hypertonic_saline",
+      "name": "Hypertonic Saline 3%",
+      "brand": null,
+      "class": "Hyperosmolar agent",
+      "presentations": [
+        {
+          "label": "3% NaCl 250 mL bag",
+          "volume_mL": 250,
+          "form": "bag"
+        },
+        {
+          "label": "23.4% NaCl 30 mL vial (central line only)",
+          "volume_mL": 30,
+          "form": "vial"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "tbi_with_herniation_signs",
+          "dose_mL": 250,
+          "route": [
+            "IV over 10-15 min"
+          ],
+          "notes": "Signs: blown pupil, posturing, GCS drop ≥2, Cushing's triad."
+        },
+        {
+          "indication": "hyponatremic_seizure",
+          "dose_mL": 100,
+          "route": [
+            "IV bolus"
+          ],
+          "repeat": "up to x2 q10 min"
+        }
+      ],
+      "pk_s": {
+        "IV": [
+          300,
+          1800,
+          10800
+        ]
+      },
+      "effects": {
+        "icp": "--",
+        "sbp": "+",
+        "bloodVolume": "+"
+      },
+      "contraindications": [],
+      "dangers": [
+        "23.4% peripherally = tissue necrosis"
+      ],
+      "scopeLevel": 5,
+      "controlled": "none",
+      "location": "cc_box"
+    },
+    {
+      "id": "mannitol",
+      "name": "Mannitol 20%",
+      "brand": "Osmitrol",
+      "class": "Osmotic diuretic",
+      "presentations": [
+        {
+          "label": "Mannitol 20% 500 mL (0.2 g/mL)",
+          "g_per_mL": 0.2,
+          "volume_mL": 500,
+          "form": "bag"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "tbi_with_herniation_signs",
+          "dose_g_per_kg": "0.5-1",
+          "route": [
+            "IV over 10-20 min"
+          ]
+        }
+      ],
+      "pk_s": {
+        "IV": [
+          900,
+          3600,
+          21600
+        ]
+      },
+      "effects": {
+        "icp": "--",
+        "urine_output": "+++",
+        "sbp": "- (diuresis)"
+      },
+      "contraindications": [
+        "Hypovolemia / hemorrhagic shock"
+      ],
+      "dangers": [
+        "Hypotension in the bleeding trauma patient — hypertonic saline preferred — trap"
+      ],
+      "scopeLevel": 5,
+      "controlled": "none",
+      "location": "cc_box"
+    },
+    {
+      "id": "oxytocin",
+      "name": "Oxytocin",
+      "brand": "Pitocin",
+      "class": "Uterotonic hormone",
+      "presentations": [
+        {
+          "label": "Oxytocin 10 units/1 mL vial",
+          "units_per_mL": 10,
+          "volume_mL": 1,
+          "form": "vial"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "postpartum_hemorrhage_after_placenta",
+          "dose_units": 10,
+          "route": [
+            "IM"
+          ],
+          "notes": "Or 10-40 units in 1 L NS titrated. Plus fundal massage."
+        }
+      ],
+      "pk_s": {
+        "IM": [
+          180,
+          1200,
+          7200
+        ],
+        "IV": [
+          60,
+          600,
+          3600
+        ]
+      },
+      "effects": {
+        "uterine_tone": "+++",
+        "postpartum_bleed_rate": "--"
+      },
+      "contraindications": [
+        "Before delivery of ALL fetuses (twins!)"
+      ],
+      "dangers": [
+        "Given before second twin delivered = trapped fetus / uterine rupture — trap",
+        "Rapid IV bolus → hypotension"
+      ],
+      "scopeLevel": 4,
+      "controlled": "none",
+      "location": "ob_kit"
+    },
+    {
+      "id": "plasma",
+      "name": "Plasma (thawed/liquid or freeze-dried)",
+      "brand": null,
+      "class": "Blood product",
+      "presentations": [
+        {
+          "label": "Plasma 1 unit (~250 mL)",
+          "volume_mL": 250,
+          "form": "blood_unit",
+          "storage": "cooler / freeze-dried room temp"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "hemorrhagic_shock_coagulopathy",
+          "dose_units": "1-2",
+          "route": [
+            "IV/IO via warmer"
+          ],
+          "notes": "Prehospital plasma improved 30-day survival in air-medical transport (PAMPer). Calcium with blood products."
+        }
+      ],
+      "pk_s": {
+        "IV": [
+          0,
+          0,
+          86400
+        ]
+      },
+      "effects": {
+        "bloodVolume": "+",
+        "coagulation": "++",
+        "sbp": "+"
+      },
+      "contraindications": [],
+      "dangers": [
+        "Hypocalcemia (citrate)",
+        "TRALI (rare)"
+      ],
+      "scopeLevel": 5,
+      "controlled": "none",
+      "location": "blood_cooler"
+    },
+    {
+      "id": "prbc",
+      "name": "Packed Red Blood Cells (O-neg)",
+      "brand": null,
+      "class": "Blood product",
+      "presentations": [
+        {
+          "label": "PRBC 1 unit (~300 mL)",
+          "volume_mL": 300,
+          "form": "blood_unit",
+          "storage": "cooler"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "hemorrhagic_shock",
+          "dose_units": "1-2",
+          "route": [
+            "IV/IO via warmer"
+          ],
+          "notes": "Pair with plasma (1:1). PRBCs alone don't fix coagulopathy."
+        }
+      ],
+      "pk_s": {
+        "IV": [
+          0,
+          0,
+          86400
+        ]
+      },
+      "effects": {
+        "bloodVolume": "+",
+        "o2_carrying": "++",
+        "sbp": "+"
+      },
+      "contraindications": [],
+      "dangers": [
+        "Hypocalcemia",
+        "Hypothermia without warmer",
+        "Coagulopathy if no plasma"
+      ],
+      "scopeLevel": 5,
+      "controlled": "none",
+      "location": "blood_cooler"
+    },
+    {
+      "id": "d5w",
+      "name": "Dextrose 5% in Water (D5W)",
+      "brand": null,
+      "class": "Hypotonic (free water) solution",
+      "presentations": [
+        {
+          "label": "D5W 250 mL bag",
+          "volume_mL": 250,
+          "form": "bag"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "drug_infusion_diluent_only",
+          "notes": "Diluent for some infusions (amiodarone drips). NOT a resuscitation fluid."
+        }
+      ],
+      "pk_s": {
+        "IV": [
+          0,
+          0,
+          3600
+        ]
+      },
+      "effects": {
+        "serum_sodium": "- (large volumes)"
+      },
+      "contraindications": [
+        "Resuscitation of any kind",
+        "TBI (cerebral edema)"
+      ],
+      "dangers": [
+        "Bolusing D5W in shock or TBI is logged as a critical error"
+      ],
+      "scopeLevel": 3,
+      "controlled": "none",
+      "location": "iv_cabinet",
+      "gameRole": "Realistic distractor in the IV cabinet."
+    },
+    {
+      "id": "piperacillin_tazobactam",
+      "name": "Piperacillin-Tazobactam",
+      "brand": "Zosyn",
+      "class": "Antibiotic",
+      "presentations": [
+        {
+          "label": "Pip-tazo 4.5 g vial",
+          "fixedDose_g": 4.5,
+          "form": "reconstitution_kit"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "septic_shock_unknown_source_or_intra_abdominal_or_pleural_contamination",
+          "dose_g": 4.5,
+          "route": [
+            "IV over 30 min"
+          ]
+        }
+      ],
+      "pk_s": {
+        "IV": [
+          0,
+          1800,
+          21600
+        ]
+      },
+      "coverage": {
+        "gramPositive": 2,
+        "MRSA": 0,
+        "gramNegative": 3,
+        "pseudomonas": 3,
+        "anaerobes": 3,
+        "atypical": 0,
+        "neisseria": 2,
+        "toxinSuppression": 0
+      },
+      "effects": {
+        "infection_growth": "- (if organism covered)"
+      },
+      "contraindications": [
+        "Penicillin anaphylaxis"
+      ],
+      "dangers": [
+        "Penicillin-allergic patient: anaphylaxis risk (check the history card)"
+      ],
+      "scopeLevel": 5,
+      "controlled": "none",
+      "location": "cc_box"
+    },
+    {
+      "id": "vancomycin",
+      "name": "Vancomycin",
+      "brand": null,
+      "class": "Antibiotic",
+      "presentations": [
+        {
+          "label": "Vancomycin 1 g vial",
+          "fixedDose_g": 1,
+          "form": "reconstitution_kit"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "suspected_mrsa_or_septic_shock_empiric",
+          "dose_mg_per_kg": "25-30",
+          "route": [
+            "IV over 1-2 h (≥1 g/h max rate)"
+          ]
+        }
+      ],
+      "pk_s": {
+        "IV": [
+          0,
+          3600,
+          43200
+        ]
+      },
+      "coverage": {
+        "gramPositive": 3,
+        "MRSA": 3,
+        "gramNegative": 0,
+        "pseudomonas": 0,
+        "anaerobes": 0,
+        "atypical": 0,
+        "neisseria": 0,
+        "toxinSuppression": 0
+      },
+      "effects": {
+        "infection_growth": "- (if organism covered)"
+      },
+      "contraindications": [],
+      "dangers": [
+        "Infused too fast → vancomycin infusion reaction (flushing, hypotension)",
+        "No gram-negative coverage: pair with another agent"
+      ],
+      "scopeLevel": 5,
+      "controlled": "none",
+      "location": "cc_box"
+    },
+    {
+      "id": "metronidazole",
+      "name": "Metronidazole",
+      "brand": "Flagyl",
+      "class": "Antibiotic",
+      "presentations": [
+        {
+          "label": "Metronidazole 500 mg/100 mL premix",
+          "fixedDose_mg": 500,
+          "form": "premix_bag"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "anaerobic_coverage_fecal_or_abdominal_add_on",
+          "dose_mg": 500,
+          "route": [
+            "IV over 30-60 min"
+          ]
+        }
+      ],
+      "pk_s": {
+        "IV": [
+          0,
+          3600,
+          28800
+        ]
+      },
+      "coverage": {
+        "gramPositive": 0,
+        "MRSA": 0,
+        "gramNegative": 0,
+        "pseudomonas": 0,
+        "anaerobes": 3,
+        "atypical": 0,
+        "neisseria": 0,
+        "toxinSuppression": 0
+      },
+      "effects": {
+        "infection_growth": "- (if organism covered)"
+      },
+      "contraindications": [],
+      "dangers": [
+        "Anaerobes only: pair with ceftriaxone/cefepime",
+        "Disulfiram reaction with alcohol"
+      ],
+      "scopeLevel": 5,
+      "controlled": "none",
+      "location": "cc_box"
+    },
+    {
+      "id": "cefepime",
+      "name": "Cefepime",
+      "brand": "Maxipime",
+      "class": "Antibiotic",
+      "presentations": [
+        {
+          "label": "Cefepime 2 g vial",
+          "fixedDose_g": 2,
+          "form": "reconstitution_kit"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "septic_shock_healthcare_associated_or_pseudomonas_risk",
+          "dose_g": 2,
+          "route": [
+            "IV over 30 min"
+          ]
+        }
+      ],
+      "pk_s": {
+        "IV": [
+          0,
+          1800,
+          28800
+        ]
+      },
+      "coverage": {
+        "gramPositive": 2,
+        "MRSA": 0,
+        "gramNegative": 3,
+        "pseudomonas": 3,
+        "anaerobes": 0,
+        "atypical": 0,
+        "neisseria": 2,
+        "toxinSuppression": 0
+      },
+      "effects": {
+        "infection_growth": "- (if organism covered)"
+      },
+      "contraindications": [
+        "Cephalosporin anaphylaxis"
+      ],
+      "dangers": [
+        "Neurotoxicity in renal failure",
+        "No anaerobes"
+      ],
+      "scopeLevel": 5,
+      "controlled": "none",
+      "location": "cc_box"
+    },
+    {
+      "id": "clindamycin",
+      "name": "Clindamycin",
+      "brand": "Cleocin",
+      "class": "Antibiotic",
+      "presentations": [
+        {
+          "label": "Clindamycin 900 mg/50 mL premix",
+          "fixedDose_mg": 900,
+          "form": "premix_bag"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "necrotizing_soft_tissue_infection_toxin_suppression_or_beta_lactam_allergy",
+          "dose_mg": 900,
+          "route": [
+            "IV over 30 min"
+          ]
+        }
+      ],
+      "pk_s": {
+        "IV": [
+          0,
+          1800,
+          28800
+        ]
+      },
+      "coverage": {
+        "gramPositive": 2,
+        "MRSA": 1,
+        "gramNegative": 0,
+        "pseudomonas": 0,
+        "anaerobes": 2,
+        "atypical": 0,
+        "neisseria": 0,
+        "toxinSuppression": 3
+      },
+      "effects": {
+        "infection_growth": "- (if organism covered)"
+      },
+      "contraindications": [],
+      "dangers": [
+        "Stops toxin production in nec fasc / toxic shock, but must be paired with broad coverage"
+      ],
+      "scopeLevel": 5,
+      "controlled": "none",
+      "location": "cc_box"
+    },
+    {
+      "id": "cefadroxil",
+      "name": "Cefadroxil (TCCC)",
+      "brand": "Duricef",
+      "class": "Antibiotic (1st-gen cephalosporin)",
+      "presentations": [
+        {
+          "label": "Cefadroxil 500 mg capsule",
+          "mg_per_tab": 500,
+          "form": "capsule"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "tccc_open_wound_able_to_swallow",
+          "dose_g": 1,
+          "route": [
+            "PO"
+          ],
+          "repeat": "daily",
+          "notes": "FY26 JTS ERC recommended PO agent."
+        }
+      ],
+      "pk_s": {
+        "PO": [
+          3600,
+          5400,
+          86400
+        ]
+      },
+      "effects": {
+        "infection_growth": "- (if covered)"
+      },
+      "contraindications": [
+        "Cephalosporin anaphylaxis"
+      ],
+      "dangers": [],
+      "scopeLevel": 4,
+      "controlled": "none",
+      "location": "jump_bag",
+      "coverage": {
+        "gramPositive": 3,
+        "MRSA": 0,
+        "gramNegative": 1,
+        "pseudomonas": 0,
+        "anaerobes": 0,
+        "atypical": 0,
+        "neisseria": 0,
+        "toxinSuppression": 0
+      }
+    },
+    {
+      "id": "cephalexin",
+      "name": "Cephalexin",
+      "brand": "Keflex",
+      "class": "Antibiotic (1st-gen cephalosporin)",
+      "presentations": [
+        {
+          "label": "Cephalexin 500 mg capsule",
+          "mg_per_tab": 500,
+          "form": "capsule"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "tccc_open_wound_able_to_swallow_alternative",
+          "dose_mg": 500,
+          "route": [
+            "PO"
+          ],
+          "repeat": "QID"
+        }
+      ],
+      "pk_s": {
+        "PO": [
+          3600,
+          3600,
+          21600
+        ]
+      },
+      "effects": {
+        "infection_growth": "- (if covered)"
+      },
+      "contraindications": [
+        "Cephalosporin anaphylaxis"
+      ],
+      "dangers": [],
+      "scopeLevel": 4,
+      "controlled": "none",
+      "location": "jump_bag",
+      "coverage": {
+        "gramPositive": 3,
+        "MRSA": 0,
+        "gramNegative": 1,
+        "pseudomonas": 0,
+        "anaerobes": 0,
+        "atypical": 0,
+        "neisseria": 0,
+        "toxinSuppression": 0
+      }
+    },
+    {
+      "id": "amoxicillin_clavulanate",
+      "name": "Amoxicillin-Clavulanate",
+      "brand": "Augmentin",
+      "class": "Antibiotic (penicillin + beta-lactamase inhibitor)",
+      "presentations": [
+        {
+          "label": "Amox-clav 875/125 mg tablet",
+          "mg_per_tab": 875,
+          "form": "tablet"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "animal_or_human_bite_prophylaxis",
+          "dose_mg": 875,
+          "route": [
+            "PO"
+          ],
+          "repeat": "BID",
+          "notes": "Covers Pasteurella, Eikenella, anaerobes. Usually ED-started; CC/PFC only."
+        }
+      ],
+      "pk_s": {
+        "PO": [
+          3600,
+          5400,
+          43200
+        ]
+      },
+      "effects": {
+        "infection_growth": "- (if covered)"
+      },
+      "contraindications": [
+        "Penicillin anaphylaxis"
+      ],
+      "dangers": [],
+      "scopeLevel": 5,
+      "controlled": "none",
+      "location": "cc_box",
+      "coverage": {
+        "gramPositive": 2,
+        "MRSA": 0,
+        "gramNegative": 2,
+        "pseudomonas": 0,
+        "anaerobes": 3,
+        "atypical": 0,
+        "neisseria": 0,
+        "toxinSuppression": 0
+      }
+    },
+    {
+      "id": "tetanus_toxoid",
+      "name": "Tetanus toxoid (Tdap/Td)",
+      "brand": "Boostrix / Tenivac",
+      "class": "Vaccine",
+      "presentations": [
+        {
+          "label": "Tdap 0.5 mL prefilled syringe",
+          "volume_mL": 0.5,
+          "form": "prefilled_syringe",
+          "storage": "refrigerated"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "open_wound_tetanus_status_unknown_or_gt_5y",
+          "dose_mL": 0.5,
+          "route": [
+            "IM"
+          ],
+          "notes": "FY26 JTS: give if available and not previously given."
+        }
+      ],
+      "pk_s": {
+        "IM": [
+          604800,
+          1209600,
+          315360000
+        ]
+      },
+      "effects": {
+        "tetanus_risk": "-- (weeks)"
+      },
+      "contraindications": [
+        "Prior severe reaction"
+      ],
+      "dangers": [
+        "No in-call effect"
+      ],
+      "scopeLevel": 4,
+      "controlled": "none",
+      "location": "cc_box"
+    },
+    {
+      "id": "levetiracetam",
+      "name": "Levetiracetam",
+      "brand": "Keppra",
+      "class": "Anticonvulsant",
+      "presentations": [
+        {
+          "label": "Levetiracetam 500 mg/5 mL vial",
+          "mg_per_mL": 100,
+          "volume_mL": 5,
+          "form": "vial"
+        }
+      ],
+      "dosing": [
+        {
+          "indication": "severe_tbi_seizure_prophylaxis",
+          "dose_mg": 1500,
+          "route": [
+            "IV over 15 min"
+          ],
+          "notes": "FY26 JTS: then 1000 mg q12h. Status epilepticus second-line 60 mg/kg max 4.5 g (hospital/CC)."
+        }
+      ],
+      "pk_s": {
+        "IV": [
+          900,
+          3600,
+          43200
+        ]
+      },
+      "effects": {
+        "seizure_threshold": "+"
+      },
+      "contraindications": [],
+      "dangers": [
+        "Somnolence"
+      ],
+      "scopeLevel": 5,
+      "controlled": "none",
+      "location": "cc_box"
+    }
+  ]
+}

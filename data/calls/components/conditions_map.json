@@ -1,0 +1,19 @@
+{
+  "_meta": {
+    "version": "0.0.1",
+    "status": "SKELETON - Dispatch Engine v1 lands Oct 31",
+    "sourceNote": "WEIGHT_EST - probabilities estimated until NEMSIS or NTDB data confirms them"
+  },
+  "mappings": [
+    {
+      "mechanismId": "placeholder_mechanism",
+      "conditions": [
+        {
+          "conditionId": "TODO - first real mapping",
+          "probability": "WEIGHT_EST",
+          "notes": "Placeholder. Oct 31 sampler reads this file."
+        }
+      ]
+    }
+  ]
+}

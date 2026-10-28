@@ -1,0 +1,69 @@
+{
+  "_meta": {
+    "version": "0.1.0",
+    "basis": "Mechanism weights from ACS NTDB Annual Report 2016 (trauma center admissions, n=861,888). Within-mechanism injury probabilities are WEIGHT_EST — replace with NEMSIS/NTDB data when available.",
+    "note": "Weights reflect trauma-center admissions, not all 911 calls. Ground-level falls in the elderly dominate real volume. The generator can apply a 'gameplay mix' multiplier so players don't get 9 hip fractures in a row, but the realistic mix is the default."
+  },
+  "mechanisms": [
+    { "id": "fall", "ntdbShare": 0.442, "caseFatality": 0.0437,
+      "subtypes": [
+        { "id": "ground_level_fall_elderly", "w": 0.70, "patient": "age 65–95", "injuries": [["hip_fracture_elderly", 0.45], ["distal_radius_fracture", 0.2], ["tbi_concussion", 0.25], ["tbi_subdural_delayed", 0.12, "x3 if anticoagulated"], ["rib_fractures_elderly", 0.12], ["scalp_laceration", 0.2]], "medicalCauseCheck": ["syncope", "hypoglycemia", "stroke", "arrhythmia", "UTI/sepsis"] },
+        { "id": "fall_from_ladder_or_roof", "w": 0.2, "patient": "age 30–70", "injuries": [["calcaneus_fracture", 0.25], ["lumbar_burst_fracture", 0.15], ["distal_radius_fracture", 0.2], ["pelvic_fracture", 0.12], ["tbi_concussion", 0.3], ["tbi_epidural", 0.05], ["rib_fractures_elderly", 0.2]] },
+        { "id": "fall_from_height_gt_20ft", "w": 0.1, "patient": "construction, balcony", "injuries": [["tbi_severe", 0.3], ["pelvic_fracture", 0.3], ["femur_fracture", 0.2], ["traumatic_aortic_injury", 0.05], ["solid_organ_hemorrhage", 0.2], ["lumbar_burst_fracture", 0.25], ["calcaneus_fracture", 0.3]] }
+      ] },
+    { "id": "motor_vehicle_traffic", "ntdbShare": 0.26, "caseFatality": 0.0462,
+      "subtypes": [
+        { "id": "mvc_frontal", "w": 0.4, "injuries": [["tbi_concussion", 0.35], ["sternal_fracture", 0.1], ["rib_fractures_elderly", 0.25], ["flail_chest", 0.05], ["solid_organ_hemorrhage", 0.12], ["posterior_hip_dislocation", 0.04], ["femur_fracture", 0.1], ["le_fort_mandible", 0.05], ["traumatic_aortic_injury", 0.02], ["cervical_spine_injury", 0.05]] },
+        { "id": "mvc_lateral_tbone", "w": 0.25, "injuries": [["rib_fractures_elderly", 0.35], ["pelvic_fracture", 0.15], ["solid_organ_hemorrhage", 0.18, "spleen if driver-side hit (US)"], ["traumatic_diaphragmatic_rupture", 0.03], ["tbi_concussion", 0.3], ["cervical_spine_injury", 0.05]] },
+        { "id": "mvc_lap_belt_seatbelt_sign", "w": 0.1, "injuries": [["hollow_viscus_injury", 0.3], ["chance_fracture", 0.2], ["solid_organ_hemorrhage", 0.15]] },
+        { "id": "mvc_rollover_ejection", "w": 0.1, "injuries": [["tbi_severe", 0.3], ["cervical_spine_injury", 0.2], ["limb_degloving_open", 0.1], ["pelvic_fracture", 0.2], ["flail_chest", 0.1], ["traumatic_amputation_limb", 0.03]] },
+        { "id": "motorcycle_crash", "w": 0.1, "injuries": [["femoral_arterial_bleed", 0.08, "fixed in Bike down"], ["open_fracture", 0.3], ["femur_fracture", 0.2], ["road_rash", 0.6], ["limb_degloving_open", 0.1], ["morel_lavallee", 0.05], ["pelvic_fracture", 0.15], ["tbi_concussion", 0.3], ["tbi_severe", 0.12, "x2 if unhelmeted"], ["tension_pneumothorax", 0.06], ["rib_fractures_elderly", 0.25]] },
+        { "id": "pedestrian_struck", "w": 0.05, "injuries": [["open_fracture", 0.35, "tib/fib at bumper height"], ["femur_fracture", 0.15], ["tbi_severe", 0.2], ["pelvic_fracture", 0.2], ["solid_organ_hemorrhage", 0.15]], "pediatricPattern": "Waddell's triad: femur + chest/abdomen + contralateral head" }
+      ] },
+    { "id": "struck_by_against", "ntdbShare": 0.065,
+      "subtypes": [
+        { "id": "assault_blunt", "w": 0.6, "injuries": [["le_fort_mandible", 0.25], ["tbi_concussion", 0.4], ["tbi_epidural", 0.03], ["rib_fractures_elderly", 0.2], ["solid_organ_hemorrhage", 0.06], ["fight_bite", 0.1, "assailant"], ["globe_rupture", 0.03]], "sceneSafety": "assailant may still be present; PD staging" },
+        { "id": "sports_impact", "w": 0.25, "injuries": [["commotio_cordis", 0.02], ["tbi_concussion", 0.5], ["cervical_spine_injury", 0.05], ["dental_avulsion", 0.1], ["distal_radius_fracture", 0.2]] },
+        { "id": "falling_object_or_crush", "w": 0.15, "injuries": [["crush_syndrome", 0.3], ["traumatic_asphyxia", 0.05], ["pelvic_fracture", 0.2], ["compartment_syndrome", 0.15], ["tbi_severe", 0.15]] }
+      ] },
+    { "id": "firearm", "ntdbShare": 0.042, "caseFatality": 0.153,
+      "subtypes": [
+        { "id": "gsw_single_or_multiple", "w": 1.0, "woundCount": "1 (60%), 2–3 (30%), 4+ (10%) WEIGHT_EST",
+          "regionWeights": [["gsw_extremity", 0.45], ["gsw_abdomen", 0.18], ["gsw_chest", 0.18], ["gsw_head", 0.1], ["gsw_neck", 0.04], ["junctional_bleed", 0.05]],
+          "sceneSafety": "PD must clear the scene; stage until secure",
+          "teachingPoint": "Count holes, but don't assume entry/exit pairs or straight trajectories. Log roll and sweep every patient." }
+      ] },
+    { "id": "cut_pierce", "ntdbShare": 0.041,
+      "subtypes": [
+        { "id": "stabbing", "w": 0.6, "regionWeights": [["stab_chest_the_box", 0.15], ["gsw_chest", 0.2, "use chest penetrating model"], ["gsw_abdomen", 0.25, "use abdominal penetrating model"], ["evisceration", 0.08], ["gsw_neck", 0.07], ["penetrating_thoracoabdominal_wound", 0.15], ["impaled_object", 0.1]] },
+        { "id": "tool_machinery_cut", "w": 0.4, "injuries": [["digit_amputation_saw", 0.35], ["traumatic_amputation_limb", 0.03], ["high_pressure_injection", 0.05], ["lawnmower_injury", 0.12], ["ring_avulsion", 0.05], ["scalp_avulsion", 0.02], ["limb_degloving_open", 0.08]] }
+      ] },
+    { "id": "transport_other_and_pedal_cyclist", "ntdbShare": 0.063,
+      "subtypes": [
+        { "id": "bicycle_crash", "w": 0.5, "injuries": [["distal_radius_fracture", 0.25], ["tbi_concussion", 0.35], ["road_rash", 0.6], ["solid_organ_hemorrhage", 0.04, "handlebar"], ["hollow_viscus_injury", 0.03, "handlebar"]] },
+        { "id": "atv_or_dirtbike", "w": 0.5, "injuries": [["femur_fracture", 0.2], ["open_fracture", 0.2], ["tbi_concussion", 0.3], ["crush_syndrome", 0.05, "rollover pin"], ["limb_degloving_open", 0.05]] }
+      ] },
+    { "id": "burn_fire_flame", "ntdbShare": 0.02, "caseFatality": 0.0593,
+      "subtypes": [
+        { "id": "house_fire", "w": 0.6, "injuries": [["burn_partial_thickness", 0.8], ["burn_full_thickness_circumferential", 0.15], ["inhalation_injury", 0.4]], "sceneSafety": "fire department controls the scene" },
+        { "id": "electrical", "w": 0.15, "injuries": [["electrical_injury", 1.0]] },
+        { "id": "chemical", "w": 0.15, "injuries": [["chemical_burn", 0.8], ["chemical_eye", 0.3]] },
+        { "id": "fireworks", "w": 0.1, "injuries": [["firework_hand_blast", 1.0]] }
+      ] },
+    { "id": "other_unusual", "ntdbShare": 0.02,
+      "subtypes": [
+        { "id": "dog_attack", "w": 0.4, "injuries": [["dog_bite", 1.0]] },
+        { "id": "diving_shallow_water", "w": 0.15, "injuries": [["diving_injury", 1.0]] },
+        { "id": "ring_or_jewelry_catch", "w": 0.15, "injuries": [["ring_avulsion", 1.0]] },
+        { "id": "fishing_or_outdoor", "w": 0.15, "injuries": [["fishhook", 0.8], ["impaled_object", 0.1]] },
+        { "id": "explosion_industrial", "w": 0.15, "injuries": [["tympanic_membrane_rupture", 0.6], ["blast_lung", 0.15], ["burn_partial_thickness", 0.5], ["gsw_extremity", 0.3, "fragment wounds use penetrating extremity model"], ["traumatic_amputation_limb", 0.1]] }
+      ] }
+  ],
+  "universalModifiers": {
+    "hypothermia_trauma": "Spawned on every major trauma; rate depends on environment, exposure time, wetness, fluids.",
+    "anticoagulant": "x1.5–3 bleed rate, x3 delayed subdural (WEIGHT_EST)",
+    "beta_blocker": "Blunts tachycardia — shock looks normal",
+    "intoxication": "Unreliable exam, combative, masks pain",
+    "age_gt_65": "Lower compensation reserve; rib fractures far more dangerous"
+  }
+}

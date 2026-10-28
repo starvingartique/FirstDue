@@ -1,0 +1,16 @@
+{
+  "_meta": {
+    "version": "0.0.1",
+    "status": "SKELETON - one placeholder entry keeps the file schema-complete. Full ACM inventory lands Oct 28-29."
+  },
+  "equipment": [
+    {
+      "id": "placeholder_cat_tourniquet",
+      "name": "TODO_CLINICAL - first real entry: CAT tourniquet",
+      "category": "hemorrhage",
+      "location": "jump_bag",
+      "quantity": "TODO_CLINICAL",
+      "notes": "Placeholder. Oct 28 adds the hemorrhage kit; Oct 29 adds airway, breathing, circulation, monitor and the rest."
+    }
+  ]
+}

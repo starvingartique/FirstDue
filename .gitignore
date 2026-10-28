@@ -1,0 +1,26 @@
+# Deps and build output
+node_modules/
+dist/
+build/
+*.tsbuildinfo
+
+# Server secrets - the Meta key lives ONLY here, never committed
+server/.env
+server/.env.*
+!server/.env.example
+
+# Any other env files, except examples
+.env
+.env.*
+!.env.example
+
+# OS noise
+.DS_Store
+Thumbs.db
+
+# Generated call cache (local only, large and regenerable)
+data/calls/cache/*.json
+!data/calls/cache/.gitkeep
+
+# Logs
+*.log

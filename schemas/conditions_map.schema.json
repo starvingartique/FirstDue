@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://firstdue.game/schemas/conditions_map.schema.json",
+  "title": "conditions_map.json - mechanism to condition probabilities",
+  "description": "Maps mechanism or cause ids to conditions with probabilities, co-occurrence and exclusion rules, and onset delays. Skeleton holds placeholders only.",
+  "type": "object",
+  "required": ["_meta", "mappings"],
+  "properties": {
+    "_meta": {
+      "type": "object",
+      "required": ["version", "status"],
+      "properties": {
+        "version": { "type": "string" },
+        "status": { "type": "string" },
+        "sourceNote": { "type": "string" }
+      }
+    },
+    "mappings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["mechanismId", "conditions"],
+        "properties": {
+          "mechanismId": { "type": "string" },
+          "conditions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["conditionId", "probability"],
+              "properties": {
+                "conditionId": { "type": "string" },
+                "probability": {
+                  "anyOf": [{ "type": "number" }, { "type": "string" }]
+                },
+                "onsetDelay_s": {
+                  "anyOf": [{ "type": "number" }, { "type": "string" }]
+                },
+                "coOccursWith": { "type": "array", "items": { "type": "string" } },
+                "excludes": { "type": "array", "items": { "type": "string" } },
+                "notes": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

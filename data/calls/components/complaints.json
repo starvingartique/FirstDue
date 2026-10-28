@@ -1,0 +1,16 @@
+{
+  "_meta": {
+    "version": "0.0.1",
+    "status": "SKELETON - weights are WEIGHT_EST until NEMSIS data lands",
+    "sourceNote": "WEIGHT_EST - replace with NEMSIS Public-Release Research Dataset when access arrives"
+  },
+  "complaints": [
+    {
+      "id": "placeholder_fall",
+      "label": "TODO - first real entry: fall",
+      "weight": "WEIGHT_EST",
+      "sourceNote": "WEIGHT_EST",
+      "minLevel": 1
+    }
+  ]
+}

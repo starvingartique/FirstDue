@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://firstdue.game/schemas/patients.schema.json",
+  "title": "patients.json - age/sex/weight distributions per complaint",
+  "description": "Sampler draws patient demographics from these distributions. Skeleton holds placeholders only.",
+  "type": "object",
+  "required": ["_meta", "distributions"],
+  "properties": {
+    "_meta": {
+      "type": "object",
+      "required": ["version", "status"],
+      "properties": {
+        "version": { "type": "string" },
+        "status": { "type": "string" },
+        "sourceNote": { "type": "string" }
+      }
+    },
+    "distributions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["complaintId", "ageRange", "sexSplit"],
+        "properties": {
+          "complaintId": { "type": "string" },
+          "ageRange": {
+            "anyOf": [
+              { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2 },
+              { "type": "string" }
+            ]
+          },
+          "sexSplit": { "type": "object" },
+          "weight_kg": { "type": "object" },
+          "notes": { "type": "string" }
+        }
+      }
+    }
+  }
+}

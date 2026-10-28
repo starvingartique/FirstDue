@@ -1,0 +1,49 @@
+{
+  "_meta": {
+    "version": "0.0.1",
+    "status": "SKELETON - Carlos must fill every TODO_CLINICAL field before the Oct 28 engine build. TUNE fields are gameplay tuning, set by the dev."
+  },
+  "baselines": {
+    "heartRate_bpm": "TODO_CLINICAL",
+    "respRate_per_min": "TODO_CLINICAL",
+    "sbp_mmhg": "TODO_CLINICAL",
+    "dbp_mmhg": "TODO_CLINICAL",
+    "spo2_pct": "TODO_CLINICAL",
+    "etco2_mmhg": "TODO_CLINICAL",
+    "gcs": "TODO_CLINICAL",
+    "glucose_mg_per_dL": "TODO_CLINICAL",
+    "coreTemp_C": "TODO_CLINICAL",
+    "capRefill_s": "TODO_CLINICAL",
+    "bloodVolume_mL_per_kg": "TODO_CLINICAL",
+    "tidalVolume_mL_per_kg": "TODO_CLINICAL"
+  },
+  "shockClasses": {
+    "classI_loss_lt_15pct": "TODO_CLINICAL",
+    "classII_loss_15_30pct": "TODO_CLINICAL",
+    "classIII_loss_30_40pct": "TODO_CLINICAL",
+    "classIV_loss_gt_40pct": "TODO_CLINICAL",
+    "compensationOrder": "TODO_CLINICAL",
+    "shockIndexFlag": "TODO_CLINICAL"
+  },
+  "effectTokens": {
+    "_tag": "TUNE",
+    "plus": "TUNE",
+    "plusplus": "TUNE",
+    "plusplusplus": "TUNE",
+    "minus": "TUNE",
+    "minusminus": "TUNE",
+    "minusminusminus": "TUNE"
+  },
+  "bleedRates_mL_per_min": {
+    "_tag": "TUNE - anchors mirror trauma_library bleedClassAnchors until Carlos confirms",
+    "capillary": "TUNE",
+    "venous_minor": "TUNE",
+    "venous_major": "TUNE",
+    "arterial_minor": "TUNE",
+    "arterial_major": "TUNE",
+    "junctional": "TUNE",
+    "internal_slow": "TUNE",
+    "internal_fast": "TUNE",
+    "internal_massive": "TUNE"
+  }
+}

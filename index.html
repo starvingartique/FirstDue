@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>First Due - Oct 27 Skeleton</title>
+  </head>
+  <body>
+    <div id="app">
+      <canvas id="scene"></canvas>
+      <div id="crosshair" aria-hidden="true"></div>
+      <header id="hud-top">
+        <div id="call-title">Loading call data...</div>
+        <nav id="spot-nav" aria-label="Camera spots">
+          <button type="button" data-spot="patient" class="spot-btn active">1 Patient</button>
+          <button type="button" data-spot="kit" class="spot-btn">2 Kit bags</button>
+          <button type="button" data-spot="bystander" class="spot-btn">3 Bystander</button>
+        </nav>
+      </header>
+      <aside id="region-panel" aria-live="polite">
+        <div id="region-title">No region selected</div>
+        <div id="region-sub">Click a body region. Medical menu arrives Oct 28.</div>
+        <div id="region-chips" aria-label="Body regions"></div>
+      </aside>
+      <aside id="debug-overlay" hidden>
+        <h2>DEBUG - engine state (placeholder)</h2>
+        <dl id="debug-vitals"></dl>
+        <p id="debug-note">Fake values. Live engine feed lands Oct 28.</p>
+      </aside>
+      <footer id="hud-bottom">
+        <span>Drag to look - Click body to select - F1 debug - 1/2/3 camera</span>
+      </footer>
+      <div id="boot-error" hidden></div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

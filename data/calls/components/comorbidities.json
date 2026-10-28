@@ -1,0 +1,17 @@
+{
+  "_meta": {
+    "version": "0.0.1",
+    "status": "SKELETON - Dispatch Engine v1 lands Oct 31",
+    "sourceNote": "WEIGHT_EST - prevalence estimated until NEMSIS data confirms it"
+  },
+  "entries": [
+    {
+      "id": "placeholder_beta_blocker",
+      "label": "TODO - first real entry: beta-blocker use (blunts tachycardia)",
+      "homeMeds": ["TODO_CLINICAL"],
+      "physiologyModifiers": { "note": "TODO_CLINICAL - how this modifies the compensation curve" },
+      "weight": "WEIGHT_EST",
+      "notes": "Placeholder. Oct 31 sampler reads this file."
+    }
+  ]
+}

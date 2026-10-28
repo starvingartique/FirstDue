@@ -1,0 +1,9 @@
+TODO - Radio report prompt lands Oct 30 with the end-to-end Bike down build.
+
+Intent: play the ED charge nurse receiving the voice report. Grade the report for
+MIST/SBAR elements and ask follow-ups for whatever is missing. Never change engine state.
+
+Current engine state:
+{{STATE}}
+
+{{EXTRA}}

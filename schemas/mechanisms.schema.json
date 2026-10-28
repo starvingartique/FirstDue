@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://firstdue.game/schemas/mechanisms.schema.json",
+  "title": "mechanisms.json - trauma mechanisms and injury patterns",
+  "description": "NTDB-weighted mechanisms with subtypes and injury tables. Matches the provided DRAFT file.",
+  "type": "object",
+  "required": ["_meta", "mechanisms"],
+  "properties": {
+    "_meta": {
+      "type": "object",
+      "required": ["version"],
+      "properties": {
+        "version": { "type": "string" },
+        "basis": { "type": "string" },
+        "note": { "type": "string" }
+      }
+    },
+    "mechanisms": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "subtypes"],
+        "properties": {
+          "id": { "type": "string" },
+          "ntdbShare": { "type": "number" },
+          "caseFatality": { "type": "number" },
+          "subtypes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["id"],
+              "properties": {
+                "id": { "type": "string" },
+                "w": { "type": "number" },
+                "patient": { "type": "string" },
+                "injuries": { "type": "array", "items": { "type": "array" } },
+                "regionWeights": { "type": "array", "items": { "type": "array" } },
+                "woundCount": { "type": "string" },
+                "medicalCauseCheck": { "type": "array", "items": { "type": "string" } },
+                "pediatricPattern": { "type": "string" },
+                "sceneSafety": { "type": "string" },
+                "teachingPoint": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "universalModifiers": { "type": "object", "additionalProperties": { "type": "string" } }
+  }
+}

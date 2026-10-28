@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://firstdue.game/schemas/trauma_library.schema.json",
+  "title": "trauma_library.json - injury catalog",
+  "description": "84 injuries with MARCH step, bleed class, findings, spawns, fixes, traps and infection seeds. Matches the provided DRAFT file.",
+  "type": "object",
+  "required": ["_meta", "injuries"],
+  "properties": {
+    "_meta": {
+      "type": "object",
+      "required": ["version", "status"],
+      "properties": {
+        "version": { "type": "string" },
+        "status": { "type": "string" }
+      }
+    },
+    "injuries": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/injury" }
+    }
+  },
+  "$defs": {
+    "injury": {
+      "type": "object",
+      "description": "Entries with ref point into conditions.json and carry no name of their own.",
+      "required": ["id"],
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "cat": { "type": "string" },
+        "region": { "type": "string" },
+        "march": { "type": "string" },
+        "bleed": { "type": "string" },
+        "findings": {
+          "type": "object",
+          "additionalProperties": { "type": "array", "items": { "type": "string" } }
+        },
+        "spawns": { "type": "array", "items": { "type": "array" } },
+        "fix": { "type": "array", "items": { "type": "string" } },
+        "traps": { "type": "array", "items": { "type": "string" } },
+        "infection": { "type": "object" },
+        "ref": { "type": "string" },
+        "stub": { "type": "boolean" },
+        "minLevel": { "type": "integer", "minimum": 1, "maximum": 5 }
+      }
+    }
+  }
+}

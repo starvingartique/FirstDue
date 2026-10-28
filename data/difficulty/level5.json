@@ -1,0 +1,15 @@
+{
+  "level": 5,
+  "role": "Critical Care",
+  "vitalsDisplay": "manual",
+  "hints": false,
+  "deterioration": "real",
+  "grading": "parked",
+  "customDials": {
+    "informationClarity": "measured with artifact",
+    "patientComplexity": "high",
+    "outcomeRealism": "realistic",
+    "gore": "clinical"
+  },
+  "notes": "Grading parked until after Nov 4. Nothing automated. Kit items already exist."
+}

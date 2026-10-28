@@ -1,0 +1,243 @@
+{
+  "_meta": {
+    "version": "0.1.0",
+    "status": "DRAFT — medic review required. Values tagged TUNE are gameplay tuning anchors, not clinical constants.",
+    "rules": [
+      "Conditions modify true physiological state per tick. They never set displayed values directly.",
+      "findings are returned only when the player performs that assessment action on that region.",
+      "spawns: conditions this one can create later (probability, delay, trigger).",
+      "generatorReady: false until a medic has reviewed and the engine models every effect listed."
+    ]
+  },
+
+  "infectionModel": {
+    "description": "Generic engine object. Every infection is an instance of this with a source, organism profile, and load.",
+    "fields": {
+      "source": ["lung", "urinary", "skin_soft_tissue", "intra_abdominal", "pleural_empyema", "mediastinal", "bloodstream", "cns", "wound", "line_related"],
+      "organismProfile": "weights 0-1 across: gramPositive, MRSA, gramNegative, pseudomonas, anaerobes, atypical, neisseria, toxinProducing",
+      "load": "0-100 abstract bacterial burden",
+      "growthRate_per_hr": "TUNE base rate × host factors",
+      "hostFactors": { "diabetes": 1.3, "immunosuppressed": 1.6, "age_gt_65": 1.3, "asplenia": 2.0, "_tag": "TUNE" },
+      "needsSourceControl": "true for abscess, empyema, fecal contamination, necrotizing infection, perforation — antibiotics only SLOW these, they never cure. Source control happens at the hospital (simulated in the outcome projection)."
+    },
+    "antibioticEffect": "growth × (1 − matchScore). matchScore = weighted overlap of drug.coverage (0-3, normalized) with organismProfile. Wrong-spectrum drug ≈ no effect. Logged: time-to-first-antibiotic, appropriateness of coverage.",
+    "allergy": "If the history card lists penicillin anaphylaxis: penicillins high reaction risk; cephalosporins ~1-2%; carbapenems <1% (TUNE). Reaction = the anaphylaxis condition.",
+    "iatrogenicRisk": "Skipping BSI/gloves, no skin prep before IV/IO, an IO through a dirty/burned site, or reusing contaminated gear adds wound or line_related infection seeds (small load, shows in the outcome projection)."
+  },
+
+  "sepsisModel": {
+    "description": "Driven by total infection load + host response. Stages escalate as load crosses thresholds (TUNE).",
+    "stages": [
+      { "id": "local", "threshold_load": 0, "effects": {} },
+      { "id": "sirs", "threshold_load": 30, "effects": { "coreTemp": ">38.3 or <36 (elderly/immunosuppressed trend low)", "heartRate": "+ (>90)", "respRate": "+ (>20)" } },
+      { "id": "sepsis_organ_dysfunction", "threshold_load": 55, "effects": { "gcs": "- (confusion)", "lactate": "≥2", "sbp": "-", "urine_output": "-" }, "flags": ["qSOFA ≥2: RR ≥22, AMS, SBP ≤100"] },
+      { "id": "septic_shock", "threshold_load": 75, "effects": { "svr": "--- (vasodilation)", "map": "<65 despite fluids", "lactate": ">4", "skin": "warm/flushed early → cold/mottled late", "coagulation": "-- (DIC)", "spo2": "- (ARDS)" } }
+    ],
+    "treatmentResponses": {
+      "crystalloid_30mL_per_kg": "transiently raises MAP; reassess lung sounds (overload → pulmonary edema)",
+      "norepinephrine": "first-line vasopressor for MAP <65 after fluids",
+      "early_antibiotics": "each hour of delay worsens projected mortality (TUNE ~ +4–8%/h in shock)",
+      "hydrocortisone": "only for vasopressor-dependent shock or known adrenal insufficiency",
+      "o2": "titrate SpO2 94–98%"
+    },
+    "assessmentTools": ["thermometer", "point-of-care lactate meter", "glucometer", "EtCO2 (<25 correlates with high lactate)", "mental status", "skin/cap refill", "qSOFA calculation by the player"]
+  },
+
+  "conditions": [
+    {
+      "id": "sternal_fracture",
+      "name": "Sternal fracture",
+      "region": "chest_center",
+      "mechanisms": ["steering_wheel_impact", "seatbelt_high_speed", "direct_blow", "cpr_complication"],
+      "effects": { "painScore": "+3", "tidalVolume_mL": "-15% (splinting, TUNE)" },
+      "findings": {
+        "inspect": ["seatbelt/steering-wheel bruising over the sternum"],
+        "palpate": ["point tenderness over the sternum", "step-off or crepitus"],
+        "patient": ["'It hurts to breathe in'"]
+      },
+      "spawns": [{ "id": "blunt_cardiac_injury", "probability": 0.2, "delay_s": "0-1800", "_tag": "TUNE" }],
+      "reducedBy": { "analgesia": "painScore − per drug" },
+      "teachingPoint": "The sternum itself is rarely the killer. What's behind it (heart, aorta) is. Get a 12-lead and monitor.",
+      "minLevel": 2,
+      "generatorReady": false
+    },
+    {
+      "id": "blunt_cardiac_injury",
+      "name": "Blunt cardiac injury (myocardial contusion)",
+      "region": "chest_center",
+      "effects": { "rhythm": "random from [sinus_tach, PVCs, new_RBBB, afib, VT, VF] weighted toward benign (TUNE)", "contractility": "- if severe", "sbp": "- if pump failure" },
+      "findings": { "monitor": ["unexplained tachycardia", "ectopy"], "12lead": ["new RBBB", "ST changes"] },
+      "resolvedBy": [],
+      "reducedBy": {},
+      "teachingPoint": "Treat arrhythmias per ACLS. No field fix: monitor, defib pads on, trauma center.",
+      "minLevel": 4,
+      "generatorReady": false
+    },
+    {
+      "id": "flail_chest",
+      "name": "Flail chest",
+      "region": "chest_left|chest_right",
+      "effects": { "tidalVolume_mL": "-30%", "spo2": "−1%/min untreated (TUNE)", "painScore": "+4", "pulmonary_contusion": "spawns underlying (SpO2 worsens over hours)" },
+      "findings": { "inspect": ["paradoxical chest wall segment moving IN on inspiration"], "palpate": ["crepitus, multiple rib fractures"] },
+      "reducedBy": { "positive_pressure_cpap_or_bvm": 0.6, "analgesia": 0.2 },
+      "dangers": ["Overzealous crystalloid worsens underlying pulmonary contusion"],
+      "minLevel": 2,
+      "generatorReady": false
+    },
+    {
+      "id": "penetrating_thoracoabdominal_wound",
+      "name": "Penetrating thoracoabdominal wound",
+      "region": "chest_lower|upper_abdomen|flank|back_lower",
+      "description": "Any penetrating wound below the nipple line (front) or scapular tip (back): assume BOTH chest and abdomen are injured.",
+      "effects": {},
+      "findings": { "inspect": ["stab/GSW wound below the nipple line or scapular tip"] },
+      "spawns": [
+        { "id": "traumatic_diaphragmatic_rupture", "probability": 0.4, "delay_s": 0 },
+        { "id": "hollow_viscus_perforation_thoracic_contamination", "probability": 0.25, "delay_s": 0, "requires": "traumatic_diaphragmatic_rupture" },
+        { "id": "open_pneumothorax", "probability": 0.3, "delay_s": 0 },
+        { "id": "solid_organ_hemorrhage", "probability": 0.35, "delay_s": 0, "notes": "liver (right) / spleen (left)" }
+      ],
+      "_tag": "probabilities TUNE",
+      "minLevel": 2,
+      "generatorReady": false
+    },
+    {
+      "id": "traumatic_diaphragmatic_rupture",
+      "name": "Traumatic diaphragmatic rupture with herniation",
+      "region": "chest_left (≈75% left; liver shields right)",
+      "mechanisms": ["high_speed_mvc_lateral_impact", "lap_belt_compression", "fall_from_height", "penetrating_thoracoabdominal"],
+      "herniatedContents": ["stomach", "colon (splenic flexure)", "small_bowel", "spleen", "omentum"],
+      "effects": {
+        "tidalVolume_mL": "−20–40% left lung compression (TUNE)",
+        "spo2": "-",
+        "respRate": "+",
+        "gastric_distension": "tracked; rises with BVM overventilation, crying/air swallowing, positive pressure"
+      },
+      "stages": [
+        { "id": "stable_herniation", "notes": "may be subtle or delayed hours to years" },
+        { "id": "tension_gastrothorax", "trigger": "gastric_distension > threshold (TUNE)", "effects": { "mediastinal_shift": true, "sbp": "--- (obstructive shock)", "heartRate": "++", "jvd": true }, "notes": "Behaves like a tension pneumothorax." }
+      ],
+      "findings": {
+        "auscultate_chest_left": ["decreased breath sounds", "BOWEL SOUNDS IN THE CHEST (gurgling)"],
+        "percuss_chest_left": ["tympany or dullness (variable)"],
+        "inspect_abdomen": ["scaphoid (sunken) abdomen"],
+        "patient": ["shortness of breath, worse lying flat", "left shoulder pain (Kehr's sign, referred)"]
+      },
+      "resolvedBy": [],
+      "reducedBy": { "og_ng_tube_gastric_decompression": "gastric_distension → near 0; reverses tension gastrothorax", "avoid_overventilation": "slows distension" },
+      "traps": [
+        "NEEDLE DECOMPRESSION into a herniated stomach: gas escapes (brief improvement, possibly) but punctures the stomach → spawns hollow_viscus_perforation_thoracic_contamination (gastric). Logged as an iatrogenic injury unless the clinical picture was indistinguishable from tension pneumo (the FTO explains why).",
+        "Finger thoracostomy: feeling bowel/stomach in the pleural space instead of air = diagnosis. Do not dig further.",
+        "Pneumatic devices / PASG / tight abdominal binding increase intra-abdominal pressure → more herniation."
+      ],
+      "teachingPoint": "Hear bowel sounds in the chest = gut in the chest. Decompress the STOMACH (OG tube), not the chest. Trauma center, surgery.",
+      "minLevel": 4,
+      "generatorReady": false
+    },
+    {
+      "id": "hollow_viscus_perforation_thoracic_contamination",
+      "name": "Herniated stomach/colon perforation with pleural contamination",
+      "region": "chest_left (pleural space)",
+      "variants": {
+        "gastric": { "organismProfile": { "gramPositive": 0.5, "gramNegative": 0.3, "anaerobes": 0.3, "_note": "acid = chemical pleuritis first; lower bacterial load" }, "initialLoad": 15, "chemical_injury": "pain ++, pleural effusion grows" },
+        "fecal": { "organismProfile": { "gramNegative": 0.9, "anaerobes": 0.9, "gramPositive": 0.4 }, "initialLoad": 40, "notes": "Highest-mortality contamination. Feculent empyema." }
+      },
+      "effects": {
+        "spawns_infection": { "source": "pleural_empyema", "needsSourceControl": true },
+        "pleural_fluid_mL_per_hr": "TUNE (effusion compresses lung over hours)",
+        "painScore": "+2",
+        "on_scene_visible_change": "minimal in the first hour — SIRS/sepsis develops over HOURS (see outcome projection)"
+      },
+      "findings": {
+        "finger_thoracostomy_or_chest_tube": ["food particles / bilious fluid (gastric)", "feculent, foul-smelling brown fluid (fecal)"],
+        "smell": ["fecal odor from the chest wound (penetrating fecal variant)"]
+      },
+      "reducedBy": { "antibiotic_with_anaerobe_and_gram_negative_coverage": "growth − (ertapenem, pip-tazo, or ceftriaxone + metronidazole)" },
+      "wrongChoices": { "cefazolin_alone": "poor anaerobe/gram-negative coverage → minimal effect", "no_antibiotic_on_long_transport": "projected empyema + septic shock" },
+      "gore": "Clinical setting shows contaminated drainage. Reduced setting desaturates and abstracts it.",
+      "teachingPoint": "You can't fix this in the field. Win by recognizing it, early broad antibiotics on long transports, not making it worse, and the right destination.",
+      "minLevel": 5,
+      "generatorReady": false
+    },
+    {
+      "id": "esophageal_perforation_mediastinitis",
+      "name": "Esophageal perforation → mediastinitis",
+      "region": "neck|chest_center",
+      "mechanisms": ["boerhaave_forceful_vomiting (often after alcohol binge)", "penetrating_neck_or_chest", "foreign_body_or_caustic_ingestion"],
+      "effects": {
+        "spawns_infection": { "source": "mediastinal", "organismProfile": { "gramPositive": 0.6, "gramNegative": 0.5, "anaerobes": 0.7 }, "initialLoad": 25, "needsSourceControl": true },
+        "painScore": "+6",
+        "subcutaneous_emphysema": "spreads over minutes to hours"
+      },
+      "findings": {
+        "patient": ["severe chest/back pain that started after violent vomiting"],
+        "palpate_neck_chest": ["crepitus (subcutaneous air)"],
+        "auscultate_chest": ["Hamman's crunch (crackling synchronous with heartbeat)"],
+        "history_card": ["binge drinking, retching"]
+      },
+      "mimics": ["ACS", "aortic dissection", "pancreatitis", "spontaneous pneumothorax"],
+      "traps": ["Giving PO meds (aspirin, oral glucose, charcoal) leaks more into the mediastinum", "Treating as ACS with heparin/lytics"],
+      "teachingPoint": "Vomiting followed by tearing chest pain plus subQ air = Boerhaave until proven otherwise. NPO, antibiotics, surgery-capable center.",
+      "minLevel": 4,
+      "generatorReady": false
+    },
+    {
+      "id": "urosepsis",
+      "name": "Urosepsis",
+      "region": "systemic",
+      "patientProfile": "elderly, nursing home, indwelling catheter, diabetic",
+      "effects": { "spawns_infection": { "source": "urinary", "organismProfile": { "gramNegative": 0.9, "pseudomonas": 0.3, "gramPositive": 0.2 }, "initialLoad": 50 } },
+      "findings": { "inspect": ["foley catheter with cloudy/foul urine"], "patient": ["new confusion (family: 'she's not herself')"], "thermometer": ["may be HYPOthermic in the elderly"] },
+      "teachingPoint": "Altered elderly patient with normal vitals at rest still needs a temp, a glucose and a lactate.",
+      "minLevel": 2,
+      "generatorReady": false
+    },
+    {
+      "id": "pneumonia_sepsis",
+      "name": "Community-acquired pneumonia with sepsis",
+      "region": "lung_left|lung_right|bilateral",
+      "effects": { "spawns_infection": { "source": "lung", "organismProfile": { "gramPositive": 0.7, "atypical": 0.4, "gramNegative": 0.3 }, "initialLoad": 45 }, "spo2": "-", "respRate": "+" },
+      "findings": { "auscultate": ["focal crackles", "bronchial breath sounds"], "patient": ["productive cough, fever, rigors"] },
+      "mimics": ["CHF (furosemide trap: dehydrated septic patient)"],
+      "minLevel": 2,
+      "generatorReady": false
+    },
+    {
+      "id": "meningococcemia",
+      "name": "Meningococcal sepsis",
+      "region": "systemic",
+      "patientProfile": "teen/young adult, dorm or barracks",
+      "effects": { "spawns_infection": { "source": "bloodstream", "organismProfile": { "neisseria": 1.0 }, "initialLoad": 55, "growthRate_multiplier": 3.0, "_tag": "TUNE — fastest killer in the library" } },
+      "findings": { "inspect_skin": ["non-blanching petechial → purpuric rash spreading over minutes"], "patient": ["headache, neck stiffness, photophobia"] },
+      "reducedBy": { "ceftriaxone": "strong" },
+      "crewSafety": "Droplet precautions: surgical mask on patient + N95/mask for the crew. Missing it is logged as a crew exposure.",
+      "teachingPoint": "The rash spreading while you watch is the clock. Antibiotics within minutes if the transport is long.",
+      "minLevel": 4,
+      "generatorReady": false
+    },
+    {
+      "id": "necrotizing_soft_tissue_infection",
+      "name": "Necrotizing fasciitis",
+      "region": "any_limb|perineum (Fournier's)",
+      "effects": { "spawns_infection": { "source": "skin_soft_tissue", "organismProfile": { "gramPositive": 0.7, "toxinProducing": 0.8, "anaerobes": 0.5, "gramNegative": 0.4 }, "initialLoad": 50, "needsSourceControl": true } },
+      "findings": { "patient": ["pain out of proportion to how it looks"], "palpate": ["crepitus", "woody induration", "skin dusky, bullae"], "history_card": ["diabetic, small cut days ago"] },
+      "reducedBy": { "clindamycin_plus_broad_spectrum": "growth − and toxin suppression" },
+      "teachingPoint": "Pain out of proportion plus crepitus = surgical emergency.",
+      "minLevel": 4,
+      "generatorReady": false
+    }
+  ],
+
+  "outcomeProjection": {
+    "description": "After handoff, the engine fast-forwards a coarse hospital course (0-72 h) from the final state + event log. Deterministic per seed. The FTO narrates it in the debrief.",
+    "inputs": ["final physiology state", "active infections + load + coverage", "time to first antibiotic", "contamination events (incl. iatrogenic)", "hemorrhage volume + blood products", "destination appropriateness", "transport time"],
+    "outputs_examples": [
+      "Feculent empyema at 18 h; thoracotomy + washout; survived ICU stay — your ertapenem at 14 min cut projected septic shock risk.",
+      "Admitted with septic shock; antibiotics first given at the ED, 52 min after your contact — FTO notes long transport without antibiotics.",
+      "Line infection at the IO site (non-sterile placement)."
+    ],
+    "rule": "Hospital events are summarized, never played. They reflect field decisions, not luck alone (realism dial controls randomness)."
+  },
+
+  "equipmentAdditions": ["OG and NG tubes + lube + 60 mL catheter-tip syringe (gastric decompression)", "Point-of-care lactate meter", "Chlorhexidine prep (asepsis tracked)", "Surgical masks / N95 / gowns (droplet + contact precautions)", "Chest tube kit (CC interfacility)"]
+}

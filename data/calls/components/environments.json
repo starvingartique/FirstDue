@@ -1,0 +1,18 @@
+{
+  "_meta": {
+    "version": "0.0.1",
+    "status": "SKELETON - Dispatch Engine v1 lands Oct 31",
+    "sourceNote": "WEIGHT_EST - weights estimated"
+  },
+  "environments": [
+    {
+      "id": "placeholder_roadside_night",
+      "label": "TODO - first real entry: roadside at night (matches Bike down)",
+      "timesOfDay": ["night"],
+      "weather": ["clear"],
+      "hazards": ["traffic"],
+      "weight": "WEIGHT_EST",
+      "notes": "Placeholder. Oct 31 sampler reads this file."
+    }
+  ]
+}

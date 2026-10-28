@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://firstdue.game/schemas/difficulty.schema.json",
+  "title": "difficulty level - same box, different help",
+  "description": "Schema for /data/difficulty/levelN.json. Difficulty changes help, information and pace only. The kit is identical at every level.",
+  "type": "object",
+  "required": ["level", "role", "vitalsDisplay", "hints", "deterioration", "grading", "notes"],
+  "properties": {
+    "level": { "type": "integer", "minimum": 1, "maximum": 5 },
+    "role": { "type": "string" },
+    "vitalsDisplay": { "type": "string" },
+    "hints": { "type": "boolean" },
+    "deterioration": { "type": "string" },
+    "grading": { "type": "string" },
+    "customDials": { "type": "object" },
+    "notes": { "type": "string" }
+  }
+}

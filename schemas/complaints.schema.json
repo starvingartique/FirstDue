@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://firstdue.game/schemas/complaints.schema.json",
+  "title": "complaints.json - dispatch chief complaints with frequency weights",
+  "description": "Seeded sampler draws the complaint first. Weights are WEIGHT_EST until NEMSIS data lands.",
+  "type": "object",
+  "required": ["_meta", "complaints"],
+  "properties": {
+    "_meta": {
+      "type": "object",
+      "required": ["version", "status"],
+      "properties": {
+        "version": { "type": "string" },
+        "status": { "type": "string" },
+        "sourceNote": { "type": "string" }
+      }
+    },
+    "complaints": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "label", "weight"],
+        "properties": {
+          "id": { "type": "string" },
+          "label": { "type": "string" },
+          "weight": {
+            "anyOf": [{ "type": "number" }, { "type": "string" }]
+          },
+          "sourceNote": { "type": "string" },
+          "minLevel": { "type": "integer", "minimum": 1, "maximum": 5 }
+        }
+      }
+    }
+  }
+}

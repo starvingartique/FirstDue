@@ -1,0 +1,15 @@
+{
+  "level": 2,
+  "role": "EMT",
+  "vitalsDisplay": "manual",
+  "hints": false,
+  "deterioration": "real",
+  "grading": "graded",
+  "customDials": {
+    "informationClarity": "measured",
+    "patientComplexity": "standard",
+    "outcomeRealism": "realistic",
+    "gore": "clinical"
+  },
+  "notes": "Manual vitals: cuff, count RR, palpate pulse, SpO2 probe, glucometer, pupils, skin. No hints. Same kit as every level."
+}

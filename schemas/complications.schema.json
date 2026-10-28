@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://firstdue.game/schemas/complications.schema.json",
+  "title": "complications.json - mid-call twists",
+  "description": "Zero or one complication is sampled per call. Skeleton holds placeholders only.",
+  "type": "object",
+  "required": ["_meta", "complications"],
+  "properties": {
+    "_meta": {
+      "type": "object",
+      "required": ["version", "status"],
+      "properties": {
+        "version": { "type": "string" },
+        "status": { "type": "string" },
+        "sourceNote": { "type": "string" }
+      }
+    },
+    "complications": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "label", "trigger"],
+        "properties": {
+          "id": { "type": "string" },
+          "label": { "type": "string" },
+          "trigger": { "type": "string" },
+          "engineEffect": { "type": "string" },
+          "weight": {
+            "anyOf": [{ "type": "number" }, { "type": "string" }]
+          },
+          "minLevel": { "type": "integer", "minimum": 1, "maximum": 5 }
+        }
+      }
+    }
+  }
+}

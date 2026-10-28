@@ -1,0 +1,92 @@
+// Boot: validate data, build world and patient, wire input, HUD and debug.
+// Any data or scene failure lands in the on-screen error box, never a void.
+
+import "./style.css";
+import { buildWorld } from "./engine/scene";
+import { SPOT_IDS, SpotCamera, type SpotId } from "./engine/camera";
+import { bindInput } from "./engine/input";
+import { pickRegion } from "./engine/raycast";
+import { startLoop } from "./engine/loop";
+import { buildPatient } from "./patient/body";
+import { RegionHighlight } from "./patient/highlight";
+import type { RegionId } from "./patient/regions";
+import { Hud } from "./ui/hud";
+import { DebugOverlay } from "./ui/debug";
+import { loadAll, loadBikeDown } from "./data/loaders";
+
+function showBootError(message: string): void {
+  const box = document.getElementById("boot-error");
+  if (box === null) return;
+  box.hidden = false;
+  box.textContent = `Startup failed: ${message}`;
+}
+
+function main(): void {
+  // Data first: a broken file must fail loudly at boot, not mid-call.
+  loadAll();
+  const call = loadBikeDown();
+
+  const canvas = document.getElementById("scene");
+  if (!(canvas instanceof HTMLCanvasElement)) {
+    throw new Error("missing <canvas id=scene> in index.html");
+  }
+
+  const { scene, renderer } = buildWorld(canvas);
+  const spotCamera = new SpotCamera();
+  const patient = buildPatient();
+  scene.add(patient.group);
+  const highlight = new RegionHighlight(patient);
+  const debug = new DebugOverlay();
+
+  const hud = new Hud({
+    onSelectRegion: (region: RegionId) => {
+      highlight.setSelected(region);
+      hud.showRegion(highlight.getSelected());
+    },
+    onSelectSpot: (spot: SpotId) => {
+      spotCamera.applySpot(spot);
+      hud.showSpot(spot);
+    }
+  });
+  hud.showCall(call);
+  hud.showRegion(null);
+  hud.showSpot(spotCamera.getSpot());
+
+  bindInput(canvas, {
+    onLook: (dx, dy) => spotCamera.addLook(dx, dy),
+    onTap: (x, y) => {
+      const hit = pickRegion(spotCamera.camera, patient.group, x, y);
+      // Tapping empty ground clears the selection.
+      highlight.setSelected(hit);
+      hud.showRegion(highlight.getSelected());
+    },
+    onSpotKey: (index) => {
+      if (index < 0 || index >= SPOT_IDS.length) return;
+      const spot: SpotId = SPOT_IDS[index];
+      spotCamera.applySpot(spot);
+      hud.showSpot(spot);
+    },
+    onDebugKey: () => debug.toggle()
+  });
+
+  startLoop({
+    renderer,
+    scene,
+    camera: spotCamera.camera,
+    patient,
+    onResize: () => spotCamera.onResize()
+  });
+}
+
+window.addEventListener("error", (event) => {
+  showBootError(event.message);
+});
+window.addEventListener("unhandledrejection", (event) => {
+  showBootError(event.reason instanceof Error ? event.reason.message : String(event.reason));
+});
+
+try {
+  main();
+} catch (error) {
+  showBootError(error instanceof Error ? error.message : String(error));
+}

@@ -1,0 +1,45 @@
+{
+  "id": "bike_down",
+  "seed": 1027,
+  "patient": {
+    "name": "Josh",
+    "nameLocked": true,
+    "age": 28,
+    "sex": "M",
+    "weight_kg": 80,
+    "weightNote": "TODO_CLINICAL - scenario estimate, confirm with Carlos. Drives blood volume (70 mL/kg) and weight-based dosing.",
+    "complaint": "motorcycle crash"
+  },
+  "dispatch": {
+    "nature": "Motorcycle vs guardrail",
+    "address": "Route 9 mile marker 14, northbound shoulder",
+    "cadText": "28-year-old male down after motorcycle vs guardrail. Caller reports heavy bleeding from the leg. Night, roadside.",
+    "updates": ["Caller states the rider is awake and talking."]
+  },
+  "scene": {
+    "location": "roadside",
+    "timeOfDay": "night",
+    "weather": "clear",
+    "mechanism": "motor_vehicle_traffic",
+    "mechanismSubtype": "motorcycle_crash",
+    "hazards": ["live traffic lane", "darkness"],
+    "description": "Night roadside. Bike on its side by the guardrail, rider supine on the shoulder, kit bags staged at his right side."
+  },
+  "backstory": "He was riding home and some truck cut him off, he swerved and just slammed into the guardrail.",
+  "injuries": [
+    {
+      "injuryId": "femoral_arterial_bleed",
+      "side": "left",
+      "region": "leg_left",
+      "notes": "Left thigh arterial bleed. Tourniquet in about 3 min or he arrests. Findings, fixes and traps come from trauma_library.json."
+    }
+  ],
+  "conditions": [],
+  "marchFocus": ["M", "R", "C", "H", "P"],
+  "bystander": {
+    "archetypeId": "placeholder_witness_driver",
+    "label": "Witnessing driver",
+    "notes": "Standing by the guardrail. Calls out once, then stays out of the way. Full archetype lands with bystanders.json."
+  },
+  "levels": [1, 2]
+}

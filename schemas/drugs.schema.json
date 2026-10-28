@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://firstdue.game/schemas/drugs.schema.json",
+  "title": "drugs.json - full drug box contents",
+  "description": "Every drug physically in the box. Clinical values are source data, never invented. Matches the provided 104-drug file.",
+  "type": "object",
+  "required": ["_meta", "drugs"],
+  "properties": {
+    "_meta": {
+      "type": "object",
+      "required": ["version", "count"],
+      "properties": {
+        "version": { "type": "string" },
+        "count": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "drugs": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/drug" }
+    }
+  },
+  "$defs": {
+    "presentation": {
+      "type": "object",
+      "required": ["label", "form"],
+      "properties": {
+        "label": { "type": "string" },
+        "form": { "type": "string" },
+        "mg_per_mL": { "type": ["number", "null"] },
+        "volume_mL": { "type": "number" },
+        "fixedDose_mg": { "type": "number" }
+      }
+    },
+    "dosing": {
+      "type": "object",
+      "required": ["indication", "route"],
+      "properties": {
+        "indication": { "type": "string" },
+        "route": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+        "dose_mg": { "type": ["number", "string"] },
+        "dose_mcg": { "type": ["number", "string"] },
+        "dose_mcg_per_min": { "type": "string" },
+        "dose_mg_per_kg": { "type": ["number", "string"] },
+        "repeat": { "type": "string" },
+        "max": { "type": "string" },
+        "notes": { "type": "string" }
+      }
+    },
+    "drug": {
+      "type": "object",
+      "required": ["id", "name", "presentations", "dosing", "scopeLevel", "location"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9_]+$" },
+        "name": { "type": "string" },
+        "class": { "type": "string" },
+        "brand": { "type": "string" },
+        "presentations": { "type": "array", "items": { "$ref": "#/$defs/presentation" }, "minItems": 1 },
+        "dosing": { "type": "array", "items": { "$ref": "#/$defs/dosing" }, "minItems": 1 },
+        "onset": { "type": "object", "additionalProperties": { "type": "string" } },
+        "duration": { "type": "object", "additionalProperties": { "type": "string" } },
+        "effects": { "type": "object", "additionalProperties": { "type": "string" } },
+        "contraindications": { "type": "array", "items": { "type": "string" } },
+        "dangers": { "type": "array", "items": { "type": "string" } },
+        "scopeLevel": {
+          "anyOf": [
+            { "type": "integer", "minimum": 1, "maximum": 5 },
+            { "type": "object", "additionalProperties": { "type": "integer" } }
+          ]
+        },
+        "controlled": { "type": "string" },
+        "location": { "type": "string" },
+        "coverage": { "type": "object", "additionalProperties": { "type": "number" } },
+        "pk_s": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": { "type": "number" },
+            "minItems": 3,
+            "maxItems": 3
+          }
+        }
+      }
+    }
+  }
+}

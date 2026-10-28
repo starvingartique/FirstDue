@@ -1,0 +1,15 @@
+{
+  "level": 4,
+  "role": "Paramedic",
+  "vitalsDisplay": "manual",
+  "hints": false,
+  "deterioration": "real",
+  "grading": "parked",
+  "customDials": {
+    "informationClarity": "measured with artifact",
+    "patientComplexity": "high",
+    "outcomeRealism": "realistic",
+    "gore": "clinical"
+  },
+  "notes": "Grading parked until after Nov 4. Unlabeled rhythm strips, partner needs direction. Kit items already exist."
+}

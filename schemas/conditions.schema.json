@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://firstdue.game/schemas/conditions.schema.json",
+  "title": "conditions.json - modeled medical conditions",
+  "description": "Per-tick effects, findings per assessment action, resolvedBy/reducedBy, spawns, onset delays. Generator may only use generatorReady entries.",
+  "type": "object",
+  "required": ["_meta", "conditions"],
+  "properties": {
+    "_meta": {
+      "type": "object",
+      "required": ["version", "status"],
+      "properties": {
+        "version": { "type": "string" },
+        "status": { "type": "string" }
+      }
+    },
+    "infectionModel": { "type": "object" },
+    "sepsisModel": { "type": "object" },
+    "conditions": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/condition" }
+    }
+  },
+  "$defs": {
+    "spawn": {
+      "type": "object",
+      "required": ["id", "probability"],
+      "properties": {
+        "id": { "type": "string" },
+        "probability": { "type": "number", "minimum": 0, "maximum": 1 },
+        "delay_s": {
+          "anyOf": [{ "type": "number" }, { "type": "string" }, { "type": "array" }]
+        },
+        "requires": { "type": "string" },
+        "trigger": { "type": "string" },
+        "notes": { "type": "string" }
+      }
+    },
+    "condition": {
+      "type": "object",
+      "required": ["id", "name", "effects", "findings", "minLevel", "generatorReady"],
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "region": { "type": "string" },
+        "description": { "type": "string" },
+        "mechanisms": { "type": "array", "items": { "type": "string" } },
+        "herniatedContents": { "type": "array", "items": { "type": "string" } },
+        "effects": { "type": "object" },
+        "stages": { "type": "array", "items": { "type": "object" } },
+        "findings": {
+          "type": "object",
+          "description": "Assessment action -> lines revealed only when the player does that action.",
+          "additionalProperties": { "type": "array", "items": { "type": "string" } }
+        },
+        "spawns": { "type": "array", "items": { "$ref": "#/$defs/spawn" } },
+        "resolvedBy": { "type": "array", "items": { "type": "string" } },
+        "reducedBy": { "type": "object" },
+        "traps": { "type": "array", "items": { "type": "string" } },
+        "dangers": { "type": "array", "items": { "type": "string" } },
+        "teachingPoint": { "type": "string" },
+        "minLevel": { "type": "integer", "minimum": 1, "maximum": 5 },
+        "generatorReady": { "type": "boolean" }
+      }
+    }
+  }
+}

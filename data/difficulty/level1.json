@@ -1,0 +1,15 @@
+{
+  "level": 1,
+  "role": "First Responder",
+  "vitalsDisplay": "auto",
+  "hints": true,
+  "deterioration": "slow",
+  "grading": "graded",
+  "customDials": {
+    "informationClarity": "shown",
+    "patientComplexity": "low",
+    "outcomeRealism": "forgiving",
+    "gore": "clinical"
+  },
+  "notes": "Vitals auto-display. Partner gives hints. Slow deterioration. Same kit as every level."
+}

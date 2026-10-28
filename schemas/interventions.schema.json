@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://firstdue.game/schemas/interventions.schema.json",
+  "title": "interventions.json - field interventions and procedures",
+  "description": "Every treatment or procedure the player can do: time cost, equipment, effects on conditions, failure modes. Skeleton holds placeholders only.",
+  "type": "object",
+  "required": ["_meta", "interventions"],
+  "properties": {
+    "_meta": {
+      "type": "object",
+      "required": ["version", "status"],
+      "properties": {
+        "version": { "type": "string" },
+        "status": { "type": "string" }
+      }
+    },
+    "interventions": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/intervention" }
+    }
+  },
+  "$defs": {
+    "intervention": {
+      "type": "object",
+      "required": ["id", "name", "timeCost_s", "minLevel"],
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "marchStep": { "type": "string" },
+        "regions": { "type": "array", "items": { "type": "string" } },
+        "timeCost_s": {
+          "anyOf": [{ "type": "number" }, { "type": "string" }]
+        },
+        "equipment": { "type": "array", "items": { "type": "string" } },
+        "fixes": { "type": "array", "items": { "type": "string" } },
+        "reduces": { "type": "object" },
+        "failureModes": { "type": "array", "items": { "type": "string" } },
+        "minLevel": { "type": "integer", "minimum": 1, "maximum": 5 },
+        "notes": { "type": "string" }
+      }
+    }
+  }
+}

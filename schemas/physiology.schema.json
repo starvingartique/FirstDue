@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://firstdue.game/schemas/physiology.schema.json",
+  "title": "physiology.json - engine constants and compensation curve",
+  "description": "Single home for baseline ranges, ATLS shock classes, effect-token mapping (TUNE) and bleed-class rates (TUNE). Skeleton holds placeholders only.",
+  "type": "object",
+  "required": ["_meta", "baselines", "shockClasses", "effectTokens", "bleedRates_mL_per_min"],
+  "properties": {
+    "_meta": {
+      "type": "object",
+      "required": ["version", "status"],
+      "properties": {
+        "version": { "type": "string" },
+        "status": { "type": "string" }
+      }
+    },
+    "baselines": {
+      "type": "object",
+      "description": "Adult resting ranges. Values are [low, high] or TODO_CLINICAL.",
+      "additionalProperties": true
+    },
+    "shockClasses": {
+      "type": "object",
+      "description": "ATLS classes I-IV keyed by blood-loss fraction, with expected signs.",
+      "additionalProperties": true
+    },
+    "effectTokens": {
+      "type": "object",
+      "description": "Maps drug effect tokens (+, ++, +++, -, --, ---) to numbers. TUNE.",
+      "additionalProperties": true
+    },
+    "bleedRates_mL_per_min": {
+      "type": "object",
+      "description": "Maps trauma_library bleed classes to mL/min. TUNE.",
+      "additionalProperties": true
+    }
+  }
+}

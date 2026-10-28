@@ -1,0 +1,17 @@
+{
+  "_meta": {
+    "version": "0.0.1",
+    "status": "SKELETON - Dispatch Engine v1 lands Oct 31",
+    "sourceNote": "WEIGHT_EST - weights estimated"
+  },
+  "complications": [
+    {
+      "id": "placeholder_vomiting",
+      "label": "TODO - first real entry: vomiting",
+      "trigger": "TODO_CLINICAL - what triggers this mid-call twist",
+      "engineEffect": "TODO_CLINICAL - what the engine does when it fires",
+      "weight": "WEIGHT_EST",
+      "minLevel": 1
+    }
+  ]
+}

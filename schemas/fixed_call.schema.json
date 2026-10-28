@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://firstdue.game/schemas/fixed_call.schema.json",
+  "title": "fixed call - hand-authored call seed",
+  "description": "Schema for /data/calls/fixed/*.json. Hand-authored seeds like bike_down.json. IDs must exist in the component and medical data.",
+  "type": "object",
+  "required": ["id", "seed", "patient", "dispatch", "scene", "injuries", "conditions", "marchFocus"],
+  "properties": {
+    "id": { "type": "string" },
+    "seed": { "type": "integer" },
+    "patient": {
+      "type": "object",
+      "required": ["name", "nameLocked", "age", "sex"],
+      "properties": {
+        "name": { "type": "string" },
+        "nameLocked": { "type": "boolean" },
+        "age": { "type": "integer" },
+        "sex": { "type": "string" },
+        "weight_kg": {
+          "anyOf": [{ "type": "number" }, { "type": "string" }]
+        },
+        "weightNote": { "type": "string" },
+        "complaint": { "type": "string" }
+      }
+    },
+    "dispatch": {
+      "type": "object",
+      "required": ["nature", "address"],
+      "properties": {
+        "nature": { "type": "string" },
+        "address": { "type": "string" },
+        "cadText": { "type": "string" },
+        "updates": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "scene": {
+      "type": "object",
+      "required": ["location", "timeOfDay", "mechanism"],
+      "properties": {
+        "location": { "type": "string" },
+        "timeOfDay": { "type": "string" },
+        "weather": { "type": "string" },
+        "mechanism": { "type": "string" },
+        "mechanismSubtype": { "type": "string" },
+        "hazards": { "type": "array", "items": { "type": "string" } },
+        "description": { "type": "string" }
+      }
+    },
+    "backstory": { "type": "string" },
+    "injuries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["injuryId", "side"],
+        "properties": {
+          "injuryId": { "type": "string" },
+          "side": { "type": "string" },
+          "region": { "type": "string" },
+          "notes": { "type": "string" }
+        }
+      }
+    },
+    "conditions": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "marchFocus": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "bystander": {
+      "type": "object",
+      "properties": {
+        "archetypeId": { "type": "string" },
+        "label": { "type": "string" },
+        "notes": { "type": "string" }
+      }
+    },
+    "levels": {
+      "type": "array",
+      "items": { "type": "integer" }
+    }
+  }
+}

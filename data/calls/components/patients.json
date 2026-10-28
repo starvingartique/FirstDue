@@ -1,0 +1,16 @@
+{
+  "_meta": {
+    "version": "0.0.1",
+    "status": "SKELETON - Dispatch Engine v1 lands Oct 31",
+    "sourceNote": "WEIGHT_EST - distributions estimated until NEMSIS data confirms them"
+  },
+  "distributions": [
+    {
+      "complaintId": "placeholder_complaint",
+      "ageRange": "WEIGHT_EST",
+      "sexSplit": { "note": "WEIGHT_EST" },
+      "weight_kg": { "note": "WEIGHT_EST" },
+      "notes": "Placeholder. Oct 31 sampler reads this file."
+    }
+  ]
+}

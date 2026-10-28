@@ -1,0 +1,15 @@
+{
+  "level": 3,
+  "role": "AEMT",
+  "vitalsDisplay": "manual",
+  "hints": false,
+  "deterioration": "real",
+  "grading": "parked",
+  "customDials": {
+    "informationClarity": "measured",
+    "patientComplexity": "standard",
+    "outcomeRealism": "realistic",
+    "gore": "clinical"
+  },
+  "notes": "Grading parked until after Nov 4. Kit items already exist."
+}
