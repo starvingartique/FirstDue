@@ -1,49 +1,126 @@
 {
   "_meta": {
-    "version": "0.0.1",
-    "status": "SKELETON - Carlos must fill every TODO_CLINICAL field before the Oct 28 engine build. TUNE fields are gameplay tuning, set by the dev."
+    "version": "0.2.0",
+    "status": "Oct 28 clinical anchors from OCT28_MEDICAL_ANSWERS. Textbook anchors (ATLS / TCCC / NREMT / PHTLS). Needs sign-off from a certified medic before Nov 4.",
+    "basis": "ATLS / TCCC / NREMT / PHTLS textbook anchors. Fields tagged TUNE are adjustable for gameplay."
   },
   "baselines": {
-    "heartRate_bpm": "TODO_CLINICAL",
-    "respRate_per_min": "TODO_CLINICAL",
-    "sbp_mmhg": "TODO_CLINICAL",
-    "dbp_mmhg": "TODO_CLINICAL",
-    "spo2_pct": "TODO_CLINICAL",
-    "etco2_mmhg": "TODO_CLINICAL",
-    "gcs": "TODO_CLINICAL",
-    "glucose_mg_per_dL": "TODO_CLINICAL",
-    "coreTemp_C": "TODO_CLINICAL",
-    "capRefill_s": "TODO_CLINICAL",
-    "bloodVolume_mL_per_kg": "TODO_CLINICAL",
-    "tidalVolume_mL_per_kg": "TODO_CLINICAL"
+    "subject": "Josh, healthy 28M before the crash",
+    "heartRate_bpm": 76,
+    "heartRate_normalRange_bpm": [60, 100],
+    "respRate_per_min": 14,
+    "respRate_normalRange_per_min": [12, 20],
+    "sbp_mmhg": 124,
+    "dbp_mmhg": 78,
+    "map_baseline_mmhg": 93,
+    "sbp_normalRange_mmhg": [100, 140],
+    "spo2_pct": 98,
+    "spo2_normalRange_pct": [94, 100],
+    "etco2_mmhg": 38,
+    "etco2_normalRange_mmhg": [35, 45],
+    "gcs": { "E": 4, "V": 5, "M": 6, "total": 15 },
+    "pupils_mm": 4,
+    "pupils_note": "equal, reactive",
+    "glucose_mg_per_dL": 95,
+    "glucose_normalRange_mg_per_dL": [70, 140],
+    "coreTemp_C": 36.8,
+    "coreTemp_normalRange_C": [36.5, 37.5],
+    "capRefill_s": 1.5,
+    "capRefill_normal_lt_s": 2,
+    "bloodVolume_mL_per_kg": 70,
+    "tidalVolume_mL_per_kg": 7,
+    "tidalVolume_mL_note": "about 550 mL at 80 kg, minute ventilation about 7.7 L/min",
+    "pain_0_to_10": 0,
+    "weight_kg": 80,
+    "weight_note": "Keep 80 kg. Blood volume 5,600 mL. Do NOT show weight to the player anywhere in UI. Josh says about 175 pounds if asked (patient prompt data, Oct 29 voice).",
+    "bloodVolume_mL": 5600,
+    "crashStressOffset": {
+      "note": "Applied at call start, separate from blood loss. Fades as analgesia takes effect.",
+      "hr_plus_bpm": 15,
+      "rr_plus_per_min": 4,
+      "sbp_plus_mmhg": 10,
+      "pain_0_to_10": "7-8"
+    }
   },
   "shockClasses": {
-    "classI_loss_lt_15pct": "TODO_CLINICAL",
-    "classII_loss_15_30pct": "TODO_CLINICAL",
-    "classIII_loss_30_40pct": "TODO_CLINICAL",
-    "classIV_loss_gt_40pct": "TODO_CLINICAL",
-    "compensationOrder": "TODO_CLINICAL",
-    "shockIndexFlag": "TODO_CLINICAL"
+    "basis": "ATLS classes from 5,600 mL blood volume",
+    "classI_loss_lt_15pct": { "loss_pct": "<15", "loss_mL": "<840", "hr": "<100", "rr": "14-20", "sbp": "Normal", "pulsePressure": "Normal", "mental": "Slightly anxious", "skin": "Normal" },
+    "classII_loss_15_30pct": { "loss_pct": "15-30", "loss_mL": "840-1,680", "hr": "100-120", "rr": "20-30", "sbp": "Normal", "pulsePressure": "Narrowed", "mental": "Mildly anxious", "skin": "Pale, cool, CR over 2 s" },
+    "classIII_loss_30_40pct": { "loss_pct": "30-40", "loss_mL": "1,680-2,240", "hr": "120-140", "rr": "30-40", "sbp": "Decreased", "pulsePressure": "Narrowed", "mental": "Anxious, confused", "skin": "Pale, cool, diaphoretic" },
+    "classIV_loss_gt_40pct": { "loss_pct": ">40", "loss_mL": ">2,240", "hr": ">140", "rr": ">35", "sbp": "Greatly decreased", "pulsePressure": "Narrowed", "mental": "Confused, lethargic", "skin": "Cold, mottled, ashen" },
+    "interpolationAnchors_TUNE": {
+      "note": "Engine anchors. Interpolate linearly between rows by loss percent.",
+      "rows": [
+        { "loss_pct": 0, "hr": 76, "sbp": 124, "dbp": 78, "rr": 14, "gcs": 15, "gcsNote": "", "capRefill_s": 1.5, "radial": "Strong" },
+        { "loss_pct": 15, "hr": 100, "sbp": 122, "dbp": 86, "rr": 20, "gcs": 15, "gcsNote": "", "capRefill_s": 2.5, "radial": "Strong" },
+        { "loss_pct": 30, "hr": 122, "sbp": 108, "dbp": 88, "rr": 28, "gcs": 14, "gcsNote": "V4, confused", "capRefill_s": 3.5, "radial": "Weak" },
+        { "loss_pct": 40, "hr": 140, "sbp": 82, "dbp": 64, "rr": 36, "gcs": 12, "gcsNote": "", "capRefill_s": 5.0, "radial": "Thready / intermittent" },
+        { "loss_pct": 50, "hr": 150, "hrNote": "then falling", "sbp": 60, "dbp": 40, "rr": 40, "rrNote": "then agonal", "gcs": 8, "gcsNote": "", "capRefill_s": 6.5, "capRefillNote": "over 6 s, mottled", "radial": "Absent" },
+        { "loss_pct": 55, "hr": null, "hrNote": "Pre-arrest bradycardia then PEA arrest", "sbp": null, "dbp": null, "rr": null, "rrNote": "Agonal / apnea", "gcs": 3, "gcsNote": "", "capRefill_s": null, "radial": "Absent" }
+      ]
+    },
+    "compensationOrder": [
+      "1. HR rises, plus anxiety",
+      "2. Peripheral vasoconstriction: pale, cool skin, cap refill over 2 s",
+      "3. Pulse pressure narrows. DBP rises while SBP holds.",
+      "4. RR rises",
+      "5. Mental status declines: anxious, then confused, then lethargic",
+      "6. SBP falls, Class III. This is the late sign.",
+      "7. Radial pulse lost. Engine rule only, not a teaching claim: rough heuristic SBP below about 80.",
+      "8. Decompensation: HR falls before arrest. Bradycardia in a bleeding patient is ominous, not improvement. Then PEA."
+    ],
+    "radialPulseRule": {
+      "note": "Engine rule only, not a teaching claim. Rough heuristic.",
+      "radialLostBelowSbp_mmhg": 80
+    },
+    "shockIndexFlag": {
+      "formula": "HR divided by SBP",
+      "normal": "0.5-0.7",
+      "caution_gt": 0.9,
+      "cautionNote": "yellow in the debrief",
+      "shock_gt": 1.0,
+      "shockNote": "scored",
+      "severe_gt": 1.4,
+      "severeNote": "transfusion likely, critical flag",
+      "betaBlocker": "Suppress the HR rise by about 60 percent, TUNE. Shock index then looks falsely reassuring, and the FTO should point that out."
+    },
+    "arrestWindow_TUNE": {
+      "note": "TUNE",
+      "chancePerSecondTick_pct": 15,
+      "chanceStartsAbove_loss_pct": 50,
+      "forceArrestAt_loss_pct": 58,
+      "rhythm": "PEA"
+    }
   },
   "effectTokens": {
-    "_tag": "TUNE",
-    "plus": "TUNE",
-    "plusplus": "TUNE",
-    "plusplusplus": "TUNE",
-    "minus": "TUNE",
-    "minusminus": "TUNE",
-    "minusminusminus": "TUNE"
+    "_tag": "TUNE - drug effect-token map. Change at peak effect, at the standard dose. Scale linearly with dose divided by standard dose up to 2 times. Above that apply toxicity flags from drugs.json.",
+    "hr_bpm": { "plus": 10, "plusplus": 25, "plusplusplus": 40, "negative": "mirrors" },
+    "sbp_mmhg": { "plus": 10, "plusplus": 25, "plusplusplus": 45, "negative": "mirrors" },
+    "rr_per_min": { "plus": 3, "plusplus": 7, "plusplusplus": 12, "apnea": "arrow to 0 equals apnea" },
+    "spo2_pct": { "plus": 2, "plusplus": 5, "plusplusplus": 10, "note": "capped by physiology" },
+    "gcs_points": { "plus": 1, "plusplus": 3, "plusplusplus": 6, "drop": "--- equals drop to 3-6" },
+    "pain_0_to_10": { "minus": -2, "minusminus": -4, "minusminusminus": -6 },
+    "glucose_mg_per_dL": { "plus": 25, "plusplus": 60, "plusplusplus": 110 },
+    "bronchodilation_other_0_to_1": { "plus": 0.15, "plusplus": 0.35, "plusplusplus": 0.6 },
+    "fluidsNote": "Fluids are NOT tokens. Model them explicitly: 1,000 mL crystalloid adds +1,000 mL intravascular immediately, then decays to about 250 mL retained over 60 min. Blood products stay about 90 percent intravascular."
   },
   "bleedRates_mL_per_min": {
-    "_tag": "TUNE - anchors mirror trauma_library bleedClassAnchors until Carlos confirms",
-    "capillary": "TUNE",
-    "venous_minor": "TUNE",
-    "venous_major": "TUNE",
-    "arterial_minor": "TUNE",
-    "arterial_major": "TUNE",
-    "junctional": "TUNE",
-    "internal_slow": "TUNE",
-    "internal_fast": "TUNE",
-    "internal_massive": "TUNE"
+    "_tag": "TUNE - mL/min at baseline MAP 93. All pressure-scaled except capillary: rate = base x (currentMAP / 93).",
+    "capillary": 2,
+    "capillaryNote": "self-clots in 5-10 min, not pressure-scaled",
+    "venous_minor": 10,
+    "venous_major": 40,
+    "arterial_minor": 80,
+    "arterial_major": 700,
+    "junctional": 500,
+    "internal_slow": 15,
+    "internal_fast": 60,
+    "internal_massive": 250,
+    "femoral_bike_down": {
+      "baseRate_mL_per_min": 700,
+      "baselineMAP_mmhg": 93,
+      "formula": "rate = base x (currentMAP / 93)",
+      "note": "Partial laceration. Partials often bleed more than complete transections because the vessel cannot retract and spasm. Untreated: Class II at about 1.5 min, Class III at about 3 min, Class IV at about 4 min, arrest window at about 5-6 min. Tourniquet within about 3 min keeps him out of Class IV."
+    }
   }
 }

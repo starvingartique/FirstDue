@@ -19,6 +19,7 @@ function el<T extends HTMLElement>(id: string): T {
 
 export class Hud {
   private title = el("call-title");
+  private clock = el("clock");
   private regionTitle = el("region-title");
   private regionSub = el("region-sub");
   private chips = el("region-chips");
@@ -50,13 +51,19 @@ export class Hud {
     this.title.textContent = `${call.dispatch.nature} - ${p.name}, ${p.age}${p.sex} - ${call.scene.timeOfDay}`;
   }
 
+  showClock(t_s: number): void {
+    const m = Math.floor(t_s / 60);
+    const s = t_s % 60;
+    this.clock.textContent = `T+${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")} since contact`;
+  }
+
   showRegion(region: RegionId | null): void {
     if (region === null) {
       this.regionTitle.textContent = "No region selected";
-      this.regionSub.textContent = "Click a body region. Medical menu arrives Oct 28.";
+      this.regionSub.textContent = "Click a body region, or pick Examine / Circulation below.";
     } else {
       this.regionTitle.textContent = `Region: ${REGION_LABELS[region]}`;
-      this.regionSub.textContent = "Placeholder panel. Examine and treatment actions arrive Oct 28.";
+      this.regionSub.textContent = "Examine tab follows this region. Circulation holds hemorrhage control.";
     }
     for (const [id, button] of this.chipButtons) {
       button.classList.toggle("active", id === region);

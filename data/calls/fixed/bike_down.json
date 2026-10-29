@@ -7,8 +7,14 @@
     "age": 28,
     "sex": "M",
     "weight_kg": 80,
-    "weightNote": "TODO_CLINICAL - scenario estimate, confirm with Carlos. Drives blood volume (70 mL/kg) and weight-based dosing.",
+    "weightNote": "Confirmed 80 kg for Oct 28 (OCT28_MEDICAL_ANSWERS section 3). Blood volume 5,600 mL. Do NOT show weight to the player anywhere in UI. Needs medic sign-off before Nov 4.",
     "complaint": "motorcycle crash"
+  },
+  "patientPrompt": {
+    "note": "Patient voice lines for the Oct 29 talking-patient build. Parked today, data only.",
+    "weightLine": "about 175 pounds",
+    "weightLineTrigger": "Josh says this if asked his weight. Never a displayed number.",
+    "tourniquetPainLine": "Barely scripted until Oct 29: he begs you to loosen the tourniquet (pain +3)."
   },
   "dispatch": {
     "nature": "Motorcycle vs guardrail",
@@ -25,21 +31,41 @@
     "hazards": ["live traffic lane", "darkness"],
     "description": "Night roadside. Bike on its side by the guardrail, rider supine on the shoulder, kit bags staged at his right side."
   },
+  "sceneStart": {
+    "note": "Scene-start fix from OCT28_MEDICAL_ANSWERS section 6. A real femoral arterial bleed would kill before EMS arrival, so the call opens mid-bleed.",
+    "bloodLossAtContact_mL": 1100,
+    "bloodLossAtContact_pct": 20,
+    "bloodLossAtContact_class": "Class II",
+    "bystanderPressure": {
+      "what": "Bystander holding a balled-up shirt on the wound",
+      "effectiveness": 0.5,
+      "note": "Direct pressure, about 50 percent. When the player takes over, or the bystander lets go to talk to them, it spurts. That is the hook moment for the demo."
+    },
+    "spurtTrigger": "player_takes_over_or_bystander_lets_go",
+    "venousTourniquetTrap": {
+      "included": true,
+      "what": "A bystander has a belt cinched around the thigh as a venous tourniquet",
+      "effect": "bleed rate x1.3, leg purple and swollen",
+      "playerMust": "Recognize it and replace it with a proper tourniquet",
+      "note": "Optional trap from section 6, included in the Oct 28 build."
+    }
+  },
   "backstory": "He was riding home and some truck cut him off, he swerved and just slammed into the guardrail.",
   "injuries": [
     {
       "injuryId": "femoral_arterial_bleed",
       "side": "left",
       "region": "leg_left",
-      "notes": "Left thigh arterial bleed. Tourniquet in about 3 min or he arrests. Findings, fixes and traps come from trauma_library.json."
+      "notes": "Left thigh partial arterial laceration. Base 700 mL/min at MAP 93, pressure-scaled. Tourniquet in about 3 min keeps him out of Class IV."
     }
   ],
-  "conditions": [],
+  "conditions": ["femoral_arterial_bleed", "hypothermia_trauma", "crash_stress_offset", "road_rash"],
+  "conditionsNote": "Oct 28 core set from OCT28_MEDICAL_ANSWERS item 8, modeled in oct28_conditions.json. The DRAFT conditions.json (sepsis and complex trauma) stays OUT of Bike down.",
   "marchFocus": ["M", "R", "C", "H", "P"],
   "bystander": {
-    "archetypeId": "placeholder_witness_driver",
-    "label": "Witnessing driver",
-    "notes": "Standing by the guardrail. Calls out once, then stays out of the way. Full archetype lands with bystanders.json."
+    "archetypeId": "helpful_driver_holding_pressure",
+    "label": "Witnessing driver holding a shirt on the wound",
+    "notes": "Holding pressure until the player takes over or talks to them, then it spurts. A second bystander cinched a belt on the thigh (venous tourniquet trap)."
   },
   "levels": [1, 2]
 }

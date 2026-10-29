@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>First Due - Oct 27 Skeleton</title>
+    <title>First Due - Oct 28 Physiology + Hemorrhage</title>
   </head>
   <body>
     <div id="app">
@@ -11,6 +11,7 @@
       <div id="crosshair" aria-hidden="true"></div>
       <header id="hud-top">
         <div id="call-title">Loading call data...</div>
+        <div id="clock">T+00:00 since contact</div>
         <nav id="spot-nav" aria-label="Camera spots">
           <button type="button" data-spot="patient" class="spot-btn active">1 Patient</button>
           <button type="button" data-spot="kit" class="spot-btn">2 Kit bags</button>
@@ -19,13 +20,17 @@
       </header>
       <aside id="region-panel" aria-live="polite">
         <div id="region-title">No region selected</div>
-        <div id="region-sub">Click a body region. Medical menu arrives Oct 28.</div>
+        <div id="region-sub">Click a body region, or pick Examine / Circulation below.</div>
+        <nav id="menu-tabs" aria-label="Medical menu"></nav>
+        <div id="menu-body"></div>
+        <div id="action-status">T+00:00 - Hands free</div>
+        <div id="menu-log" aria-label="Recent events"></div>
         <div id="region-chips" aria-label="Body regions"></div>
       </aside>
       <aside id="debug-overlay" hidden>
-        <h2>DEBUG - engine state (placeholder)</h2>
+        <h2>DEBUG - live engine state</h2>
         <dl id="debug-vitals"></dl>
-        <p id="debug-note">Fake values. Live engine feed lands Oct 28.</p>
+        <p id="debug-note">True state, ticking every sim-second. Hidden from the player; F1 only.</p>
       </aside>
       <footer id="hud-bottom">
         <span>Drag to look - Click body to select - F1 debug - 1/2/3 camera</span>

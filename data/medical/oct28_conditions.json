@@ -1,0 +1,85 @@
+{
+  "_meta": {
+    "version": "0.2.0",
+    "status": "Oct 28 core conditions for Bike down from OCT28_MEDICAL_ANSWERS item 8. Separate from the DRAFT conditions.json, which stays OUT of Bike down. Textbook anchors (ATLS / TCCC / NREMT / PHTLS). Needs sign-off from a certified medic before Nov 4."
+  },
+  "conditions": [
+    {
+      "id": "femoral_arterial_bleed",
+      "name": "Femoral arterial bleed, partial laceration, left thigh",
+      "region": "leg_left",
+      "bleedClass": "arterial_major",
+      "baseRate_mL_per_min": 700,
+      "baselineMAP_mmhg": 93,
+      "pressureScaling": "rate = base x (currentMAP / 93)",
+      "pressureScaling_TUNE": true,
+      "note": "Partial laceration. Partials often bleed more than complete transections because the vessel cannot retract and spasm.",
+      "effects": { "bloodLoss_mL_per_min": "700 x (currentMAP / 93)" },
+      "stages": [],
+      "findings": {
+        "inspect": ["bright red pulsatile spurting, timed to the pulse", "blood pool expanding under the thigh", "soaked jeans over the left thigh"],
+        "expose": ["partial laceration over the anterior thigh, spurting arterial blood", "belt cinched mid-thigh (venous tourniquet trap): leg purple and swollen below it"],
+        "palpate": ["no distal pulse palpable once the tourniquet is correctly occluded"],
+        "patient": ["Parked until Oct 29 voice: he begs you to loosen the tourniquet (pain +3)."]
+      },
+      "resolvedBy": ["tourniquet_high_and_tight", "second_tourniquet_proximal"],
+      "reducedBy": {
+        "hemostatic_packing_3min_pressure": 0.9,
+        "direct_pressure_firm": 0.55,
+        "pressure_dressing_over_unpacked_arterial": 0.4
+      },
+      "minLevel": 1,
+      "generatorReady": true
+    },
+    {
+      "id": "hypothermia_trauma",
+      "name": "Trauma hypothermia risk, night roadside, soaked jeans",
+      "region": "systemic",
+      "effects": { "coreTemp_C_per_10min_exposed_wet": -0.5 },
+      "effects_TUNE": true,
+      "findings": {
+        "inspect": ["soaked jeans, shivering", "cool skin, night roadside"],
+        "expose": ["wet clothing against the skin"],
+        "thermometer": ["core temp falling while exposed and wet"]
+      },
+      "resolvedBy": ["remove_wet_clothing", "hypothermia_wrap"],
+      "reducedBy": {},
+      "note": "About -0.5 C per 10 min exposed and wet, TUNE. Fixes: wrap and remove wet clothing. Wrap action lands with H-step depth; the engine already tracks the temp slide and stops it when wrapped.",
+      "minLevel": 1,
+      "generatorReady": true
+    },
+    {
+      "id": "crash_stress_offset",
+      "name": "Crash pain and stress offset",
+      "region": "systemic",
+      "effects": { "hr_plus_bpm": 15, "rr_plus_per_min": 4, "sbp_plus_mmhg": 10, "pain_0_to_10": "7-8" },
+      "findings": {
+        "inspect": ["anxious, scared, hurting before any blood loss is counted"],
+        "patient": ["Parked until Oct 29 voice: pain and fear answers."]
+      },
+      "resolvedBy": ["analgesia"],
+      "reducedBy": {},
+      "note": "Applied at call start, separate from blood loss. Fades as analgesia takes effect. Part of why HR alone is a weak shock sign.",
+      "minLevel": 1,
+      "generatorReady": true
+    },
+    {
+      "id": "road_rash",
+      "name": "Road rash, deep abrasion (W step)",
+      "region": "arm_right",
+      "bleedClass": "capillary",
+      "baseRate_mL_per_min": 2,
+      "note": "Optional item-8 condition, included for the W step. Capillary 2 mL/min, self-clots in 5-10 min. See trauma_library.json road_rash.",
+      "effects": { "bloodLoss_mL_per_min": 2, "selfClots_min": "5-10" },
+      "stages": [],
+      "findings": {
+        "inspect": ["large abraded area with embedded gravel"],
+        "expose": ["full-thickness patches like a burn, oozing"]
+      },
+      "resolvedBy": ["irrigate", "moist_nonadherent_dressing"],
+      "reducedBy": { "direct_pressure": 0.9 },
+      "minLevel": 1,
+      "generatorReady": true
+    }
+  ]
+}

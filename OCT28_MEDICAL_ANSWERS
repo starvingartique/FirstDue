@@ -1,0 +1,312 @@
+# First Due — Oct 28 medical answers (items 1–7)
+
+**For:** ONION / Muse Code · **Re:** physiology.json, interventions.json, equipment.json · **Status:** DRAFT, values are textbook anchors (ATLS / TCCC / NREMT / PHTLS). Anything marked **TUNE** is OK to adjust for gameplay. Items 8–9 are not covered here.
+
+---
+
+## 1. Physiology baselines — Josh, healthy 28M (before the crash)
+
+| Variable | Value | Notes |
+|---|---|---|
+| HR | 76 bpm | Normal 60–100 |
+| RR | 14 /min | Normal 12–20 |
+| BP | 124/78 mmHg (MAP ≈ 93) | |
+| SpO2 | 98% | |
+| EtCO2 | 38 mmHg | Normal 35–45 |
+| GCS | 15 (E4 V5 M6) | |
+| Pupils | 4 mm, equal, reactive | |
+| Glucose | 95 mg/dL | |
+| Core temp | 36.8 °C | |
+| Cap refill | 1.5 s | Normal < 2 s |
+| Blood volume | 70 mL/kg → **5,600 mL** at 80 kg | |
+| Tidal volume | 7 mL/kg → **~550 mL** | Minute ventilation ≈ 7.7 L/min |
+| Pain | 0 | |
+
+**Crash stress offset (apply at call start, separate from blood loss):** pain and fear add **HR +15, RR +4, SBP +10, pain 7–8/10**. A scared, hurting patient is tachycardic before he's lost any blood. That's real, and it's part of why HR alone is a weak shock sign. This offset fades as analgesia takes effect.
+
+---
+
+## 2. Hemorrhagic shock classes (ATLS)
+
+Josh's mL thresholds are calculated from 5,600 mL.
+
+| | Class I | Class II | Class III | Class IV |
+|---|---|---|---|---|
+| Blood loss % | < 15% | 15–30% | 30–40% | > 40% |
+| Josh (mL) | < 840 | 840–1,680 | 1,680–2,240 | > 2,240 |
+| HR | < 100 | 100–120 | 120–140 | > 140 |
+| RR | 14–20 | 20–30 | 30–40 | > 35 |
+| SBP | Normal | Normal | Decreased | Greatly decreased |
+| Pulse pressure | Normal | **Narrowed** | Narrowed | Narrowed |
+| Mental status | Slightly anxious | Mildly anxious | Anxious, confused | Confused, lethargic |
+| Skin | Normal | Pale, cool, CR > 2 s | Pale, cool, diaphoretic | Cold, mottled, ashen |
+
+### Engine interpolation anchors (TUNE) — interpolate linearly between rows
+
+| Loss % | HR | BP | RR | GCS | Cap refill | Radial pulse |
+|---|---|---|---|---|---|---|
+| 0 | 76 | 124/78 | 14 | 15 | 1.5 s | Strong |
+| 15 | 100 | 122/86 | 20 | 15 | 2.5 s | Strong |
+| 30 | 122 | 108/88 | 28 | 14 (V4, confused) | 3.5 s | Weak |
+| 40 | 140 | 82/64 | 36 | 12 | 5 s | Thready / intermittent |
+| 50 | 150 → falling | 60/40 | 40 → agonal | 8 | > 6 s, mottled | Absent |
+| ≥ 55 | Pre-arrest bradycardia → **PEA arrest** | — | Agonal / apnea | 3 | — | Absent |
+
+Arrest window: start a 15% per-second-tick chance of PEA once loss > 50%, and force arrest at 58% (TUNE).
+
+### Compensation order (the engine must follow this sequence)
+1. HR rises (plus anxiety)
+2. Peripheral vasoconstriction: pale, cool skin, cap refill > 2 s
+3. **Pulse pressure narrows.** DBP rises while SBP holds.
+4. RR rises
+5. Mental status declines (anxious → confused → lethargic)
+6. **SBP falls (Class III). This is the late sign.**
+7. Radial pulse lost. The rough heuristic is SBP below ~80; it's imperfect, so use it as an engine rule only, not a teaching claim.
+8. Decompensation: **HR falls before arrest.** Bradycardia in a bleeding patient is ominous, not improvement. Then PEA.
+
+### Shock index (HR ÷ SBP)
+- 0.5–0.7 normal
+- **> 0.9 caution flag** (yellow in the debrief)
+- **> 1.0 shock flag** (scored)
+- **> 1.4 severe**: transfusion likely, critical flag
+- Beta-blocker patients: suppress the HR rise by about 60% (TUNE). The SI then looks falsely reassuring, and the FTO should point that out.
+
+---
+
+## 3. Josh's weight
+
+**80 kg (≈ 176 lb, 5'10") works.** It's a realistic weight for a 28-year-old rider, and it gives clean math: blood volume 5,600 mL, fentanyl 1 mcg/kg = 80 mcg, ketamine 0.3 mg/kg = 24 mg. The average US adult male is closer to 90 kg, so 80 is slightly lean but realistic.
+
+Realism add (cheap): **the player never sees "80 kg."** Josh's history card says *"about 175 pounds"* if asked, and the player converts. At L4+, weight-based dose errors from bad estimates are logged.
+
+---
+
+## 4. Interventions (Oct 28)
+
+General rules for all five:
+- Every intervention can **loosen or fail after patient movement** (log roll, cot transfer, loading). A reassessment check is required after each move.
+- Every hand on the wound is a hand not doing anything else. Direct pressure occupies whoever holds it.
+
+### 4a. Tourniquet, high and tight (CAT)
+- **Time:** about 20–40 s for a trained provider. The game flow is: route the strap and pull it tight (10–15 s), crank the windlass (about 3 s per half-turn), lock it in the clip, then write the time (5 s).
+- **How it works:** placed as high on the thigh as possible (groin crease). Once you're past the immediate threat, it can be moved to 2–3 in above the wound, on skin. It's fixed when **bleeding stops AND the distal pulse is gone**. Thigh: about 3 half-turns to occlude if the strap was pulled tight first (TUNE).
+- **Wrong or late:**
+  - **Strap slack before cranking:** the windlass maxes out without occluding, so the player must start over.
+  - **Too loose = venous tourniquet:** it blocks venous return but not arterial inflow. **Bleed rate goes UP (×1.3)** and the limb turns engorged and blue. This is a signature trap.
+  - **Over the knee joint:** ineffective (×0.9 of the original bleed).
+  - **Late:** blood loss keeps accruing at the full rate until it's on.
+  - **No time written:** logged, and missing from MIST.
+  - **Side effects (all real):**
+    - Pain +3. The patient begs you to loosen it.
+    - Over 2 h: a conversion decision.
+    - Over 6 h: the limb is likely lost (outcome projection).
+- **Single thigh tourniquet failure:** a 25% chance (TUNE) that one CAT on a large thigh can't fully occlude, leaving 10–20% residual flow. That's the trigger for 4b.
+
+### 4b. Second tourniquet
+- **Time:** 20–40 s.
+- **How it works:** placed **directly above** (proximal to) the first, side by side, not overlapping. Combined, they bring the bleed to 0.
+- **Wrong:**
+  - **Placed below the first or over the wound:** no effect.
+  - **Loosening the first one to place the second:** full bleed resumes during the gap.
+  - **Overlapping windlasses:** neither locks properly, so only partial effect (×0.5 residual).
+
+### 4c. Hemostatic packing + 3 min pressure (Combat Gauze / QuikClot)
+- **Use:** junctional wounds (groin, axilla) or any wound a tourniquet can't reach. It's also an adjunct before converting a tourniquet.
+- **Time:** packing 30–90 s depending on wound size (about 60 s for a thigh-size wound), then **3 min of continuous firm pressure**, then a pressure dressing over it.
+- **How it works:** gauze packed **into the wound, onto the bleeding source**, until the wound is full. With 3 min of pressure, the arterial bleed drops by about **90%**, and the dressing holds that.
+- **Wrong:**
+  - **Gauze laid on top, not packed:** only about 35% reduction.
+  - **Pressure released before 3 min:** a 60% rebleed chance (TUNE).
+  - **Peeking or removing the packing:** disrupts the clot, so the bleed restarts at full rate and the player has to repack.
+  - **Plain gauze instead of hemostatic:** about 75% reduction instead of 90%.
+  - **Junctional arterial wound:** packing alone has about an 80% success rate (TUNE). On failure, a junctional tourniquet is needed.
+
+### 4d. Direct pressure
+- **Time:** starts within 2–5 s. It must be held continuously, so it **ties up a provider** (delegate it to the partner or a bystander).
+- **How it works:** venous or minor bleeds are controlled at about 85–95%. Femoral arterial: firm pressure (heel of hand or knee, bodyweight) gives about **50–60%** reduction. It's a bridge, not a fix.
+- **Wrong:**
+  - **Light pressure:** about 20%.
+  - **Not over the source:** about 10%.
+  - **Lifting to look:** full rate resumes instantly.
+  - **Fatigue:** about −5% effectiveness per minute after 3 min unless someone swaps in (TUNE).
+  - **Patient moved:** pressure is lost until it's re-established.
+
+### 4e. Pressure dressing (Israeli / emergency trauma bandage)
+- **Time:** 45–90 s.
+- **How it works:** it holds pressure over packing (maintains about 90% of the packing's effect) or controls venous and minor bleeds. **Over an unpacked femoral arterial wound, it only reduces bleeding about 40%.**
+- **Wrong:**
+  - **Too loose:** it soaks through, about 15% effect.
+  - **Too tight:** it becomes a distal venous tourniquet. Distal cap refill goes long and the limb swells, so the PMS check catches it.
+  - **Soaked through:** the correct move is to escalate to a tourniquet or pack. Adding more layers on top is acceptable for venous bleeds. Removing the soaked dressing restarts the bleed.
+
+---
+
+## 5. Hemorrhage kit (equipment.json)
+
+Typical ALS ambulance layout:
+
+| Item | Duty belt / pocket | Jump (trauma) bag | Truck trauma cabinet |
+|---|---|---|---|
+| CAT tourniquet | 1 | 2 | 4 |
+| SOF-T Wide tourniquet | — | — | 2 |
+| Junctional tourniquet (SAM JT) | — | — | 1 (many civilian units don't carry one; keep it in the cabinet) |
+| Hemostatic gauze (z-fold) | — | 2 | 4 |
+| Plain gauze roll (Kerlix) | — | 4 | 10 |
+| Pressure bandage 6" | — | 2 | 6 |
+| Pressure bandage 4" | — | 2 | 4 |
+| Elastic wrap (ACE) | — | 2 | 6 |
+| Trauma dressing 10×30 / ABD pads | — | 2 / 6 | 4 / 10 |
+| Trauma shears | 1 | 1 | 1 |
+| Vented chest seal | — | 2 | 4 |
+| Sharpie (TQ time) | 1 | 1 | — |
+
+Gameplay rule: the **jump bag is what's at the patient**. Cabinet items require someone to go to the truck, which costs **45–60 s round trip** (partner or player).
+
+---
+
+## 6. TUNE anchors
+
+### Femoral arterial bleed (bike_down)
+- **Base rate: 700 mL/min at baseline MAP 93** (partial laceration; partials often bleed more than complete transections because the vessel can't retract and spasm).
+- **Pressure-dependent:** `rate = base × (currentMAP / 93)`. The bleed slows as he crashes, which is real and keeps the timeline survivable.
+- With this curve, untreated: **Class II at ~1.5 min, Class III at ~3 min, Class IV at ~4 min, arrest window at ~5–6 min.** "Tourniquet within ~3 min" now means *keep him out of Class IV*, which matches the brief.
+
+### ⚠️ Scene-start fix (important)
+A real femoral arterial bleed would kill Josh before EMS arrives, since response times run 8–10 min. Start the call like this:
+- **At patient contact: ~20% loss already (≈ 1,100 mL, Class II).** A bystander is holding a balled-up shirt on the wound (direct pressure, about 50%).
+- When the player takes over, or the bystander lets go to talk to them, **it spurts.** That's the hook moment for the demo.
+- **Optional trap:** a bystander has a belt cinched around the thigh as a venous tourniquet (×1.3), and the leg is purple and swollen. The player has to recognize it and replace it.
+
+### Other bleed classes (mL/min at baseline MAP; all pressure-scaled except capillary)
+- Capillary 2: self-clots in 5–10 min
+- Venous minor 10
+- Venous major 40
+- Arterial minor 80
+- Arterial major 700
+- Junctional 500
+- Internal slow 15
+- Internal fast 60
+- Internal massive 250
+
+### Drug effect-token map
+
+This is the change at peak effect, at the standard dose. Scale linearly with dose/standard dose up to 2×; above that, apply toxicity flags from drugs.json.
+
+| Variable | + | ++ | +++ | (negative mirrors) |
+|---|---|---|---|---|
+| HR (bpm) | +10 | +25 | +40 | − same |
+| SBP (mmHg) | +10 | +25 | +45 | − same |
+| RR (/min) | +3 | +7 | +12 | `→ 0` = apnea |
+| SpO2 (%) | +2 | +5 | +10 | capped by physiology |
+| GCS (points) | +1 | +3 | +6 | `---` = drop to 3–6 |
+| Pain (0–10) | — | — | — | −2 / −4 / −6 |
+| Glucose (mg/dL) | +25 | +60 | +110 | |
+| Bronchodilation / other 0–1 scales | +0.15 | +0.35 | +0.6 | |
+
+Fluids are not tokens. Model them explicitly: 1,000 mL crystalloid adds +1,000 mL intravascular immediately, then decays to ~250 mL retained over 60 min. Blood products stay about 90% intravascular.
+
+---
+
+## 7. Oct 29 kit depth
+
+### Airway sizing (Josh: 80 kg, 5'10", adult male)
+
+| Device | How to size | Josh's correct size | Too small | Too big |
+|---|---|---|---|---|
+| OPA | Corner of mouth → earlobe/angle of jaw. Sizes 80/90/100 mm | **100 mm** (90 acceptable) | Pushes tongue back, patency −0.4 | Pushes epiglottis down, patency −0.5, gag → vomiting |
+| NPA | Nostril → earlobe; diameter ≈ nostril. 26–34 Fr | **30–32 Fr** | Doesn't pass the tongue, no benefit | Epistaxis, esophageal placement (gastric air) |
+| i-gel | By weight: #3 30–60 kg, #4 50–90 kg, #5 > 90 kg | **#4** | Leak, delivered TV ×0.6 | Won't seat, leak ×0.6, tissue trauma |
+| King LT | By height: #3 4–5 ft, #4 5–6 ft, #5 > 6 ft | **#4** | Leak | Won't seat properly |
+| ETT | Male 7.5–8.0, female 7.0–7.5; depth ≈ 3 × tube size at the teeth | **7.5–8.0 at 22–23 cm** | High resistance, cuff leak | Won't pass, laryngeal trauma |
+| BVM mask | Small / medium / large adult face | **Large** | Leak, TV ×0.5 | Leak, TV ×0.5 |
+
+**Key failure modes:**
+- **OPA contraindicated with an intact gag reflex.** It causes vomiting and aspiration.
+- **NPA contraindicated with basilar skull or midface fracture.**
+- **ETT too deep → right mainstem:** left breath sounds go absent, SpO2 falls, airway pressures rise.
+- **ETT in the esophagus:** no EtCO2 waveform. If unrecognized, SpO2 falls about 2%/10 s, leading to bradycardia and arrest. Waveform EtCO2 is the only reliable confirmation.
+- **Dislodgement:** a chance with every patient move unless the tube is secured.
+- **Cuff pressure:** target 20–30 cmH2O.
+
+**BVM:**
+- About 1,500 mL bag; deliver 500–600 mL (about one-third of a squeeze), one breath every 6 s.
+- **Overventilation (rate > 12 or volume too big):**
+  - Gastric distension builds toward vomiting and aspiration. It also feeds tension gastrothorax if the diaphragm is ruptured.
+  - Intrathoracic pressure rises, venous return falls, and **SBP drops** (worse in hypovolemia).
+  - In TBI, the EtCO2 drop worsens outcome.
+
+**Suction:**
+- Rigid Yankauer for the mouth; 14 Fr flexible catheter for the ETT.
+- Max 10–15 s per pass. Each pass costs about −3–5% SpO2.
+
+**O2 delivery (FiO2):**
+
+| Device | Flow | FiO2 |
+|---|---|---|
+| Nasal cannula | 1–6 L | 24–44% (+4%/L) |
+| Simple mask | 6–10 L | 35–60% |
+| **Non-rebreather** | 10–15 L | 60–90% (**reservoir must be pre-inflated; if deflated, the patient rebreathes = trap**) |
+| BVM + reservoir | 15 L | ~95–100% |
+| CPAP | 5–10 cmH2O | — |
+
+**Tank duration** (min) = (psi − 200) × factor ÷ L/min. Factor D = 0.16, M = 1.56. A full D (2,000 psi) at 15 L/min ≈ 19 min. The tank can run out.
+
+### IV / IO and fluids
+
+**IV catheter gravity flow (crystalloid; pressure bag at 300 mmHg ≈ 1.5–2×):**
+
+| Gauge (color) | Flow |
+|---|---|
+| 14g (orange) | ~300 mL/min |
+| 16g (gray) | ~200 |
+| 18g (green) | ~100 |
+| 20g (pink) | ~60 |
+| 22g (blue) | ~35 |
+| 24g (yellow) | ~20 |
+
+**IV start:**
+- About 60–90 s per attempt.
+- First-attempt success about 75% baseline, then modifiers: shock or collapsed veins −30%, moving rig −15%, dark/rain −10%, large gauge in a small vein −10% (TUNE).
+- Sites: AC (preferred for trauma and adenosine), forearm, hand.
+- Infiltration: about 5% per hour, plus 5% per patient move (TUNE). An infiltrated line stops delivering and the site swells.
+
+**IO (EZ-IO):**
+- About 20–40 s, about 95% success.
+- Needles: 15 mm (3–39 kg), 25 mm (adult tibial), 45 mm (humeral or obese).
+- Flow: humeral ~80–150 mL/min with a pressure bag; tibial ~30–80 with a pressure bag; poor on gravity.
+- **Conscious patient:** lidocaine 40 mg IO before the flush, or the pain hits 10/10.
+- Contraindications: fracture in that bone, infection or burn at the site, IO in the same bone within 48 h, prosthetic joint.
+
+**Drip sets:**
+- Macro 10, 15 or 20 gtt/mL; micro 60 gtt/mL.
+- gtt/min = mL/h × drop factor ÷ 60. At L4+ the player sets the drip rate.
+- Blood products need blood tubing with a filter, and a warmer at 38 °C.
+
+### Manual vitals procedures
+
+| Vital | Procedure | Time | Error / artifact |
+|---|---|---|---|
+| Pulse | Radial (or carotid if no radial): count 30 s × 2; irregular = full 60 s | 15–30 s | Engine rule: radial lost below SBP ~80, femoral below ~70, carotid below ~60 (heuristic only) |
+| RR | Watch chest rise 30 s × 2. **Don't tell the patient**; RR rises if they know | 30 s | Talking patient reads +4 |
+| BP (auscultated) | Cuff width ≈ 40% of arm circumference. Inflate ~30 above radial loss, deflate 2–3 mmHg/s. First sound = SBP, sounds stop = DBP | 45–60 s | **Cuff too small reads HIGH +10–30, too big reads LOW −5–10.** Deflating too fast misses SBP (±10). Roadside or moving rig: inaudible, fall back to palpated BP |
+| BP (palpated) | Inflate until radial is lost, deflate; radial returns = SBP | 30 s | SBP only, reads ~10 low |
+| NIBP (monitor) | Auto cycle | 30–45 s | Fails with motion, very low BP (reads `---`), irregular rhythm |
+| SpO2 | Finger probe | 10–20 s to read | **Shock/cold fingers = no reading or falsely low.** Motion artifact. CO = falsely normal. Lags real SpO2 by ~30 s |
+| Cap refill | Press nail bed 5 s, release, count | 5–10 s | Unreliable in cold (night roadside reads +1–2 s) |
+| Pupils | Penlight each eye, check consensual | 10 s | Size 2–8 mm |
+| Glucose | Fingerstick | 10–15 s | ±15%; shock makes fingertip readings unreliable |
+| Temp | Tympanic / oral / temporal | 10–30 s | Temporal reads low in cold or sweaty skin |
+| Skin | Look/touch: color, temp, moisture | 5 s | — |
+| Lung sounds | 4–6 sites, compare left vs right | 20–30 s | Roadside noise; moving rig muffles |
+| GCS | Eyes / verbal / motor via interaction | 15–30 s | Intoxication or pain confounds |
+
+---
+
+## For item 8 (Bike down core conditions)
+Minimum set for Oct 28:
+- `femoral_arterial_bleed` (above)
+- `hypothermia_trauma`: night, roadside, soaked jeans. About −0.5 °C per 10 min exposed and wet (TUNE). Fixes: wrap and remove wet clothing.
+- Crash pain / stress offset (§1)
+- Optional `road_rash` (W step)
+
+That's enough to exercise **M, R (expose + check the back), C, H and P.**

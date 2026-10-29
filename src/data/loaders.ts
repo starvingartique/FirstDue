@@ -18,6 +18,7 @@ import comorbiditiesJson from "../../data/calls/components/comorbidities.json";
 import environmentsJson from "../../data/calls/components/environments.json";
 import bystandersJson from "../../data/calls/components/bystanders.json";
 import complicationsJson from "../../data/calls/components/complications.json";
+import oct28ConditionsJson from "../../data/medical/oct28_conditions.json";
 import bikeDownJson from "../../data/calls/fixed/bike_down.json";
 import level1Json from "../../data/difficulty/level1.json";
 import level2Json from "../../data/difficulty/level2.json";
@@ -39,6 +40,7 @@ import type {
   InterventionsFile,
   MarchPawsFile,
   MechanismsFile,
+  Oct28ConditionsFile,
   PatientsFile,
   PhysiologyFile,
   TraumaLibraryFile
@@ -83,6 +85,30 @@ export function loadPhysiology(): PhysiologyFile {
     for (const key of ["baselines", "shockClasses", "effectTokens", "bleedRates_mL_per_min"]) {
       if (!isObject(root[key])) throw new DataError("physiology.json", `"${key}" must be an object`);
     }
+    // Oct 28 anchors: Josh baselines and the femoral bleed must match the
+    // medical answers exactly, or the engine curve is wrong.
+    const base = root["baselines"] as Record<string, unknown>;
+    const expect: Record<string, unknown> = {
+      heartRate_bpm: 76,
+      respRate_per_min: 14,
+      sbp_mmhg: 124,
+      dbp_mmhg: 78,
+      spo2_pct: 98,
+      etco2_mmhg: 38,
+      bloodVolume_mL: 5600
+    };
+    for (const [key, value] of Object.entries(expect)) {
+      if (base[key] !== value) {
+        throw new DataError("physiology.json", `baselines.${key} must be ${String(value)}`);
+      }
+    }
+    const bleed = root["bleedRates_mL_per_min"] as Record<string, unknown>;
+    if (bleed["arterial_major"] !== 700) {
+      throw new DataError("physiology.json", '"arterial_major" must be 700');
+    }
+    if (bleed["junctional"] !== 500) {
+      throw new DataError("physiology.json", '"junctional" must be 500');
+    }
   });
 }
 
@@ -101,6 +127,14 @@ export function loadConditions(): ConditionsFile {
   });
 }
 
+const OCT28_INTERVENTION_IDS = [
+  "tourniquet_high_and_tight",
+  "second_tourniquet_proximal",
+  "hemostatic_packing_3min_pressure",
+  "direct_pressure",
+  "pressure_dressing"
+];
+
 export function loadInterventions(): InterventionsFile {
   return as<InterventionsFile>("interventions.json", interventionsJson, (root) => {
     checkMeta("interventions.json", root);
@@ -111,6 +145,10 @@ export function loadInterventions(): InterventionsFile {
       "minLevel"
     ]);
     checkUniqueIds("interventions.json", "interventions", list);
+    const ids = new Set(list.map((entry) => entry["id"]));
+    for (const id of OCT28_INTERVENTION_IDS) {
+      if (!ids.has(id)) throw new DataError("interventions.json", `missing Oct 28 intervention "${id}"`);
+    }
   });
 }
 
@@ -125,6 +163,28 @@ export function loadEquipment(): EquipmentFile {
       "quantity"
     ]);
     checkUniqueIds("equipment.json", "equipment", list);
+    // Oct 28 kit: every hemorrhage item carries per-stash quantities.
+    const cat = list.find((entry) => entry["id"] === "cat_tourniquet");
+    if (cat === undefined) throw new DataError("equipment.json", 'missing "cat_tourniquet"');
+    const q = cat["quantities"];
+    if (!isObject(q) || q["belt"] !== 1 || q["jump_bag"] !== 2 || q["cabinet"] !== 4) {
+      throw new DataError("equipment.json", '"cat_tourniquet" quantities must be belt 1, jump 2, cabinet 4');
+    }
+  });
+}
+
+export function loadOct28Conditions(): Oct28ConditionsFile {
+  return as<Oct28ConditionsFile>("oct28_conditions.json", oct28ConditionsJson, (root) => {
+    checkMeta("oct28_conditions.json", root);
+    const list = checkEntries("oct28_conditions.json", "conditions", root, [
+      "id",
+      "name",
+      "effects",
+      "findings",
+      "minLevel",
+      "generatorReady"
+    ]);
+    checkUniqueIds("oct28_conditions.json", "conditions", list);
   });
 }
 
@@ -223,6 +283,15 @@ export function loadBikeDown(): FixedCall {
         throw new DataError("bike_down.json", `patient is missing "${key}"`);
       }
     }
+    if (patient["weight_kg"] !== 80) {
+      throw new DataError("bike_down.json", 'patient.weight_kg must stay 80 (never shown in UI)');
+    }
+    // Oct 28 scene-start fix: contact happens mid-bleed at about 20 percent.
+    const sceneStart = root["sceneStart"];
+    if (!isObject(sceneStart)) throw new DataError("bike_down.json", '"sceneStart" must be an object');
+    if (sceneStart["bloodLossAtContact_mL"] !== 1100) {
+      throw new DataError("bike_down.json", '"sceneStart.bloodLossAtContact_mL" must be 1100');
+    }
   });
 }
 
@@ -249,6 +318,7 @@ export function loadAll(): void {
   loadDrugs();
   loadPhysiology();
   loadConditions();
+  loadOct28Conditions();
   loadInterventions();
   loadEquipment();
   loadTraumaLibrary();

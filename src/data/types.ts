@@ -54,7 +54,7 @@ export interface DrugsFile {
   drugs: Drug[];
 }
 
-// - physiology (skeleton placeholders) -
+// - physiology (Oct 28 clinical anchors) -
 
 export interface PhysiologyFile {
   _meta: MetaBlock;
@@ -102,7 +102,7 @@ export interface ConditionsFile {
   conditions: Condition[];
 }
 
-// - interventions and equipment (skeleton placeholders) -
+// - interventions and equipment (Oct 28 hemorrhage set) -
 
 export interface Intervention {
   id: string;
@@ -129,6 +129,12 @@ export interface EquipmentItem {
   category: string;
   location: string;
   quantity: number | string;
+  /** Per-stash counts for Oct 28: belt, jump_bag (at patient), cabinet (truck). */
+  quantities?: {
+    belt: number;
+    jump_bag: number;
+    cabinet: number;
+  };
   sizes?: string[];
   sizeEffects?: Record<string, unknown>;
   consumable?: boolean;
@@ -138,6 +144,31 @@ export interface EquipmentItem {
 export interface EquipmentFile {
   _meta: MetaBlock;
   equipment: EquipmentItem[];
+}
+
+// - Oct 28 core conditions (separate from the DRAFT conditions.json) -
+
+export interface Oct28Condition {
+  id: string;
+  name: string;
+  region?: string;
+  bleedClass?: string;
+  baseRate_mL_per_min?: number;
+  baselineMAP_mmhg?: number;
+  pressureScaling?: string;
+  effects: Record<string, unknown>;
+  stages?: Record<string, unknown>[];
+  findings: Record<string, string[]>;
+  resolvedBy?: string[];
+  reducedBy?: Record<string, unknown>;
+  minLevel: number;
+  generatorReady: boolean;
+  note?: string;
+}
+
+export interface Oct28ConditionsFile {
+  _meta: MetaBlock;
+  conditions: Oct28Condition[];
 }
 
 // - trauma library -
@@ -353,8 +384,36 @@ export interface FixedCall {
     description?: string;
   };
   backstory?: string;
+  /** Parked Oct 29 voice lines. Data only today. */
+  patientPrompt?: {
+    note?: string;
+    weightLine?: string;
+    weightLineTrigger?: string;
+    tourniquetPainLine?: string;
+  };
+  /** Scene-start fix: mid-bleed contact, bystander pressure, spurt hook, belt trap. */
+  sceneStart?: {
+    note?: string;
+    bloodLossAtContact_mL?: number;
+    bloodLossAtContact_pct?: number;
+    bloodLossAtContact_class?: string;
+    bystanderPressure?: {
+      what?: string;
+      effectiveness?: number;
+      note?: string;
+    };
+    spurtTrigger?: string;
+    venousTourniquetTrap?: {
+      included?: boolean;
+      what?: string;
+      effect?: string;
+      playerMust?: string;
+      note?: string;
+    };
+  };
   injuries: FixedCallInjury[];
   conditions: string[];
+  conditionsNote?: string;
   marchFocus: string[];
   bystander?: {
     archetypeId?: string;

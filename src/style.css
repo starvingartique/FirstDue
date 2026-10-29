@@ -71,6 +71,13 @@ body {
   letter-spacing: 0.02em;
 }
 
+#clock {
+  font-size: 14px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
+}
+
 #spot-nav {
   display: flex;
   gap: 8px;
@@ -103,8 +110,10 @@ body {
   position: absolute;
   left: 14px;
   bottom: 44px;
-  width: 300px;
+  width: 330px;
   max-width: calc(100vw - 28px);
+  max-height: calc(100vh - 160px);
+  overflow-y: auto;
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -195,6 +204,127 @@ body {
   font-size: 11px;
   color: var(--dim);
   margin: 8px 0 0;
+}
+
+#menu-tabs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+}
+
+.tab-btn {
+  appearance: none;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.tab-btn.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+
+.tabs-parked {
+  font-size: 10px;
+  color: var(--dim);
+  margin-left: auto;
+  text-align: right;
+}
+
+#menu-body {
+  margin-top: 8px;
+}
+
+.menu-h {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin: 12px 0 6px;
+}
+
+.menu-note {
+  font-size: 12px;
+  color: var(--dim);
+  margin: 6px 0;
+}
+
+.menu-findings {
+  font-size: 12px;
+  margin: 6px 0;
+  padding-left: 18px;
+}
+
+.menu-findings li {
+  margin: 2px 0;
+}
+
+.menu-btn {
+  display: block;
+  width: 100%;
+  appearance: none;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+  font-size: 13px;
+  text-align: left;
+  padding: 7px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  margin: 4px 0;
+}
+
+.menu-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.menu-opt {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--dim);
+  margin: 4px 0;
+}
+
+.menu-opt select {
+  background: #101722;
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font-size: 12px;
+  padding: 4px 6px;
+  max-width: 170px;
+}
+
+#action-status {
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  margin-top: 10px;
+  border-top: 1px solid var(--line);
+  padding-top: 8px;
+}
+
+#menu-log {
+  font-size: 11px;
+  color: var(--dim);
+  margin-top: 6px;
+}
+
+#menu-log div {
+  margin: 2px 0;
 }
 
 #hud-bottom {

@@ -1,16 +1,141 @@
 {
   "_meta": {
-    "version": "0.0.1",
-    "status": "SKELETON - one placeholder entry keeps the file schema-complete. Full ACM inventory lands Oct 28-29."
+    "version": "0.2.0",
+    "status": "Oct 28 hemorrhage kit from OCT28_MEDICAL_ANSWERS section 5. Typical ALS ambulance layout. Needs sign-off from a certified medic before Nov 4.",
+    "gameplayRule": "The jump bag is what is at the patient. Cabinet items require someone to go to the truck: 45-60 s round trip (partner or player).",
+    "cabinetFetch_s": "45-60",
+    "cabinetFetch_engine_s": 50
   },
   "equipment": [
     {
-      "id": "placeholder_cat_tourniquet",
-      "name": "TODO_CLINICAL - first real entry: CAT tourniquet",
+      "id": "cat_tourniquet",
+      "name": "CAT tourniquet",
       "category": "hemorrhage",
       "location": "jump_bag",
-      "quantity": "TODO_CLINICAL",
-      "notes": "Placeholder. Oct 28 adds the hemorrhage kit; Oct 29 adds airway, breathing, circulation, monitor and the rest."
+      "quantity": 7,
+      "quantities": { "belt": 1, "jump_bag": 2, "cabinet": 4 },
+      "consumable": false,
+      "notes": "Belt 1, jump 2, cabinet 4."
+    },
+    {
+      "id": "softt_wide_tourniquet",
+      "name": "SOF-T Wide tourniquet",
+      "category": "hemorrhage",
+      "location": "cabinet",
+      "quantity": 2,
+      "quantities": { "belt": 0, "jump_bag": 0, "cabinet": 2 },
+      "consumable": false,
+      "notes": "Cabinet only."
+    },
+    {
+      "id": "junctional_tourniquet_samjt",
+      "name": "Junctional tourniquet (SAM JT)",
+      "category": "hemorrhage",
+      "location": "cabinet",
+      "quantity": 1,
+      "quantities": { "belt": 0, "jump_bag": 0, "cabinet": 1 },
+      "consumable": false,
+      "notes": "Cabinet only. Many civilian units do not carry one; keep it in the cabinet."
+    },
+    {
+      "id": "hemostatic_gauze_zfold",
+      "name": "Hemostatic gauze, z-fold (Combat Gauze / QuikClot)",
+      "category": "hemorrhage",
+      "location": "jump_bag",
+      "quantity": 6,
+      "quantities": { "belt": 0, "jump_bag": 2, "cabinet": 4 },
+      "consumable": true,
+      "notes": "Jump 2, cabinet 4."
+    },
+    {
+      "id": "plain_gauze_roll_kerlix",
+      "name": "Plain gauze roll (Kerlix)",
+      "category": "hemorrhage",
+      "location": "jump_bag",
+      "quantity": 14,
+      "quantities": { "belt": 0, "jump_bag": 4, "cabinet": 10 },
+      "consumable": true,
+      "notes": "Jump 4, cabinet 10. Packs at about 75 percent instead of 90."
+    },
+    {
+      "id": "pressure_bandage_6in",
+      "name": "Pressure bandage 6 in (Israeli / emergency trauma bandage)",
+      "category": "hemorrhage",
+      "location": "jump_bag",
+      "quantity": 8,
+      "quantities": { "belt": 0, "jump_bag": 2, "cabinet": 6 },
+      "consumable": true,
+      "notes": "Jump 2, cabinet 6."
+    },
+    {
+      "id": "pressure_bandage_4in",
+      "name": "Pressure bandage 4 in",
+      "category": "hemorrhage",
+      "location": "jump_bag",
+      "quantity": 6,
+      "quantities": { "belt": 0, "jump_bag": 2, "cabinet": 4 },
+      "consumable": true,
+      "notes": "Jump 2, cabinet 4."
+    },
+    {
+      "id": "elastic_wrap_ace",
+      "name": "Elastic wrap (ACE)",
+      "category": "hemorrhage",
+      "location": "jump_bag",
+      "quantity": 8,
+      "quantities": { "belt": 0, "jump_bag": 2, "cabinet": 6 },
+      "consumable": true,
+      "notes": "Jump 2, cabinet 6."
+    },
+    {
+      "id": "trauma_dressing_10x30",
+      "name": "Trauma dressing 10x30",
+      "category": "hemorrhage",
+      "location": "jump_bag",
+      "quantity": 6,
+      "quantities": { "belt": 0, "jump_bag": 2, "cabinet": 4 },
+      "consumable": true,
+      "notes": "Jump 2, cabinet 4."
+    },
+    {
+      "id": "abd_pad",
+      "name": "ABD pad",
+      "category": "hemorrhage",
+      "location": "jump_bag",
+      "quantity": 16,
+      "quantities": { "belt": 0, "jump_bag": 6, "cabinet": 10 },
+      "consumable": true,
+      "notes": "Jump 6, cabinet 10."
+    },
+    {
+      "id": "trauma_shears",
+      "name": "Trauma shears",
+      "category": "assessment",
+      "location": "belt",
+      "quantity": 3,
+      "quantities": { "belt": 1, "jump_bag": 1, "cabinet": 1 },
+      "consumable": false,
+      "notes": "Belt 1, jump 1, cabinet 1. Needed to expose the wound."
+    },
+    {
+      "id": "vented_chest_seal",
+      "name": "Vented chest seal",
+      "category": "chest",
+      "location": "jump_bag",
+      "quantity": 6,
+      "quantities": { "belt": 0, "jump_bag": 2, "cabinet": 4 },
+      "consumable": true,
+      "notes": "Jump 2, cabinet 4. Parked use until R step depth lands; carried for inventory truth."
+    },
+    {
+      "id": "sharpie_tq_time",
+      "name": "Sharpie (TQ time)",
+      "category": "hemorrhage",
+      "location": "belt",
+      "quantity": 2,
+      "quantities": { "belt": 1, "jump_bag": 1, "cabinet": 0 },
+      "consumable": false,
+      "notes": "Belt 1, jump 1. No time written is logged and missing from MIST."
     }
   ]
 }

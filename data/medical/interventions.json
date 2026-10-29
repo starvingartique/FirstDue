@@ -1,15 +1,126 @@
 {
   "_meta": {
-    "version": "0.0.1",
-    "status": "SKELETON - one placeholder entry keeps the file schema-complete. Real interventions land Oct 28 (tourniquet, packing, pressure) and Oct 29."
+    "version": "0.2.0",
+    "status": "Oct 28 hemorrhage set from OCT28_MEDICAL_ANSWERS section 4. Textbook anchors (ATLS / TCCC / NREMT / PHTLS). Needs sign-off from a certified medic before Nov 4.",
+    "generalRules": [
+      "Every intervention can loosen or fail after patient movement (log roll, cot transfer, loading). A reassessment check is required after each move.",
+      "Every hand on the wound is a hand not doing anything else. Direct pressure occupies whoever holds it."
+    ]
   },
   "interventions": [
     {
-      "id": "placeholder_examine",
-      "name": "TODO_CLINICAL - first real entry: rapid blood sweep",
-      "timeCost_s": "TODO_CLINICAL",
+      "id": "tourniquet_high_and_tight",
+      "name": "Tourniquet, high and tight (CAT)",
+      "marchStep": "M",
+      "regions": ["leg_left", "leg_right", "arm_left", "arm_right"],
+      "timeCost_s": "20-40 for a trained provider: route strap and pull tight 10-15 s, crank windlass about 3 s per half-turn, lock in clip, write time 5 s",
+      "timeCost_engine_s": 30,
+      "windlass_s_per_halfTurn": 3,
+      "thigh_halfTurns_to_occlude_TUNE": 3,
+      "equipment": ["cat_tourniquet", "sharpie_tq_time"],
+      "fixes": ["femoral_arterial_bleed"],
+      "reduces": { "femoral_arterial_bleed": 1.0 },
+      "placement": "As high on the thigh as possible, groin crease. Once past the immediate threat, can move to 2-3 in above the wound, on skin. Fixed when bleeding stops AND distal pulse is gone.",
+      "failureModes": [
+        "slack_strap: strap slack before cranking, windlass maxes out without occluding, player must start over",
+        "venous_tourniquet: too loose, blocks venous return but not arterial inflow, bleed rate x1.3, limb engorged and blue",
+        "over_knee_joint: ineffective, x0.9 of the original bleed",
+        "late: blood loss keeps accruing at full rate until it is on",
+        "no_time_written: logged, missing from MIST",
+        "single_cat_large_thigh_failure_TUNE: 25 percent chance one CAT cannot fully occlude, 10-20 percent residual flow, trigger for second tourniquet"
+      ],
+      "sideEffects": [
+        "Pain +3. Patient begs you to loosen it.",
+        "Over 2 h: conversion decision.",
+        "Over 6 h: limb likely lost (outcome projection)."
+      ],
       "minLevel": 1,
-      "notes": "Placeholder. Oct 28 adds tourniquet_high_and_tight, hemostatic packing, direct pressure with real time costs and fixes."
+      "notes": "Thigh: about 3 half-turns to occlude if the strap was pulled tight first, TUNE."
+    },
+    {
+      "id": "second_tourniquet_proximal",
+      "name": "Second tourniquet, proximal to first",
+      "marchStep": "M",
+      "regions": ["leg_left", "leg_right", "arm_left", "arm_right"],
+      "timeCost_s": "20-40",
+      "timeCost_engine_s": 30,
+      "equipment": ["cat_tourniquet"],
+      "fixes": ["femoral_arterial_bleed"],
+      "reduces": { "femoral_arterial_bleed_residual": 1.0 },
+      "placement": "Directly above (proximal to) the first, side by side, not overlapping. Combined, they bring the bleed to 0.",
+      "requires": "tourniquet_high_and_tight with residual flow",
+      "failureModes": [
+        "below_first_or_over_wound: no effect",
+        "loosened_first_to_place_second: full bleed resumes during the gap",
+        "overlapping_windlasses: neither locks properly, partial effect, x0.5 residual"
+      ],
+      "minLevel": 1,
+      "notes": "Trigger is the 25 percent single-CAT failure on a large thigh (TUNE)."
+    },
+    {
+      "id": "hemostatic_packing_3min_pressure",
+      "name": "Hemostatic packing + 3 min pressure (Combat Gauze / QuikClot)",
+      "marchStep": "M",
+      "regions": ["leg_left", "leg_right", "arm_left", "arm_right"],
+      "timeCost_s": "Packing 30-90 s by wound size (about 60 s for thigh-size), then 3 min continuous firm pressure, then a pressure dressing over it",
+      "timeCost_engine_s": 60,
+      "pressureHold_s": 180,
+      "equipment": ["hemostatic_gauze_zfold", "pressure_bandage_6in"],
+      "fixes": [],
+      "reduces": { "arterial_bleed_packed": 0.9 },
+      "use": "Junctional wounds (groin, axilla) or any wound a tourniquet cannot reach. Also an adjunct before converting a tourniquet.",
+      "technique": "Gauze packed INTO the wound, onto the bleeding source, until the wound is full. With 3 min of pressure the arterial bleed drops by about 90 percent, and the dressing holds that.",
+      "failureModes": [
+        "gauze_on_top_not_packed: only about 35 percent reduction",
+        "pressure_released_before_3min_TUNE: 60 percent rebleed chance",
+        "peeking_or_removing_packing: disrupts the clot, bleed restarts at full rate, player must repack",
+        "plain_gauze_instead_of_hemostatic: about 75 percent reduction instead of 90",
+        "junctional_arterial_packing_alone_TUNE: about 80 percent success rate, on failure a junctional tourniquet is needed"
+      ],
+      "minLevel": 1,
+      "notes": "IDs hemostatic_packing_firm_3min_pressure and hemostatic_packing_if_not_tourniquetable in trauma_library.json both resolve to this entry."
+    },
+    {
+      "id": "direct_pressure",
+      "name": "Direct pressure",
+      "marchStep": "M",
+      "regions": ["leg_left", "leg_right", "arm_left", "arm_right", "head", "neck"],
+      "timeCost_s": "Starts within 2-5 s. Must be held continuously, ties up a provider (delegate to partner or bystander).",
+      "timeCost_engine_s": 3,
+      "equipment": [],
+      "fixes": [],
+      "reduces": { "venous_or_minor_bleed": 0.9, "femoral_arterial_firm": 0.55 },
+      "technique": "Venous or minor bleeds controlled at about 85-95 percent. Femoral arterial: firm pressure (heel of hand or knee, bodyweight) gives about 50-60 percent reduction. A bridge, not a fix.",
+      "failureModes": [
+        "light_pressure: about 20 percent",
+        "not_over_source: about 10 percent",
+        "lifting_to_look: full rate resumes instantly",
+        "fatigue_TUNE: about -5 percent effectiveness per minute after 3 min unless someone swaps in",
+        "patient_moved: pressure is lost until re-established"
+      ],
+      "occupiesProvider": true,
+      "minLevel": 1,
+      "notes": "Bystander shirt at scene start counts as direct pressure at about 50 percent until the player takes over."
+    },
+    {
+      "id": "pressure_dressing",
+      "name": "Pressure dressing (Israeli / emergency trauma bandage)",
+      "marchStep": "M",
+      "regions": ["leg_left", "leg_right", "arm_left", "arm_right", "head"],
+      "timeCost_s": "45-90",
+      "timeCost_engine_s": 65,
+      "equipment": ["pressure_bandage_6in"],
+      "fixes": [],
+      "reduces": { "over_packing_holds": 0.9, "venous_or_minor": 0.9, "unpacked_femoral_arterial": 0.4 },
+      "technique": "Holds pressure over packing (maintains about 90 percent of the packing effect) or controls venous and minor bleeds. Over an unpacked femoral arterial wound, only about 40 percent reduction.",
+      "failureModes": [
+        "too_loose: soaks through, about 15 percent effect",
+        "too_tight: becomes a distal venous tourniquet, distal cap refill goes long and limb swells, PMS check catches it",
+        "soaked_through: correct move is escalate to tourniquet or pack; adding more layers on top is acceptable for venous bleeds",
+        "removing_soaked_dressing: restarts the bleed"
+      ],
+      "minLevel": 1,
+      "notes": "Escalate, do not stack, on arterial soak-through."
     }
   ]
 }

@@ -12,6 +12,10 @@ export interface PatientModel {
   regionMeshes: Map<RegionId, THREE.Mesh[]>;
   /** Chest meshes, used for the idle breathing motion. */
   chestMeshes: THREE.Mesh[];
+  /** Engine-driven blood pool: scale grows with cumulative mL lost. */
+  bloodPool: THREE.Mesh;
+  /** Femoral wound marker: pulses while arterial bleeding is uncontrolled. */
+  wound: THREE.Mesh;
 }
 
 const SKIN = 0xc9a07a;
@@ -126,19 +130,21 @@ export function buildPatient(): PatientModel {
   const back = add("back", new THREE.BoxGeometry(0.36, 0.04, 0.62), mat(SHIRT), 0, 0.03, -0.2);
   back.castShadow = false;
 
-  // Wound marker on the left thigh plus a static blood pool. Sizes are fixed
-  // placeholders; the Oct 28 engine drives pool size from real mL lost.
+  // Wound marker on the left thigh plus the engine-driven blood pool. The
+  // loop rescales the pool from cumulative mL lost every tick (unit circle
+  // geometry scaled to the engine radius, so growth is exact).
   const wound = new THREE.Mesh(
     new THREE.CylinderGeometry(0.045, 0.055, 0.02, 16),
     mat(WOUND, 0.4)
   );
   wound.position.set(-0.11, 0.185, 0.5);
   group.add(wound);
-  const pool = new THREE.Mesh(new THREE.CircleGeometry(0.34, 28), mat(BLOOD, 0.35));
+  const pool = new THREE.Mesh(new THREE.CircleGeometry(1, 28), mat(BLOOD, 0.35));
   pool.rotation.x = -Math.PI / 2;
   pool.position.set(-0.14, 0.006, 0.52);
+  pool.scale.setScalar(0.33);
   pool.receiveShadow = true;
   group.add(pool);
 
-  return { group, regionMeshes, chestMeshes };
+  return { group, regionMeshes, chestMeshes, bloodPool: pool, wound };
 }

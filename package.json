@@ -14,7 +14,8 @@
     "preview": "vite preview",
     "server": "tsx server/index.ts",
     "server:test": "tsx scripts/server-test.ts",
-    "validate-data": "tsx scripts/validate-data.ts"
+    "validate-data": "tsx scripts/validate-data.ts",
+    "sim:test": "tsx scripts/sim-test.ts"
   },
   "dependencies": {
     "@hono/node-server": "^1.13.0",

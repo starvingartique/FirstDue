@@ -1,22 +1,13 @@
-// F1 debug overlay. Placeholder vitals only, clearly labeled. The Oct 28
-// physiology engine replaces these with the true ticking state.
+// F1 debug overlay. LIVE engine values, refreshed every sim-second while open.
+// Hidden truth: the player learns findings only through assessment, but F1
+// shows true state for development and demo purposes.
 
-export interface DebugVitals {
-  hr: number;
-  sbp: number;
-  dbp: number;
-  spo2: number;
-  rr: number;
-  etco2: number;
-  gcs: string;
-}
+import type { Sim } from "../sim/engine";
 
-// Fake but plausible for a young adult with a controlled bleed. Jitter keeps
-// the overlay visibly alive without implying engine truth.
-const BASE: DebugVitals = { hr: 128, sbp: 92, dbp: 58, spo2: 97, rr: 24, etco2: 31, gcs: "E4 V5 M6 (15)" };
-
-function jitter(base: number, spread: number): number {
-  return Math.round(base + (Math.random() * 2 - 1) * spread);
+function fmtClock(t_s: number): string {
+  const m = Math.floor(t_s / 60);
+  const s = t_s % 60;
+  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
 export class DebugOverlay {
@@ -24,7 +15,7 @@ export class DebugOverlay {
   private vitals: HTMLElement;
   private timer: number | null = null;
 
-  constructor() {
+  constructor(private readonly sim: Sim) {
     const overlay = document.getElementById("debug-overlay");
     const vitals = document.getElementById("debug-vitals");
     if (overlay === null || vitals === null) {
@@ -40,7 +31,7 @@ export class DebugOverlay {
     this.overlay.hidden = !hidden;
     if (hidden) {
       this.render();
-      this.timer = window.setInterval(() => this.render(), 2000);
+      this.timer = window.setInterval(() => this.render(), 1000);
     } else if (this.timer !== null) {
       window.clearInterval(this.timer);
       this.timer = null;
@@ -48,14 +39,28 @@ export class DebugOverlay {
   }
 
   private render(): void {
+    const v = this.sim.vitals;
     const rows: [string, string][] = [
-      ["HR", `${jitter(BASE.hr, 2)}`],
-      ["SBP", `${jitter(BASE.sbp, 2)}`],
-      ["DBP", `${jitter(BASE.dbp, 2)}`],
-      ["SpO2", `${jitter(BASE.spo2, 1)}`],
-      ["RR", `${jitter(BASE.rr, 1)}`],
-      ["EtCO2", `${jitter(BASE.etco2, 1)}`],
-      ["GCS", BASE.gcs]
+      ["T+ contact", fmtClock(this.sim.t_s)],
+      ["HR", `${v.hr_bpm}`],
+      ["BP", v.arrested ? "0/0" : `${v.sbp_mmhg}/${v.dbp_mmhg} (MAP ${v.map_mmhg})`],
+      ["Pulse press.", `${v.pulsePressure_mmhg}`],
+      ["RR", `${v.rr_per_min}`],
+      ["SpO2", `${v.spo2_pct}`],
+      ["EtCO2", `${v.etco2_mmhg}`],
+      ["GCS", v.gcs_text],
+      ["Cap refill", v.capRefill_text],
+      ["Radial", v.radial],
+      ["Skin", v.skin],
+      ["Mental", v.mental],
+      ["Temp", `${v.temp_C} C`],
+      ["Pain", `${v.pain_0_to_10}/10`],
+      ["Rhythm", v.rhythm],
+      ["Shock idx", `${v.shockIndex} (${v.shockFlag})`],
+      ["ATLS class", v.atlsClass],
+      ["Blood lost", `${v.loss_mL} mL (${v.loss_pct}%)`],
+      ["Bleed rate", `${Math.round(this.sim.bleedRate_mL_per_min())} mL/min`],
+      ["Engine", this.sim.busy ? this.sim.pendingLabel : "Idle"]
     ];
     this.vitals.innerHTML = "";
     for (const [label, value] of rows) {

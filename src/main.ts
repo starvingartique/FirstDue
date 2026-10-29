@@ -1,5 +1,6 @@
-// Boot: validate data, build world and patient, wire input, HUD and debug.
-// Any data or scene failure lands in the on-screen error box, never a void.
+// Boot: validate data, build world, patient and sim, wire input, HUD, ACM
+// menu and live debug. Any data or scene failure lands in the on-screen
+// error box, never a void.
 
 import "./style.css";
 import { buildWorld } from "./engine/scene";
@@ -12,6 +13,8 @@ import { RegionHighlight } from "./patient/highlight";
 import type { RegionId } from "./patient/regions";
 import { Hud } from "./ui/hud";
 import { DebugOverlay } from "./ui/debug";
+import { MedicalMenu } from "./ui/medicalMenu";
+import { newBikeDownSim } from "./sim/scenario";
 import { loadAll, loadBikeDown } from "./data/loaders";
 
 function showBootError(message: string): void {
@@ -25,6 +28,7 @@ function main(): void {
   // Data first: a broken file must fail loudly at boot, not mid-call.
   loadAll();
   const call = loadBikeDown();
+  const sim = newBikeDownSim();
 
   const canvas = document.getElementById("scene");
   if (!(canvas instanceof HTMLCanvasElement)) {
@@ -36,12 +40,14 @@ function main(): void {
   const patient = buildPatient();
   scene.add(patient.group);
   const highlight = new RegionHighlight(patient);
-  const debug = new DebugOverlay();
+  const debug = new DebugOverlay(sim);
+  const menu = new MedicalMenu(sim);
 
   const hud = new Hud({
     onSelectRegion: (region: RegionId) => {
       highlight.setSelected(region);
       hud.showRegion(highlight.getSelected());
+      menu.setRegion(highlight.getSelected());
     },
     onSelectSpot: (spot: SpotId) => {
       spotCamera.applySpot(spot);
@@ -51,6 +57,7 @@ function main(): void {
   hud.showCall(call);
   hud.showRegion(null);
   hud.showSpot(spotCamera.getSpot());
+  hud.showClock(0);
 
   bindInput(canvas, {
     onLook: (dx, dy) => spotCamera.addLook(dx, dy),
@@ -59,6 +66,7 @@ function main(): void {
       // Tapping empty ground clears the selection.
       highlight.setSelected(hit);
       hud.showRegion(highlight.getSelected());
+      menu.setRegion(highlight.getSelected());
     },
     onSpotKey: (index) => {
       if (index < 0 || index >= SPOT_IDS.length) return;
@@ -74,7 +82,12 @@ function main(): void {
     scene,
     camera: spotCamera.camera,
     patient,
-    onResize: () => spotCamera.onResize()
+    sim,
+    onResize: () => spotCamera.onResize(),
+    onTick: () => {
+      hud.showClock(sim.t_s);
+      menu.refresh();
+    }
   });
 }
 
