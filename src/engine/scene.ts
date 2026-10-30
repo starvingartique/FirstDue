@@ -1,8 +1,10 @@
 // Night roadside world: ground, road, shoulder, guardrail, downed bike with a
-// live headlight, lamp post, kit bags, bystander, cones, stars and tree line.
-// One scene type rendered well; depth lives in data (brief section 0).
+// live headlight, lamp post, jump bag and staged kit, bystander, cones,
+// stars and tree line. One scene type rendered well; depth lives in data
+// (brief section 0).
 
 import * as THREE from "three";
+import { buildKit } from "./kit";
 
 export interface World {
   scene: THREE.Scene;
@@ -11,25 +13,6 @@ export interface World {
 
 function mat(color: number, roughness = 0.9): THREE.MeshStandardMaterial {
   return new THREE.MeshStandardMaterial({ color, roughness, metalness: 0 });
-}
-
-function box(
-  scene: THREE.Scene,
-  w: number,
-  h: number,
-  d: number,
-  color: number,
-  x: number,
-  y: number,
-  z: number,
-  roughness = 0.9
-): THREE.Mesh {
-  const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat(color, roughness));
-  mesh.position.set(x, y, z);
-  mesh.castShadow = true;
-  mesh.receiveShadow = true;
-  scene.add(mesh);
-  return mesh;
 }
 
 export function buildWorld(canvas: HTMLCanvasElement): World {
@@ -143,10 +126,8 @@ export function buildWorld(canvas: HTMLCanvasElement): World {
   lampHead.position.set(2.35, 4.42, -2.4);
   scene.add(lampHead);
 
-  // - kit bags staged at the patient right side -
-  box(scene, 0.55, 0.3, 0.32, 0xa11f1f, 1.15, 0.15, 0.95, 0.8);
-  box(scene, 0.4, 0.22, 0.26, 0x7a1515, 1.2, 0.11, 1.35, 0.8);
-  box(scene, 0.3, 0.12, 0.2, 0xd8d8d8, 1.1, 0.36, 0.95, 0.6); // drug box lid
+  // - jump bag and staged kit at the patient right side -
+  scene.add(buildKit());
 
   // - bystander witness by the road edge -
   const witness = new THREE.Group();
