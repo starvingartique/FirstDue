@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://firstdue.game/schemas/oct29_vitals.schema.json",
+  "title": "oct29_vitals.json - Oct 29 manual vitals procedures",
+  "description": "Manual vitals procedures with times and errors from OCT28_MEDICAL_ANSWERS section 7.",
+  "type": "object",
+  "required": ["_meta", "procedures", "shockThresholds"],
+  "properties": {
+    "_meta": {
+      "type": "object",
+      "required": ["version", "status"],
+      "properties": {
+        "version": { "type": "string" },
+        "status": { "type": "string" }
+      }
+    },
+    "procedures": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "time_engine_s", "error"],
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "time_engine_s": { "type": "number" },
+          "error": { "type": "string" }
+        }
+      }
+    },
+    "shockThresholds": { "type": "object" }
+  }
+}

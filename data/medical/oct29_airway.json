@@ -1,0 +1,156 @@
+{
+  "_meta": {
+    "version": "0.1.0",
+    "status": "Oct 29 airway and breathing values from OCT28_MEDICAL_ANSWERS section 7. Textbook anchors (ATLS / TCCC / NREMT / PHTLS). Needs sign-off from a certified medic before Nov 4.",
+    "basis": "ATLS / TCCC / NREMT / PHTLS textbook anchors. Fields tagged TUNE are adjustable for gameplay.",
+    "subject": "Josh, adult male. Correct sizes below are his sizes. Never show his weight in UI."
+  },
+  "airwayDevices": [
+    {
+      "id": "opa",
+      "name": "Oropharyngeal airway (OPA)",
+      "sizing": "Corner of mouth to earlobe or angle of jaw. Sizes 80, 90, 100 mm.",
+      "sizes_mm": [80, 90, 100],
+      "correctForJosh_mm": 100,
+      "acceptableForJosh_mm": [90, 100],
+      "tooSmall": "Pushes tongue back, patency -0.4.",
+      "tooSmall_patency": -0.4,
+      "tooBig": "Pushes epiglottis down, patency -0.5, gag leads to vomiting.",
+      "tooBig_patency": -0.5,
+      "contraindication": "Intact gag reflex: causes vomiting and aspiration.",
+      "timeCost_engine_s": 15
+    },
+    {
+      "id": "npa",
+      "name": "Nasopharyngeal airway (NPA)",
+      "sizing": "Nostril to earlobe, diameter about nostril. Sizes 26-34 Fr.",
+      "sizes_fr": [26, 28, 30, 32, 34],
+      "correctForJosh_fr": [30, 32],
+      "tooSmall": "Does not pass the tongue, no benefit.",
+      "tooBig": "Epistaxis, esophageal placement (gastric air).",
+      "contraindication": "Basilar skull or midface fracture.",
+      "timeCost_engine_s": 15
+    },
+    {
+      "id": "igel",
+      "name": "i-gel supraglottic airway",
+      "sizing": "By weight: #3 30-60 kg, #4 50-90 kg, #5 over 90 kg.",
+      "sizes": [3, 4, 5],
+      "correctForJosh": 4,
+      "tooSmall": "Leak, delivered tidal volume x0.6.",
+      "tooBig": "Will not seat, leak x0.6, tissue trauma.",
+      "leak_tidalVolume_x": 0.6,
+      "timeCost_engine_s": 25
+    },
+    {
+      "id": "kinglt",
+      "name": "King LT supraglottic airway",
+      "sizing": "By height: #3 4-5 ft, #4 5-6 ft, #5 over 6 ft.",
+      "sizes": [3, 4, 5],
+      "correctForJosh": 4,
+      "tooSmall": "Leak.",
+      "tooSmall_tidalVolume_x": 0.6,
+      "tooBig": "Will not seat properly.",
+      "timeCost_engine_s": 25
+    },
+    {
+      "id": "ett",
+      "name": "Endotracheal tube (ETT)",
+      "sizing": "Male 7.5-8.0, female 7.0-7.5. Depth about 3 x tube size at the teeth.",
+      "sizes_mm": [6.0, 6.5, 7.0, 7.5, 8.0, 8.5],
+      "correctForJosh_mm": [7.5, 8.0],
+      "correctDepth_cm": [22, 23],
+      "tooSmall": "High resistance, cuff leak.",
+      "tooBig": "Will not pass, laryngeal trauma.",
+      "tooDeep": "Right mainstem: left breath sounds absent, SpO2 falls, airway pressures rise.",
+      "esophageal": "No EtCO2 waveform. If unrecognized, SpO2 falls about 2 percent per 10 s, leading to bradycardia and arrest.",
+      "esophageal_spo2_per_10s": -2,
+      "confirmation": "Waveform EtCO2 is the only reliable confirmation.",
+      "dislodgement": "A chance with every patient move unless the tube is secured.",
+      "cuffPressure_target_cmH2O": [20, 30],
+      "timeCost_engine_s": 60
+    },
+    {
+      "id": "bvm_mask",
+      "name": "BVM mask",
+      "sizing": "Small, medium, large adult face.",
+      "sizes": ["small", "medium", "large"],
+      "correctForJosh": "large",
+      "tooSmall": "Leak, tidal volume x0.5.",
+      "tooBig": "Leak, tidal volume x0.5.",
+      "leak_tidalVolume_x": 0.5
+    }
+  ],
+  "bvm": {
+    "bag_mL": 1500,
+    "deliver_mL": [500, 600],
+    "deliverNote": "About one-third of a squeeze.",
+    "rate_every_s": 6,
+    "rate_per_min": 10,
+    "overventilation": "Rate over 12 or volume too big.",
+    "overvent_rate_gt_per_min": 12,
+    "overvent_volume_gt_mL": 600,
+    "overventEffects": [
+      "Gastric distension builds toward vomiting and aspiration. Also feeds tension gastrothorax if the diaphragm is ruptured.",
+      "Intrathoracic pressure rises, venous return falls, and SBP drops (worse in hypovolemia).",
+      "In TBI, the EtCO2 drop worsens outcome."
+    ],
+    "sbpDrop_per_excess_breath_mmhg_TUNE": 2,
+    "sbpDrop_doubled_when_loss_pct_gt_TUNE": 30,
+    "gastricClimb_per_overvent_breath_TUNE": 1,
+    "gastricVomitAt_TUNE": 10
+  },
+  "suction": {
+    "rigid": "Rigid Yankauer for the mouth.",
+    "flexible": "14 Fr flexible catheter for the ETT.",
+    "max_s_per_pass": [10, 15],
+    "spo2Cost_per_pass_pct": [-3, -5],
+    "spo2Dip_engine_pct": 4,
+    "spo2Dip_recovery_s": 60
+  },
+  "oxygenDelivery": [
+    { "device": "nasal_cannula", "name": "Nasal cannula", "flow_L_per_min": [1, 6], "fio2": "24-44 percent (+4 percent per L)" },
+    { "device": "simple_mask", "name": "Simple mask", "flow_L_per_min": [6, 10], "fio2": "35-60 percent" },
+    { "device": "non_rebreather", "name": "Non-rebreather", "flow_L_per_min": [10, 15], "fio2": "60-90 percent", "trap": "Reservoir must be pre-inflated. If deflated, the patient rebreathes." },
+    { "device": "bvm_reservoir", "name": "BVM + reservoir", "flow_L_per_min": [15, 15], "fio2": "about 95-100 percent" },
+    { "device": "cpap", "name": "CPAP", "pressure_cmH2O": [5, 10], "fio2": "set on device" }
+  ],
+  "fio2Table": {
+    "nasal_cannula_per_L": 0.04,
+    "nasal_cannula_base": 0.2,
+    "simple_mask_low": 0.35,
+    "simple_mask_high": 0.6,
+    "non_rebreather_low": 0.6,
+    "non_rebreather_high": 0.9,
+    "non_rebreather_deflated": 0.21,
+    "bvm_reservoir": 0.95,
+    "room_air": 0.21
+  },
+  "tank": {
+    "formula_min": "(psi - 200) x factor / L per min",
+    "factor_D": 0.16,
+    "factor_M": 1.56,
+    "full_psi": 2000,
+    "reserve_psi": 200,
+    "lowWarn_psi": 500,
+    "example": "A full D (2,000 psi) at 15 L per min is about 19 min.",
+    "note": "The tank can run out."
+  },
+  "engineCoupling_TUNE": {
+    "note": "TUNE: patency and FiO2 to vitals coupling. Section 7 gives device effects, not this coupling. Needs medic sign-off.",
+    "spo2_penalty_per_patencyLost": 20,
+    "etco2_rise_per_patencyLost": 15,
+    "spo2_bonus_per_fio2AboveAir": 25,
+    "spo2_aspiration_penalty": 8,
+    "etco2_overvent_drop": 10,
+    "etco2_rebreathe_rise": 10,
+    "spo2_mainstem_per_10s": -1,
+    "spo2_cuffLeak": -2,
+    "spo2_bvmAssist_bonus": 5,
+    "vomit_soiled_patency": -0.3,
+    "laryngeal_trauma_patency": -0.2,
+    "cpap_o2_L_per_min": 10,
+    "io_gravity_mL_per_min": 10,
+    "temp_temporal_low_C": "0.5-1.0"
+  }
+}

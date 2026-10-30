@@ -17,6 +17,9 @@ import {
   loadMarchPaws,
   loadMechanisms,
   loadOct28Conditions,
+  loadOct29Airway,
+  loadOct29Lines,
+  loadOct29Vitals,
   loadPatients,
   loadPhysiology,
   loadTraumaLibrary
@@ -27,6 +30,9 @@ try {
   const drugs = loadDrugs();
   const conditions = loadConditions();
   const oct28 = loadOct28Conditions();
+  const airway = loadOct29Airway();
+  const lines = loadOct29Lines();
+  const vitals = loadOct29Vitals();
   const trauma = loadTraumaLibrary();
   const march = loadMarchPaws();
   const mechanisms = loadMechanisms();
@@ -46,6 +52,9 @@ try {
   console.log(`drugs.json OK (${drugs.drugs.length} drugs)`);
   console.log(`conditions.json OK (${conditions.conditions.length} conditions, DRAFT, unused by Bike down)`);
   console.log(`oct28_conditions.json OK (${oct28.conditions.map((c) => c.id).join(", ")})`);
+  console.log(`oct29_airway.json OK (${airway.airwayDevices.length} devices, O2 + tank + BVM)`);
+  console.log(`oct29_lines.json OK (${lines.ivCatheters.length} catheters, IO + drip sets + explicit fluids)`);
+  console.log(`oct29_vitals.json OK (${vitals.procedures.length} manual procedures)`);
   console.log(`trauma_library.json OK (${trauma.injuries.length} injuries)`);
   console.log(`march_paws.json OK (${march.sequence.length} steps)`);
   console.log(`mechanisms.json OK (${mechanisms.mechanisms.length} mechanisms)`);

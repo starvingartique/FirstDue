@@ -1,0 +1,86 @@
+{
+  "_meta": {
+    "version": "0.1.0",
+    "status": "Oct 29 IV/IO and fluids values from OCT28_MEDICAL_ANSWERS section 7. Textbook anchors (ATLS / TCCC / NREMT / PHTLS). Needs sign-off from a certified medic before Nov 4.",
+    "basis": "ATLS / TCCC / NREMT / PHTLS textbook anchors. Fields tagged TUNE are adjustable for gameplay."
+  },
+  "ivCatheters": [
+    { "gauge": 14, "color": "orange", "gravityFlow_mL_per_min": 300 },
+    { "gauge": 16, "color": "gray", "gravityFlow_mL_per_min": 200 },
+    { "gauge": 18, "color": "green", "gravityFlow_mL_per_min": 100 },
+    { "gauge": 20, "color": "pink", "gravityFlow_mL_per_min": 60 },
+    { "gauge": 22, "color": "blue", "gravityFlow_mL_per_min": 35 },
+    { "gauge": 24, "color": "yellow", "gravityFlow_mL_per_min": 20 }
+  ],
+  "pressureBag": {
+    "note": "Pressure bag at 300 mmHg is about 1.5-2x gravity flow.",
+    "mmHg": 300,
+    "multiplier_engine": 1.75
+  },
+  "ivStart": {
+    "time_s": [60, 90],
+    "time_engine_s": 75,
+    "firstAttemptSuccess_pct": 75,
+    "modifiers_pct": {
+      "shockOrCollapsedVeins": -30,
+      "shockMeans": "ATLS Class II or worse (loss 15 percent or more). Engine definition.",
+      "movingRig": -15,
+      "movingRigNote": "No moving rig on Oct 29 (no transport phase). Parked until Oct 30.",
+      "darkOrRain": -10,
+      "darkOrRainNote": "Applies at night roadside (Bike down is night). Scene lighting does not fully offset it.",
+      "largeGaugeSmallVein_TUNE": -10,
+      "largeGaugeSmallVeinMeans_TUNE": "14g or 16g in a hand vein. Engine definition."
+    },
+    "sites": ["AC (preferred for trauma and adenosine)", "forearm", "hand"],
+    "sites_engine": ["ac", "forearm", "hand"],
+    "infiltration_per_hour_pct": 5,
+    "infiltration_per_move_pct_TUNE": 5,
+    "infiltrationNote": "An infiltrated line stops delivering and the site swells."
+  },
+  "io": {
+    "device": "EZ-IO",
+    "time_s": [20, 40],
+    "time_engine_s": 30,
+    "success_pct": 95,
+    "needles_mm": [
+      { "length_mm": 15, "for": "3-39 kg" },
+      { "length_mm": 25, "for": "adult tibial" },
+      { "length_mm": 45, "for": "humeral or obese" }
+    ],
+    "joshNeedle_mm": { "tibial": 25, "humeral": 45 },
+    "flow_mL_per_min": {
+      "humeral_pressureBag": [80, 150],
+      "tibial_pressureBag": [30, 80],
+      "gravity": "poor",
+      "gravity_engine_mL_per_min": 10
+    },
+    "consciousLidocaine_mg": 40,
+    "consciousLidocaineNote": "Conscious patient: lidocaine 40 mg IO before the flush, or the pain hits 10/10.",
+    "consciousMeans": "GCS total 14 or 15. Engine definition.",
+    "contraindications": [
+      "Fracture in that bone",
+      "Infection or burn at the site",
+      "IO in the same bone within 48 h",
+      "Prosthetic joint"
+    ]
+  },
+  "dripSets": {
+    "macro_gtt_per_mL": [10, 15, 20],
+    "micro_gtt_per_mL": 60,
+    "formula": "gtt per min = mL per h x drop factor / 60",
+    "playerSetsRateAt": "L4+",
+    "oct29behavior": "L1/L2 run wide open at catheter gravity flow (x pressure bag if applied). The menu shows the gtt math for the running rate."
+  },
+  "fluids": {
+    "note": "Fluids are NOT tokens. Model them explicitly.",
+    "crystalloid_bolus_mL": 1000,
+    "crystalloid_immediate_mL": 1000,
+    "crystalloid_retained_mL_at_60min": 250,
+    "crystalloid_decay": "Exponential to 250 mL retained over 60 min. retained(t) = 250 + 750 x e^(-0.077 x t_min). Engine fit to the stated curve.",
+    "crystalloid_decay_k_per_min": 0.077,
+    "blood_retained_fraction": 0.9,
+    "bloodNote": "Blood products stay about 90 percent intravascular.",
+    "bloodRequires": "Blood tubing with a filter, and a warmer at 38 C.",
+    "bloodWarmer_C": 38
+  }
+}

@@ -7,6 +7,7 @@ export interface InputHandlers {
   onTap: (x: number, y: number) => void;
   onSpotKey: (index: number) => void;
   onDebugKey: () => void;
+  onTalkKey: () => void;
 }
 
 const TAP_SLOP_PX = 6;
@@ -54,6 +55,10 @@ export function bindInput(canvas: HTMLCanvasElement, handlers: InputHandlers): v
     }
     if (event.key === "1" || event.key === "2" || event.key === "3") {
       handlers.onSpotKey(Number(event.key) - 1);
+    }
+    // V opens the Talk tab. Typing in an input field must not retrigger it.
+    if ((event.key === "v" || event.key === "V") && !(event.target instanceof HTMLInputElement)) {
+      handlers.onTalkKey();
     }
   });
 

@@ -74,7 +74,8 @@ function main(): void {
       spotCamera.applySpot(spot);
       hud.showSpot(spot);
     },
-    onDebugKey: () => debug.toggle()
+    onDebugKey: () => debug.toggle(),
+    onTalkKey: () => menu.openTalk()
   });
 
   startLoop({

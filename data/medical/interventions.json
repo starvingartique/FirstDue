@@ -5,7 +5,8 @@
     "generalRules": [
       "Every intervention can loosen or fail after patient movement (log roll, cot transfer, loading). A reassessment check is required after each move.",
       "Every hand on the wound is a hand not doing anything else. Direct pressure occupies whoever holds it."
-    ]
+    ],
+    "oct29Note": "Oct 29 adds airway, breathing, lines/fluids, hypothermia and manual-vitals interventions from OCT28_MEDICAL_ANSWERS section 7. Drug prep loop reads standard doses and token effects from drugs.json plus physiology.json effectTokens."
   },
   "interventions": [
     {
@@ -121,6 +122,188 @@
       ],
       "minLevel": 1,
       "notes": "Escalate, do not stack, on arterial soak-through."
+    },
+    {
+      "id": "remove_wet_clothing",
+      "name": "Remove wet clothing",
+      "marchStep": "H",
+      "timeCost_s": "45",
+      "timeCost_engine_s": 45,
+      "equipment": [],
+      "fixes": ["hypothermia_trauma"],
+      "minLevel": 1,
+      "notes": "Halves the hypothermia slide. Oct 28 action, now a tracked intervention."
+    },
+    {
+      "id": "hypothermia_wrap",
+      "name": "Hypothermia wrap (blanket)",
+      "marchStep": "H",
+      "timeCost_s": "30",
+      "timeCost_engine_s": 30,
+      "equipment": ["hypothermia_wrap_blanket"],
+      "fixes": ["hypothermia_trauma"],
+      "minLevel": 1,
+      "notes": "Oct 29 fix-up: now consumes the tracked blanket item. Wrap plus dry clothing stops the slide."
+    },
+    {
+      "id": "opa_insert",
+      "name": "Insert OPA",
+      "marchStep": "A",
+      "timeCost_s": "15",
+      "timeCost_engine_s": 15,
+      "equipment": ["opa_set"],
+      "minLevel": 1,
+      "notes": "Josh: 100 mm (90 acceptable). Too small: patency -0.4. Too big: patency -0.5 plus gag to vomiting. Contraindicated with intact gag: vomiting and aspiration."
+    },
+    {
+      "id": "npa_insert",
+      "name": "Insert NPA",
+      "marchStep": "A",
+      "timeCost_s": "15",
+      "timeCost_engine_s": 15,
+      "equipment": ["npa_set"],
+      "minLevel": 1,
+      "notes": "Josh: 30-32 Fr. Too small: no benefit. Too big: epistaxis, esophageal placement (gastric air). Contraindicated with basilar skull or midface fracture."
+    },
+    {
+      "id": "igel_place",
+      "name": "Place i-gel",
+      "marchStep": "A",
+      "timeCost_s": "25",
+      "timeCost_engine_s": 25,
+      "equipment": ["igel_set"],
+      "minLevel": 1,
+      "notes": "Josh: #4. Wrong size either way: leak, delivered tidal volume x0.6."
+    },
+    {
+      "id": "kinglt_place",
+      "name": "Place King LT",
+      "marchStep": "A",
+      "timeCost_s": "25",
+      "timeCost_engine_s": 25,
+      "equipment": ["kinglt_set"],
+      "minLevel": 1,
+      "notes": "Josh: #4. Too small: leak. Too big: will not seat properly."
+    },
+    {
+      "id": "ett_intubate",
+      "name": "Intubate (ETT)",
+      "marchStep": "A",
+      "timeCost_s": "60",
+      "timeCost_engine_s": 60,
+      "equipment": ["ett_set", "waveform_etco2"],
+      "minLevel": 2,
+      "notes": "Josh: 7.5-8.0 at 22-23 cm. Too small: resistance plus cuff leak. Too big: will not pass plus laryngeal trauma. Too deep: right mainstem. Esophageal: no EtCO2 waveform, SpO2 falls about 2 percent per 10 s. Cuff 20-30 cmH2O. Dislodges on moves unless secured."
+    },
+    {
+      "id": "suction_airway",
+      "name": "Suction airway",
+      "marchStep": "A",
+      "timeCost_s": "Max 10-15 s per pass",
+      "timeCost_engine_s": 12,
+      "equipment": ["suction_unit", "suction_catheter_14fr"],
+      "minLevel": 1,
+      "notes": "Rigid Yankauer for the mouth, 14 Fr catheter for the ETT. Each pass costs about -3 to -5 percent SpO2."
+    },
+    {
+      "id": "o2_apply",
+      "name": "Apply supplemental O2",
+      "marchStep": "R",
+      "timeCost_s": "20",
+      "timeCost_engine_s": 20,
+      "equipment": ["nasal_cannula", "simple_mask", "non_rebreather", "o2_tank_d"],
+      "minLevel": 1,
+      "notes": "NC 1-6 L 24-44 percent, simple 6-10 L 35-60 percent, NRB 10-15 L 60-90 percent with pre-inflated reservoir (deflated = rebreathe trap), BVM + reservoir 15 L about 95-100 percent, CPAP 5-10 cmH2O. Tank: (psi - 200) x factor / L per min."
+    },
+    {
+      "id": "bvm_ventilate",
+      "name": "Ventilate with BVM",
+      "marchStep": "R",
+      "timeCost_s": "Ongoing: one breath every 6 s",
+      "timeCost_engine_s": 0,
+      "equipment": ["bvm_adult", "o2_tank_d"],
+      "minLevel": 1,
+      "notes": "1,500 mL bag, deliver 500-600 mL per breath. Overventilation (rate over 12 or volume too big): gastric distension toward vomiting and aspiration, SBP drops (worse in hypovolemia), EtCO2 drops (worse in TBI)."
+    },
+    {
+      "id": "iv_start",
+      "name": "Start IV",
+      "marchStep": "C",
+      "timeCost_s": "60-90 per attempt",
+      "timeCost_engine_s": 75,
+      "equipment": ["iv_cath_14g", "iv_cath_16g", "iv_cath_18g", "iv_cath_20g", "iv_cath_22g", "iv_cath_24g"],
+      "minLevel": 2,
+      "notes": "First-attempt success about 75 percent: shock -30, moving rig -15, dark/rain -10, large gauge in small vein -10 (TUNE). Sites AC, forearm, hand. Infiltration about 5 percent per hour plus 5 percent per move (TUNE)."
+    },
+    {
+      "id": "io_start",
+      "name": "Start IO (EZ-IO)",
+      "marchStep": "C",
+      "timeCost_s": "20-40",
+      "timeCost_engine_s": 30,
+      "equipment": ["io_drill_ezio", "io_needle_15mm", "io_needle_25mm", "io_needle_45mm"],
+      "minLevel": 2,
+      "notes": "About 95 percent success. Josh: 25 mm tibial, 45 mm humeral. Humeral 80-150 mL/min with pressure bag, tibial 30-80, poor on gravity. Conscious: lidocaine 40 mg IO before flush or pain 10/10."
+    },
+    {
+      "id": "fluid_hang",
+      "name": "Hang fluids on a line",
+      "marchStep": "C",
+      "timeCost_s": "30",
+      "timeCost_engine_s": 30,
+      "equipment": ["ns_1000ml", "lr_1000ml", "whole_blood_unit", "macro_drip_set", "micro_drip_set", "pressure_bag_300", "blood_tubing_filter", "fluid_warmer"],
+      "minLevel": 2,
+      "notes": "Explicit model: 1,000 mL crystalloid adds +1,000 mL now, about 250 mL retained over 60 min. Blood stays about 90 percent intravascular, needs blood tubing with filter plus warmer at 38 C."
+    },
+    {
+      "id": "drug_prep_push",
+      "name": "Drug prep loop (pick, prep, push)",
+      "marchStep": "P",
+      "timeCost_s": "45 prep + push",
+      "timeCost_engine_s": 45,
+      "equipment": ["syringe_3ml", "syringe_10ml", "syringe_20ml"],
+      "minLevel": 2,
+      "notes": "Minimal Oct 29 loop: pick from drug box, prep, give the standard dose from drugs.json first dosing entry (single numeric mass dose only). Token effects at peak, scaled linearly to 2x; above 2x apply toxicity flags. No-dose or no-mapping drugs stay unusable, listed in TODO_CLINICAL."
+    },
+    {
+      "id": "manual_pulse",
+      "name": "Manual pulse",
+      "marchStep": "C",
+      "timeCost_s": "15-30 (60 if irregular)",
+      "timeCost_engine_s": 20,
+      "equipment": [],
+      "minLevel": 2,
+      "notes": "Radial, or carotid if no radial. 30 s x 2 (even-number read). Radial lost below SBP about 80, femoral about 70, carotid about 60 (engine rule only)."
+    },
+    {
+      "id": "manual_rr",
+      "name": "Manual RR",
+      "marchStep": "R",
+      "timeCost_s": "30",
+      "timeCost_engine_s": 30,
+      "equipment": [],
+      "minLevel": 2,
+      "notes": "Watch chest rise 30 s x 2. Do not tell the patient. Talking patient reads +4."
+    },
+    {
+      "id": "manual_bp",
+      "name": "Manual BP (auscultated or palpated)",
+      "marchStep": "C",
+      "timeCost_s": "45-60 auscultated, 30 palpated",
+      "timeCost_engine_s": 50,
+      "equipment": ["bp_cuff_adult", "bp_cuff_large", "bp_cuff_peds", "stethoscope"],
+      "minLevel": 2,
+      "notes": "Cuff too small reads HIGH +10-30, too big LOW -5-10. Fast deflation misses SBP (+/-10). Roadside: inaudible, fall back to palpated (SBP only, about 10 low)."
+    },
+    {
+      "id": "manual_assessment",
+      "name": "Manual assessment set (SpO2, cap refill, pupils, glucose, temp, skin, lungs, GCS)",
+      "marchStep": "H",
+      "timeCost_s": "Per procedure (5-30 s)",
+      "timeCost_engine_s": 15,
+      "equipment": ["monitor_defib", "glucometer", "thermometer", "penlight", "stethoscope"],
+      "minLevel": 2,
+      "notes": "SpO2 10-20 s (shock/cold = none or falsely low, 30 s lag). Cap refill 5-10 s (+1-2 s night cold). Pupils 10 s. Glucose 10-15 s (+/-15 percent). Temp 10-30 s. Skin 5 s. Lungs 20-30 s (4-6 sites). GCS 15-30 s."
     }
   ]
 }

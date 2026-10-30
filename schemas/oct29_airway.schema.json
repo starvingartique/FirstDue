@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://firstdue.game/schemas/oct29_airway.schema.json",
+  "title": "oct29_airway.json - Oct 29 airway and breathing values",
+  "description": "Airway sizing, BVM, suction, O2 delivery and tank math from OCT28_MEDICAL_ANSWERS section 7.",
+  "type": "object",
+  "required": ["_meta", "airwayDevices", "bvm", "suction", "oxygenDelivery", "fio2Table", "tank", "engineCoupling_TUNE"],
+  "properties": {
+    "_meta": {
+      "type": "object",
+      "required": ["version", "status"],
+      "properties": {
+        "version": { "type": "string" },
+        "status": { "type": "string" }
+      }
+    },
+    "airwayDevices": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name"],
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" }
+        }
+      }
+    },
+    "bvm": { "type": "object" },
+    "suction": { "type": "object" },
+    "oxygenDelivery": { "type": "array" },
+    "fio2Table": { "type": "object" },
+    "tank": { "type": "object" },
+    "engineCoupling_TUNE": { "type": "object" }
+  }
+}

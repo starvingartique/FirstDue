@@ -40,6 +40,12 @@ export class DebugOverlay {
 
   private render(): void {
     const v = this.sim.vitals;
+    const s = this.sim;
+    const airway = s.airway.ett !== null
+      ? `ETT ${s.airway.ett.size_mm}/${s.airway.ett.depth_cm} ${s.airway.ett.placement}`
+      : s.airway.adjunct !== null
+        ? `${s.airway.adjunct.kind} ${s.airway.adjunct.size}`
+        : "none";
     const rows: [string, string][] = [
       ["T+ contact", fmtClock(this.sim.t_s)],
       ["HR", `${v.hr_bpm}`],
@@ -47,7 +53,7 @@ export class DebugOverlay {
       ["Pulse press.", `${v.pulsePressure_mmhg}`],
       ["RR", `${v.rr_per_min}`],
       ["SpO2", `${v.spo2_pct}`],
-      ["EtCO2", `${v.etco2_mmhg}`],
+      ["EtCO2", `${v.etco2_mmhg}${v.etco2Waveform ? " (wave)" : " (no wave)"}`],
       ["GCS", v.gcs_text],
       ["Cap refill", v.capRefill_text],
       ["Radial", v.radial],
@@ -55,10 +61,22 @@ export class DebugOverlay {
       ["Mental", v.mental],
       ["Temp", `${v.temp_C} C`],
       ["Pain", `${v.pain_0_to_10}/10`],
+      ["Glucose", `${v.glucose_mg_per_dL}`],
+      ["FiO2", `${v.fio2_0_to_1}`],
+      ["Patency", `${v.airwayPatency_0_to_1}`],
+      ["Airway", airway],
+      ["O2", `${s.o2.device} ${Math.round(s.o2.tankPsi)}psi`],
+      ["Lines", s.fluids.lines.length === 0 ? "none" : s.fluids.lines.map((l) => `${l.id}:${l.kind}${l.infiltrated ? "(infil)" : ""}`).join(" ")],
+      ["Retained", `${Math.round(s.retainedFluids_mL())} mL`],
+      ["Circ vol", `${v.circulating_mL} mL`],
+      ["Drugs", s.drugs.active.length === 0 ? "none" : s.drugs.active.map((d) => `${d.drugId} ${d.ratio_to_standard}x`).join(" ")],
+      ["Tox flags", `${s.drugs.flags.length}`],
+      ["Observed", `${Object.keys(s.observed).length} slots`],
       ["Rhythm", v.rhythm],
       ["Shock idx", `${v.shockIndex} (${v.shockFlag})`],
       ["ATLS class", v.atlsClass],
       ["Blood lost", `${v.loss_mL} mL (${v.loss_pct}%)`],
+      ["Eff loss", `${Math.round(s.effectiveLoss_mL())} mL`],
       ["Bleed rate", `${Math.round(this.sim.bleedRate_mL_per_min())} mL/min`],
       ["Engine", this.sim.busy ? this.sim.pendingLabel : "Idle"]
     ];

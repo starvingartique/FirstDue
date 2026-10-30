@@ -1,0 +1,123 @@
+{
+  "_meta": {
+    "version": "0.1.0",
+    "status": "Oct 29 manual vitals (L2) values from OCT28_MEDICAL_ANSWERS section 7. Textbook anchors (ATLS / TCCC / NREMT / PHTLS). Needs sign-off from a certified medic before Nov 4.",
+    "basis": "ATLS / TCCC / NREMT / PHTLS textbook anchors. Fields tagged TUNE are adjustable for gameplay.",
+    "rule": "F1 stays a debug overlay only. Gameplay vitals must be earned by doing the procedure. Each procedure takes its listed time, occupies the player, and returns its listed error or artifact, not the exact engine value."
+  },
+  "procedures": [
+    {
+      "id": "pulse",
+      "name": "Pulse (radial, or carotid if no radial)",
+      "procedure": "Count 30 s x 2. Irregular rhythm = full 60 s.",
+      "time_s": [15, 30],
+      "time_engine_s": 20,
+      "time_irregular_engine_s": 60,
+      "error": "Count granularity: 30 s x 2 returns an even number. Engine rule only: radial lost below SBP about 80, femoral below about 70, carotid below about 60 (heuristic only).",
+      "pulsePoints_lostBelowSbp": { "radial": 80, "femoral": 70, "carotid": 60 }
+    },
+    {
+      "id": "rr",
+      "name": "Respiratory rate (watch chest rise)",
+      "procedure": "Watch chest rise 30 s x 2. Do not tell the patient.",
+      "time_s": 30,
+      "time_engine_s": 30,
+      "error": "RR rises if the patient knows. Talking patient reads +4. Engine rule: if the player used Talk in the last 120 s, the read is +4."
+    },
+    {
+      "id": "bp_auscultated",
+      "name": "BP auscultated (cuff + stethoscope)",
+      "procedure": "Cuff width about 40 percent of arm circumference. Inflate about 30 above radial loss, deflate 2-3 mmHg/s. First sound = SBP, sounds stop = DBP.",
+      "time_s": [45, 60],
+      "time_engine_s": 50,
+      "joshCuff": "adult",
+      "error": "Cuff too small reads HIGH +10-30, too big reads LOW -5-10. Deflating too fast misses SBP (+/-10). Roadside or moving rig: inaudible, fall back to palpated BP."
+    },
+    {
+      "id": "bp_palpated",
+      "name": "BP palpated (cuff only)",
+      "procedure": "Inflate until radial is lost, deflate. Radial returns = SBP.",
+      "time_s": 30,
+      "time_engine_s": 30,
+      "error": "SBP only, reads about 10 low."
+    },
+    {
+      "id": "nibp",
+      "name": "NIBP auto cycle (monitor)",
+      "procedure": "Auto cycle on the monitor.",
+      "time_s": [30, 45],
+      "time_engine_s": 40,
+      "error": "Fails with motion, very low BP (reads ---), irregular rhythm."
+    },
+    {
+      "id": "spo2",
+      "name": "SpO2 finger probe",
+      "procedure": "Finger probe, wait for the read.",
+      "time_s": [10, 20],
+      "time_engine_s": 15,
+      "error": "Shock or cold fingers = no reading or falsely low. Motion artifact. CO = falsely normal. Lags real SpO2 by about 30 s."
+    },
+    {
+      "id": "caprefill",
+      "name": "Capillary refill",
+      "procedure": "Press nail bed 5 s, release, count.",
+      "time_s": [5, 10],
+      "time_engine_s": 8,
+      "error": "Unreliable in cold (night roadside reads +1-2 s)."
+    },
+    {
+      "id": "pupils",
+      "name": "Pupils (penlight each eye)",
+      "procedure": "Penlight each eye, check consensual.",
+      "time_s": 10,
+      "time_engine_s": 10,
+      "error": "Size 2-8 mm. Engine: 4 mm equal reactive unless a drug or injury state says otherwise."
+    },
+    {
+      "id": "glucose",
+      "name": "Glucose fingerstick",
+      "procedure": "Fingerstick, wait for the meter.",
+      "time_s": [10, 15],
+      "time_engine_s": 12,
+      "error": "+/-15 percent. Shock makes fingertip readings unreliable."
+    },
+    {
+      "id": "temp",
+      "name": "Temperature",
+      "procedure": "Tympanic, oral, or temporal.",
+      "time_s": [10, 30],
+      "time_engine_s": 15,
+      "error": "Temporal reads low in cold or sweaty skin."
+    },
+    {
+      "id": "skin",
+      "name": "Skin (look and touch)",
+      "procedure": "Look and touch: color, temp, moisture.",
+      "time_s": 5,
+      "time_engine_s": 5,
+      "error": "None. Returns the true engine skin description."
+    },
+    {
+      "id": "lungs",
+      "name": "Lung sounds (4-6 sites)",
+      "procedure": "4-6 sites, compare left vs right.",
+      "time_s": [20, 30],
+      "time_engine_s": 25,
+      "error": "Roadside noise. Moving rig muffles. Mainstem ETT: left sounds absent."
+    },
+    {
+      "id": "gcs",
+      "name": "GCS (eyes, verbal, motor)",
+      "procedure": "Eyes, verbal, motor via interaction.",
+      "time_s": [15, 30],
+      "time_engine_s": 20,
+      "error": "Intoxication or pain confounds. Engine returns true GCS with a confound note when pain is 7+."
+    }
+  ],
+  "shockThresholds": {
+    "spo2_unreliable_when_loss_pct_gt": 30,
+    "spo2_unreliable_when_temp_lt_C": 35,
+    "glucose_unreliable_when_loss_pct_gt": 30,
+    "note": "Engine cutoffs for the shock/cold artifact rules. The answers file states the artifacts without cutoffs, so these are TUNE-adjacent engine definitions."
+  }
+}

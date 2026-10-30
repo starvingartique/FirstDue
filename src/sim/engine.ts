@@ -5,12 +5,60 @@
 
 import { Rng } from "./rng";
 import { deriveVitals, BASELINE_MAP, FEMORAL_BASE_ML_PER_MIN, BLOOD_VOLUME_ML } from "./physiology";
+import {
+  bvmDeliveryFactor,
+  bvmRatePerMin,
+  fio2For,
+  fitEtt,
+  fitMask,
+  fitNpa,
+  fitOpa,
+  fitSupraglottic,
+  freshAirway,
+  freshBvm,
+  freshO2,
+  tankPsiPerSecond
+} from "./airway";
+import {
+  IO_FLOW,
+  PRESSURE_BAG_X,
+  freshFluids,
+  isLargeGaugeSmallVein,
+  ioNeedleOk,
+  ivSuccessP,
+  IV_GRAVITY_FLOW,
+  retainedFluids_mL
+} from "./lines";
+import { drugCatalog, effectFactor, formatDose } from "./drugs";
+import {
+  bpAuscultatedRead,
+  bpPalpatedRead,
+  capRefillRead,
+  glucoseRead,
+  nibpRead,
+  pulsePointForSbp,
+  pulseRead,
+  rrRead,
+  spo2Read,
+  tempRead
+} from "./exams";
+import type { CuffFit } from "./exams";
 import type {
+  ActiveDrug,
+  AirwayState,
   AtlsClass,
+  BvmState,
   DressingState,
+  DrugsState,
   FetchJob,
+  FluidsState,
   Holder,
+  LineState,
   LogEvent,
+  MonitorState,
+  O2Device,
+  O2State,
+  ObservedVitals,
   PackingState,
   PendingAction,
   PressureState,
@@ -18,6 +66,7 @@ import type {
   TqState,
   Vitals
 } from "./types";
+import type { Oct29AirwayInput, Oct29DrugInput } from "./physiology";
 
 export interface SimConfig {
   seed: number;
@@ -32,6 +81,8 @@ export interface SimConfig {
   startPain_0_to_10: number;
   /** Cabinet round trip in sim-seconds. Data range is 45-60. */
   fetch_s: number;
+  darkScene: boolean;
+  roadside: boolean;
 }
 
 export interface ActionResult {
@@ -61,7 +112,26 @@ export interface PressureOptions {
   holder: Holder;
 }
 
-const TOOL_ITEMS = new Set(["trauma_shears", "sharpie_tq_time"]);
+const TOOL_ITEMS = new Set([
+  "trauma_shears",
+  "sharpie_tq_time",
+  "opa_set",
+  "npa_set",
+  "suction_unit",
+  "waveform_etco2",
+  "bvm_adult",
+  "io_drill_ezio",
+  "pressure_bag_300",
+  "fluid_warmer",
+  "stethoscope",
+  "bp_cuff_adult",
+  "bp_cuff_large",
+  "bp_cuff_peds",
+  "penlight",
+  "glucometer",
+  "thermometer",
+  "monitor_defib"
+]);
 
 function freshTq(): TqState {
   return {
@@ -133,6 +203,22 @@ export class Sim {
   packing: PackingState = freshPacking();
   pressure: PressureState = freshPressure();
   dressing: DressingState = freshDressing();
+
+  // Oct 29 kit depth: airway, breathing, lines/fluids, drugs, exams, monitor.
+  airway: AirwayState = freshAirway();
+  o2: O2State = freshO2();
+  bvm: BvmState = freshBvm();
+  fluids: FluidsState = freshFluids();
+  drugs: DrugsState = { active: [], flags: [] };
+  observed: ObservedVitals = {};
+  monitor: MonitorState = { spo2Attached: false, etco2Attached: false, spo2History: [], movedDuringNibp: false };
+  /** Cert level for vitals display: L1 auto, L2 manual. Bike down runs L2. */
+  level: 1 | 2 = 2;
+  lastTalkAt_s = -1000;
+  talkCount = 0;
+  private stressEasedLogged = false;
+  /** Rolled IO pressure-bag flows by line id (seeded at placement, logged). */
+  private ioPressureFlows = new Map<number, number>();
 
   pending: PendingAction | null = null;
   private pendingDone: (() => void) | null = null;
@@ -223,9 +309,11 @@ export class Sim {
   /** Advance one sim-second: timers, bleed, vitals, flags, arrest rolls. */
   tick(): void {
     if (this.arrested) {
-      // PEA: clock runs, nothing recovers. No CPR on Oct 28.
+      // PEA: clock runs, nothing recovers. No CPR on Oct 28. The tank still
+      // drains and fluids still run, so the Oct 29 tick still applies.
       this.t_s += 1;
       this.finishPending();
+      this.tickOct29();
       this.vitals = this.derive();
       return;
     }
@@ -246,6 +334,8 @@ export class Sim {
     // Direct-pressure fatigue clock.
     if (this.pressure.active) this.pressure.held_s += 1;
 
+    this.tickOct29();
+
     // Bleed accrues at the controlled rate. MAP from last tick keeps the
     // pressure scaling causal: the bleed slows as he crashes.
     const ratePerMin = this.bleedRate_mL_per_min();
@@ -257,6 +347,11 @@ export class Sim {
 
     this.vitals = this.derive();
     this.lastMap = this.vitals.map_mmhg;
+    // Monitor SpO2 lags true SpO2 by 30 s: keep a ring of true values.
+    this.monitor.spo2History.push({ t_s: this.t_s, value: this.vitals.spo2_pct });
+    while (this.monitor.spo2History.length > 0 && this.t_s - (this.monitor.spo2History[0]?.t_s ?? 0) > 120) {
+      this.monitor.spo2History.shift();
+    }
 
     // Class and shock-index flags, logged on change.
     if (this.lastClass !== null && this.vitals.atlsClass !== this.lastClass) {
@@ -269,8 +364,9 @@ export class Sim {
     this.lastShock = this.vitals.shockFlag;
 
     // Arrest window: 15 percent per-second-tick chance above 50 percent loss,
-    // forced at 58 percent (TUNE).
-    const loss_pct = (this.loss_mL / BLOOD_VOLUME_ML) * 100;
+    // forced at 58 percent (TUNE). Runs on EFFECTIVE loss so fluids help;
+    // with no fluids this is identical to Oct 28.
+    const loss_pct = (this.effectiveLoss_mL() / BLOOD_VOLUME_ML) * 100;
     if (loss_pct >= 58) {
       this.arrest("forced at 58 percent loss");
     } else if (loss_pct > 50 && this.rng.chance(0.15)) {
@@ -311,7 +407,10 @@ export class Sim {
       betaBlocked: this.betaBlocked,
       temp_C: this.temp_C,
       pain_0_to_10: this.pain_0_to_10,
-      arrested: this.arrested
+      arrested: this.arrested,
+      effectiveLoss_mL: this.effectiveLoss_mL(),
+      airway: this.airwayDeriveInput(),
+      drugs: this.drugDeriveInput()
     });
   }
 
@@ -726,6 +825,26 @@ export class Sim {
       this.addLog("movement", `${label} during the 3 min hold: pressure broken.`);
       this.releasePackingEarly();
     }
+    // Oct 29: ETT dislodges on any move unless secured (shallow: even secured).
+    const ett = this.airway.ett;
+    if (ett !== null && (!ett.secured || ett.depth_cm < 22)) {
+      this.airway.ett = null;
+      this.airway.esophageal_s = 0;
+      this.airway.mainstem_s = 0;
+      this.airway.dislodged = true;
+      this.airway.patency_0_to_1 = Math.max(this.airway.patency_0_to_1, 0.8);
+      this.addLog("movement", `${label}: ETT dislodged (was ${ett.secured ? "shallow" : "not secured"}). Reassess the airway.`);
+    }
+    // Oct 29: infiltration +5 percent per move (TUNE) on every running line.
+    for (const line of this.fluids.lines) {
+      if (!line.patent || line.infiltrated) continue;
+      if (this.rng.chance(0.05)) {
+        line.infiltrated = true;
+        this.addLog("movement", `${label}: line ${line.id} infiltrated. Stops delivering, site swells.`);
+      }
+    }
+    // Oct 29: NIBP fails with motion.
+    if (this.pending?.id === "nibp") this.monitor.movedDuringNibp = true;
     return { ok: true };
   }
 
@@ -760,10 +879,925 @@ export class Sim {
 
   applyWrap(): ActionResult {
     if (this.wrapped) return { ok: false, reason: "Already wrapped." };
-    // Standard blanket; the Oct 29 kit depth adds it to equipment.json.
+    if (!this.take("hypothermia_wrap_blanket")) {
+      return { ok: false, reason: "No wrap blanket at the patient. Fetch one from the truck." };
+    }
     return this.start("wrap", "Wrap for hypothermia", 30, () => {
       this.wrapped = true;
       this.addLog("action", "Patient wrapped. Hypothermia slide cut.");
+    });
+  }
+
+  // - Oct 29 shared helpers -
+
+  /** Retained fluids in mL: crystalloid decay sum + blood at 90 percent. */
+  retainedFluids_mL(): number {
+    return retainedFluids_mL(this.fluids, this.t_s);
+  }
+
+  /** Effective loss drives the shock anchors and the arrest window. */
+  effectiveLoss_mL(): number {
+    return Math.max(0, this.loss_mL - this.retainedFluids_mL());
+  }
+
+  effectiveLoss_pct(): number {
+    return (this.effectiveLoss_mL() / BLOOD_VOLUME_ML) * 100;
+  }
+
+  /** Delivered FiO2: device math, or room air when the tank is dry. */
+  fio2Current(): number {
+    if (this.o2.device === "none") return 0.21;
+    if (this.o2.tankPsi <= 200) return 0.21;
+    if (this.o2.device === "cpap") return this.o2.cpap_fio2;
+    return fio2For(this.o2.device, this.o2.flow_L_per_min, this.o2.reservoirInflated);
+  }
+
+  /** O2 drain rate for the current device (CPAP 10 L/min is a TUNE stand-in). */
+  private o2Drain_L_per_min(): number {
+    if (this.o2.device === "none" || this.o2.tankPsi <= 200) return 0;
+    if (this.o2.device === "cpap") return 10;
+    return this.o2.flow_L_per_min;
+  }
+
+  /** True when a correct BVM breath landed in the last 10 s. */
+  private bvmAssisting(): boolean {
+    const recent = this.bvm.breaths.filter((b) => this.t_s - b.t_s <= 10);
+    return recent.some((b) => b.volume_mL >= 500 && b.volume_mL <= 600);
+  }
+
+  private overventing(): boolean {
+    if (bvmRatePerMin(this.bvm, this.t_s) > 12) return true;
+    return this.bvm.breaths.some((b) => this.t_s - b.t_s < 60 && b.volume_mL > 600);
+  }
+
+  private airwayDeriveInput(): Oct29AirwayInput {
+    const aw = this.airway;
+    const fio2 = this.fio2Current();
+    // TUNE couplings from oct29_airway.json engineCoupling_TUNE.
+    let penalty = (1 - aw.patency_0_to_1) * 20;
+    if (aw.aspirated) penalty += 8;
+    penalty += Math.floor(aw.esophageal_s / 10) * 2;
+    penalty += Math.floor(aw.mainstem_s / 10) * 1;
+    penalty += aw.suctionDip_pct;
+    if (aw.ett?.cuffLeak === true) penalty += 2;
+    let bonus = Math.max(0, (fio2 - 0.21) * 25);
+    if (this.bvmAssisting()) bonus += 5;
+    let etco2Delta = (1 - aw.patency_0_to_1) * 15;
+    if (this.overventing()) etco2Delta -= 10;
+    if (this.o2.device === "non_rebreather" && !this.o2.reservoirInflated) etco2Delta += 10;
+    const esophageal = aw.ett?.placement === "esophageal";
+    // First derive runs before vitals exists: assume spontaneous breathing.
+    const lastRr = this.vitals === undefined ? 14 : this.vitals.rr_per_min;
+    const ventilated = lastRr > 0 || this.bvmAssisting();
+    // Excess overvent breaths in the trailing minute drive the SBP drop.
+    const rate = bvmRatePerMin(this.bvm, this.t_s);
+    const excess = Math.max(0, rate - 12);
+    let sbpDrop = excess * 2;
+    if (this.effectiveLoss_pct() > 30) sbpDrop *= 2;
+    return {
+      patency_0_to_1: aw.patency_0_to_1,
+      fio2_0_to_1: Math.round(fio2 * 100) / 100,
+      spo2Penalty_pct: Math.round(penalty * 10) / 10,
+      spo2Bonus_pct: Math.round(bonus * 10) / 10,
+      etco2Delta_mmhg: Math.round(etco2Delta * 10) / 10,
+      etco2Override_mmhg: esophageal ? 0 : null,
+      etco2Waveform: this.monitor.etco2Attached && !esophageal && ventilated && !this.arrested,
+      overventSbpDrop_mmhg: sbpDrop
+    };
+  }
+
+  private drugDeriveInput(): Oct29DrugInput {
+    const out: Oct29DrugInput = {
+      hr_bpm: 0,
+      sbp_mmhg: 0,
+      rr_per_min: 0,
+      spo2_pct: 0,
+      gcs_points: 0,
+      pain_0_to_10: 0,
+      glucose_mg_per_dL: 0,
+      apnea_0_to_1: 0
+    };
+    for (const d of this.drugs.active) {
+      const f = effectFactor(d.givenAt_s, d.onset_s, d.peak_s, d.duration_s, this.t_s);
+      if (f <= 0) continue;
+      const s = Math.min(2, d.ratio_to_standard) * f;
+      out.hr_bpm += (d.tokens.hr_bpm ?? 0) * s;
+      out.sbp_mmhg += (d.tokens.sbp_mmhg ?? 0) * s;
+      out.rr_per_min += (d.tokens.rr_per_min ?? 0) * s;
+      out.spo2_pct += (d.tokens.spo2_pct ?? 0) * s;
+      out.gcs_points += (d.tokens.gcs_points ?? 0) * s;
+      out.pain_0_to_10 += (d.tokens.pain_0_to_10 ?? 0) * s;
+      out.glucose_mg_per_dL += (d.tokens.glucose_mg_per_dL ?? 0) * s;
+      if (d.tokens.apnea === true) {
+        out.apnea_0_to_1 = Math.max(out.apnea_0_to_1, f * Math.min(1, d.ratio_to_standard));
+      }
+      // Analgesia on board eases the crash stress offset (section 1 rule).
+      if ((d.tokens.pain_0_to_10 ?? 0) < 0 && f > 0.25 && this.stressActive) {
+        this.stressActive = false;
+        if (!this.stressEasedLogged) {
+          this.stressEasedLogged = true;
+          this.addLog("drug", "Analgesia taking effect: crash stress offset easing.");
+        }
+      }
+    }
+    return out;
+  }
+
+  private tickOct29(): void {
+    // Esophageal and mainstem clocks run while the tube sits there.
+    const placement = this.airway.ett?.placement;
+    if (placement === "esophageal") this.airway.esophageal_s += 1;
+    if (placement === "mainstem") this.airway.mainstem_s += 1;
+    // Suction dip recovers over 60 s.
+    if (this.airway.suctionDip_pct > 0) {
+      this.airway.suctionDip_pct = Math.max(0, this.airway.suctionDip_pct - 4 / 60);
+    }
+    // Prune the BVM window to the trailing 120 s.
+    this.bvm.breaths = this.bvm.breaths.filter((b) => this.t_s - b.t_s < 120);
+    // Tank drain.
+    const drain = this.o2Drain_L_per_min();
+    if (drain > 0) {
+      this.o2.tankPsi = Math.max(0, this.o2.tankPsi - tankPsiPerSecond(this.o2.tankFactor, drain));
+      if (this.o2.tankPsi <= 200 && !this.o2.tankEmptyWarned) {
+        this.o2.tankEmptyWarned = true;
+        this.addLog("trap", "O2 tank at reserve (200 psi): flows room air now. Swap cylinders.");
+      }
+    }
+    // Lines: infuse, finish bags, roll hourly infiltration (5 percent/hr).
+    for (const line of this.fluids.lines) {
+      if (!line.patent || line.infiltrated) continue;
+      if (this.rng.chance(0.05 / 3600)) {
+        line.infiltrated = true;
+        this.addLog("trap", `Line ${line.id} infiltrated: stops delivering, site swells.`);
+        continue;
+      }
+      const bag = line.bag;
+      if (bag === null || bag.volumeLeft_mL <= 0) continue;
+      const per_s = line.flow_mL_per_min / 60;
+      const mL = Math.min(per_s, bag.volumeLeft_mL);
+      bag.volumeLeft_mL -= mL;
+      line.infused_mL += mL;
+      if (bag.fluid === "blood") this.fluids.bloodRetained_mL += mL * 0.9;
+      if (bag.volumeLeft_mL <= 0.001) {
+        bag.volumeLeft_mL = 0;
+        if (bag.fluid !== "blood") {
+          this.fluids.crystalloidBags.push({ t_s: this.t_s, mL: bag.volumeTotal_mL });
+        }
+        this.addLog("fluid", `Line ${line.id}: ${bag.fluid} bag empty (${Math.round(bag.volumeTotal_mL)} mL in).`);
+        line.bag = null;
+      }
+    }
+    // Drugs: expire finished curves.
+    for (let i = this.drugs.active.length - 1; i >= 0; i--) {
+      const d = this.drugs.active[i];
+      if (d === undefined) continue;
+      if (this.t_s >= d.givenAt_s + d.peak_s + d.duration_s) {
+        this.drugs.active.splice(i, 1);
+        this.addLog("drug", `${d.drugId} wore off.`);
+      }
+    }
+  }
+
+  /** Shared vomit event: soils the airway, aspirates unless protected. */
+  private vomit(why: string): void {
+    const aw = this.airway;
+    aw.vomited = true;
+    aw.soiled = true;
+    aw.patency_0_to_1 = Math.max(0.1, aw.patency_0_to_1 - 0.3);
+    const ett = aw.ett;
+    const protectedAirway =
+      ett !== null &&
+      (ett.placement === "tracheal" || ett.placement === "mainstem") &&
+      !ett.cuffLeak &&
+      ett.cuff_cmH2O >= 20 &&
+      ett.cuff_cmH2O <= 30;
+    if (protectedAirway) {
+      this.addLog("airway", `Patient vomits (${why}). Cuffed ETT protects: suction now.`);
+    } else {
+      aw.aspirated = true;
+      this.addLog("trap", `Patient vomits and aspirates (${why}). SpO2 penalty until suctioned.`);
+    }
+  }
+
+  /** Lagged monitor SpO2 (30 s) with shock/cold and motion artifacts. */
+  monitorSpo2(): { value: number; note: string } | { none: string } | null {
+    if (!this.monitor.spo2Attached) return null;
+    if (this.arrested) return { none: "No pleth: arrest." };
+    const target = this.t_s - 30;
+    let lagged = this.vitals.spo2_pct;
+    for (const entry of this.monitor.spo2History) {
+      if (entry.t_s <= target) lagged = entry.value;
+      else break;
+    }
+    // Deterministic per state: the monitor must not re-roll every refresh.
+    // The one-shot manual read (readSpo2) keeps the seeded coin flip.
+    if (this.effectiveLoss_pct() > 30 || this.temp_C < 35) {
+      return { value: Math.max(0, lagged - 6), note: "Weak pleth: falsely low in shock / cold." };
+    }
+    return { value: lagged, note: "Good pleth." };
+  }
+
+  monitorEtco2(): { waveform: boolean; value: number } | null {
+    if (!this.monitor.etco2Attached) return null;
+    return { waveform: this.vitals.etco2Waveform, value: this.vitals.etco2_mmhg };
+  }
+
+  setLevel(level: 1 | 2): void {
+    this.level = level;
+    this.addLog("info", `Cert level ${level}: ${level === 1 ? "vitals auto-display." : "manual vitals."}`);
+  }
+
+  recordTalk(): void {
+    this.lastTalkAt_s = this.t_s;
+    this.talkCount += 1;
+  }
+
+  // - Oct 29 airway actions -
+
+  private airwayBlocked(): string | null {
+    if (this.airway.adjunct !== null) return "An airway adjunct is already in. Remove it first.";
+    if (this.airway.ett !== null) return "An ETT is already in. Remove it first.";
+    return null;
+  }
+
+  insertOpa(size_mm: number): ActionResult {
+    const blocked = this.airwayBlocked();
+    if (blocked !== null) return { ok: false, reason: blocked };
+    if (this.atPatient("opa_set") < 1) return { ok: false, reason: "Need the OPA set at the patient." };
+    return this.start("opa", `Insert OPA ${size_mm} mm`, 15, () => {
+      const fit = fitOpa(size_mm);
+      this.airway.adjunct = { kind: "opa", size: String(size_mm), fit };
+      // OPA with an intact gag reflex is contraindicated, whatever the size.
+      if (this.airway.gagIntact) {
+        this.addLog("trap", `OPA ${size_mm} in a patient with an intact gag: contraindicated.`);
+        this.vomit("OPA against an intact gag");
+        return;
+      }
+      if (fit === "correct") {
+        this.airway.patency_0_to_1 = 1;
+        this.addLog("airway", `OPA ${size_mm} seated: airway patent.`);
+      } else if (fit === "small") {
+        this.airway.patency_0_to_1 = Math.max(0.1, this.airway.patency_0_to_1 - 0.4);
+        this.addLog("trap", `OPA ${size_mm} too small: pushes the tongue back, patency -0.4.`);
+      } else {
+        this.airway.patency_0_to_1 = Math.max(0.1, this.airway.patency_0_to_1 - 0.5);
+        this.addLog("trap", `OPA ${size_mm} too big: pushes the epiglottis down, patency -0.5.`);
+        this.vomit("oversized OPA on the gag");
+      }
+    });
+  }
+
+  insertNpa(size_fr: number): ActionResult {
+    const blocked = this.airwayBlocked();
+    if (blocked !== null) return { ok: false, reason: blocked };
+    if (this.atPatient("npa_set") < 1) return { ok: false, reason: "Need the NPA set at the patient." };
+    return this.start("npa", `Insert NPA ${size_fr} Fr`, 15, () => {
+      const fit = fitNpa(size_fr);
+      this.airway.adjunct = { kind: "npa", size: String(size_fr), fit };
+      if (fit === "correct") {
+        this.airway.patency_0_to_1 = 1;
+        this.addLog("airway", `NPA ${size_fr} seated past the tongue: airway patent.`);
+      } else if (fit === "small") {
+        this.addLog("trap", `NPA ${size_fr} too small: does not pass the tongue, no benefit.`);
+      } else {
+        this.airway.epistaxis = true;
+        this.airway.gastricAir = true;
+        this.addLog("trap", `NPA ${size_fr} too big: epistaxis plus esophageal placement (gastric air).`);
+      }
+    });
+  }
+
+  placeSupraglottic(kind: "igel" | "kinglt", size: number): ActionResult {
+    const blocked = this.airwayBlocked();
+    if (blocked !== null) return { ok: false, reason: blocked };
+    const item = kind === "igel" ? "igel_set" : "kinglt_set";
+    if (!this.take(item)) return { ok: false, reason: `No ${kind === "igel" ? "i-gel" : "King LT"} at the patient.` };
+    const label = kind === "igel" ? `i-gel #${size}` : `King LT #${size}`;
+    return this.start("sga", `Place ${label}`, 25, () => {
+      const fit = fitSupraglottic(size, 4);
+      this.airway.adjunct = { kind, size: `#${size}`, fit };
+      if (fit === "correct") {
+        this.airway.patency_0_to_1 = 1;
+        this.addLog("airway", `${label} seated: airway patent.`);
+      } else if (kind === "igel") {
+        this.addLog("trap", `${label} wrong size: leak, delivered tidal volume x0.6.`);
+      } else if (fit === "small") {
+        this.addLog("trap", `${label} too small: leak.`);
+      } else {
+        this.addLog("trap", `${label} too big: will not seat properly.`);
+      }
+    });
+  }
+
+  intubate(size_mm: number, depth_cm: number, blind: boolean, cuff_cmH2O: number): ActionResult {
+    const blocked = this.airwayBlocked();
+    if (blocked !== null) return { ok: false, reason: blocked };
+    if (!this.take("ett_set")) return { ok: false, reason: "No ETT set at the patient." };
+    return this.start("ett", `Intubate ${size_mm} mm at ${depth_cm} cm`, 60, () => {
+      const fit = fitEtt(size_mm);
+      if (fit === "big") {
+        this.airway.patency_0_to_1 = Math.max(0.1, this.airway.patency_0_to_1 - 0.2);
+        this.addLog("trap", `ETT ${size_mm} too big: will not pass, laryngeal trauma.`);
+        return;
+      }
+      const placement = depth_cm < 22 ? "tracheal" : blind ? "esophageal" : depth_cm > 23 ? "mainstem" : "tracheal";
+      const cuffOk = cuff_cmH2O >= 20 && cuff_cmH2O <= 30;
+      this.airway.ett = {
+        size_mm,
+        depth_cm,
+        placement,
+        secured: false,
+        cuff_cmH2O,
+        cuffLeak: fit === "small" || !cuffOk,
+        willNotPass: false
+      };
+      this.airway.esophageal_s = 0;
+      this.airway.mainstem_s = 0;
+      this.airway.esophagealRecognized = false;
+      this.airway.dislodged = false;
+      if (fit === "small") {
+        this.addLog("trap", `ETT ${size_mm} too small: high resistance, cuff leak.`);
+      }
+      if (!cuffOk) {
+        this.addLog("trap", `Cuff at ${cuff_cmH2O} cmH2O: outside the 20-30 target, cuff leak.`);
+      }
+      if (placement === "esophageal") {
+        this.airway.patency_0_to_1 = 0.1;
+        this.addLog("trap", "Tube in the esophagus: no EtCO2 waveform. SpO2 falls 2 percent per 10 s until it is out.");
+      } else if (placement === "mainstem") {
+        this.airway.patency_0_to_1 = 0.9;
+        this.addLog("trap", `ETT at ${depth_cm} cm: right mainstem. Left sounds absent, SpO2 falling, pressures up. Pull back.`);
+      } else if (depth_cm < 22) {
+        this.airway.patency_0_to_1 = 1;
+        this.addLog("airway", `ETT ${size_mm} at ${depth_cm} cm: tracheal but shallow, high dislodge risk. Advance to 22-23.`);
+      } else {
+        this.airway.patency_0_to_1 = 1;
+        this.addLog("airway", `ETT ${size_mm} at ${depth_cm} cm: tracheal. Confirm on waveform EtCO2, then secure it.`);
+      }
+    });
+  }
+
+  secureTube(): ActionResult {
+    const ett = this.airway.ett;
+    if (ett === null) return { ok: false, reason: "No tube to secure." };
+    if (ett.secured) return { ok: false, reason: "Tube already secured." };
+    return this.start("secure_ett", "Secure the ETT", 15, () => {
+      const tube = this.airway.ett;
+      if (tube !== null) tube.secured = true;
+      this.addLog("airway", "ETT secured: holds through patient moves (unless shallow).");
+    });
+  }
+
+  removeAirwayDevice(): ActionResult {
+    if (this.airway.adjunct === null && this.airway.ett === null) {
+      return { ok: false, reason: "No airway device to remove." };
+    }
+    const what =
+      this.airway.ett !== null
+        ? `ETT ${this.airway.ett.size_mm} (${this.airway.ett.placement})`
+        : `${this.airway.adjunct?.kind} ${this.airway.adjunct?.size}`;
+    this.airway.adjunct = null;
+    this.airway.ett = null;
+    this.airway.esophageal_s = 0;
+    this.airway.mainstem_s = 0;
+    this.airway.patency_0_to_1 = Math.max(this.airway.patency_0_to_1, 0.8);
+    this.addLog("airway", `${what} removed. Reassess patency.`);
+    return { ok: true };
+  }
+
+  checkTube(): ActionResult {
+    const ett = this.airway.ett;
+    if (ett === null) return { ok: false, reason: "No tube to check." };
+    if (!this.monitor.etco2Attached) {
+      return { ok: false, reason: "Attach waveform EtCO2 on the Monitor tab first: it is the only reliable confirmation." };
+    }
+    if (ett.placement === "esophageal") {
+      this.airway.esophagealRecognized = true;
+      this.addLog("trap", "EtCO2 check: NO waveform. The tube is esophageal. Pull it now.");
+    } else if (ett.placement === "mainstem") {
+      this.addLog("airway", "EtCO2 check: waveform present, but left sounds are absent. Right mainstem: pull back 2 cm.");
+    } else {
+      this.addLog("airway", "EtCO2 check: square waveform, value tracks perfusion. Tube confirmed tracheal.");
+    }
+    return { ok: true };
+  }
+
+  suctionAirway(site: "mouth" | "ett", seconds: number): ActionResult {
+    if (seconds < 10 || seconds > 15) return { ok: false, reason: "Suction passes run 10-15 s max." };
+    if (this.atPatient("suction_unit") < 1) return { ok: false, reason: "Need the suction unit at the patient." };
+    if (site === "ett") {
+      if (this.airway.ett === null) return { ok: false, reason: "No ETT to suction." };
+      if (!this.take("suction_catheter_14fr")) {
+        return { ok: false, reason: "Need a 14 Fr catheter for the ETT." };
+      }
+    }
+    return this.start("suction", `Suction ${site} (${seconds}s)`, seconds, () => {
+      this.airway.soiled = false;
+      this.airway.patency_0_to_1 = Math.min(1, this.airway.patency_0_to_1 + 0.3);
+      this.airway.suctionDip_pct = 4;
+      this.addLog("airway", `Suction ${site} clear. Pass cost about -4 percent SpO2, recovers over a minute.`);
+    });
+  }
+
+  // - Oct 29 O2 and BVM actions -
+
+  applyO2(device: O2Device, flow_L_per_min: number, reservoirInflated: boolean, cpap_cmH2O: number, cpap_fio2: number): ActionResult {
+    if (device === "none") return { ok: false, reason: "Pick an O2 device." };
+    const item =
+      device === "nasal_cannula"
+        ? "nasal_cannula"
+        : device === "simple_mask"
+          ? "simple_mask"
+          : device === "non_rebreather"
+            ? "non_rebreather"
+            : device === "cpap"
+              ? "cpap_unit"
+              : "bvm_adult";
+    if (device === "bvm_reservoir") {
+      if (this.atPatient("bvm_adult") < 1) return { ok: false, reason: "Need the BVM at the patient." };
+    } else if (device === "cpap") {
+      if (this.atPatient("cpap_unit") < 1) return { ok: false, reason: "No CPAP at the patient. Fetch it from the truck." };
+    } else if (!this.take(item)) {
+      return { ok: false, reason: `No ${device} at the patient.` };
+    }
+    if (this.atPatient("o2_tank_d") < 1 && this.o2.tankPsi <= 200 && this.atPatient("o2_tank_m") < 1) {
+      return { ok: false, reason: "No O2 cylinder at the patient." };
+    }
+    return this.start("o2", `Apply ${device} at ${device === "cpap" ? cpap_cmH2O + " cmH2O" : flow_L_per_min + " L/min"}`, 20, () => {
+      this.o2.device = device;
+      this.o2.flow_L_per_min = flow_L_per_min;
+      this.o2.reservoirInflated = reservoirInflated;
+      this.o2.cpap_cmH2O = cpap_cmH2O;
+      this.o2.cpap_fio2 = cpap_fio2;
+      if (device === "non_rebreather" && !reservoirInflated) {
+        this.addLog("trap", "NRB on with a deflated reservoir: the patient rebreathes. Pre-inflate it.");
+      } else {
+        this.addLog("airway", `${device} flowing. Tank ${Math.round(this.o2.tankPsi)} psi.`);
+      }
+    });
+  }
+
+  preinflateReservoir(): ActionResult {
+    if (this.o2.device !== "non_rebreather") return { ok: false, reason: "No NRB on to pre-inflate." };
+    if (this.o2.reservoirInflated) return { ok: false, reason: "Reservoir already inflated." };
+    this.o2.reservoirInflated = true;
+    this.addLog("airway", "NRB reservoir pre-inflated: now delivering 60-90 percent.");
+    return { ok: true };
+  }
+
+  removeO2(): ActionResult {
+    if (this.o2.device === "none") return { ok: false, reason: "No O2 device on." };
+    this.o2.device = "none";
+    this.o2.flow_L_per_min = 0;
+    this.addLog("airway", "O2 device removed: back to room air.");
+    return { ok: true };
+  }
+
+  swapTank(): ActionResult {
+    if (!this.take("o2_tank_m")) {
+      return { ok: false, reason: "No M cylinder at the patient. Fetch one from the truck." };
+    }
+    return this.start("tank_swap", "Swap to the M cylinder", 30, () => {
+      this.o2.tankPsi = 2000;
+      this.o2.tankFactor = 1.56;
+      this.o2.tankEmptyWarned = false;
+      this.addLog("airway", "M cylinder on (factor 1.56): tank math restarts at 2,000 psi.");
+    });
+  }
+
+  setBvmMask(size: "small" | "medium" | "large"): ActionResult {
+    this.bvm.maskSize = size;
+    const fit = fitMask(size);
+    if (fit === "correct") this.addLog("airway", "BVM mask large: seals.");
+    else this.addLog("trap", `BVM mask ${size}: leaks, tidal volume x0.5.`);
+    return { ok: true };
+  }
+
+  squeezeBvm(volume_mL: number): ActionResult {
+    if (this.arrested) return { ok: false, reason: "Patient is in arrest." };
+    if (this.atPatient("bvm_adult") < 1) return { ok: false, reason: "Need the BVM at the patient." };
+    const delivered = Math.round(volume_mL * bvmDeliveryFactor(this.bvm.maskSize, this.airway.adjunct));
+    this.bvm.breaths.push({ t_s: this.t_s, volume_mL });
+    const rate = bvmRatePerMin(this.bvm, this.t_s);
+    const over = rate > 12 || volume_mL > 600;
+    if (over) {
+      this.bvm.overventBreaths += 1;
+      this.bvm.gastric_0_to_10 = Math.min(10, this.bvm.gastric_0_to_10 + 1);
+      this.addLog(
+        "trap",
+        `Overventilation (rate ${rate}/min, ${volume_mL} mL set, ${delivered} mL delivered): ` +
+          `gastric distension ${Math.round(this.bvm.gastric_0_to_10)}/10, SBP sagging.`
+      );
+      if (this.bvm.gastric_0_to_10 >= 10) {
+        this.bvm.gastric_0_to_10 = 4;
+        this.vomit("gastric distension from overventilation");
+      }
+    } else if (volume_mL < 500) {
+      this.addLog("airway", `Shallow BVM breath (${delivered} mL delivered): ventilates poorly.`);
+    }
+    return { ok: true };
+  }
+
+  // - Oct 29 lines and fluids actions -
+
+  startIv(site: "ac" | "forearm" | "hand", gauge: number): ActionResult {
+    const flow = IV_GRAVITY_FLOW[gauge];
+    if (flow === undefined) return { ok: false, reason: `No ${gauge}g catheter in the kit.` };
+    if (!this.take(`iv_cath_${gauge}g`)) {
+      return { ok: false, reason: `No ${gauge}g catheter at the patient.` };
+    }
+    return this.start("iv", `Start ${gauge}g IV (${site})`, 75, () => {
+      const p = ivSuccessP({
+        shock: this.effectiveLoss_pct() >= 15,
+        darkOrRain: this.config.darkScene,
+        largeGaugeSmallVein: isLargeGaugeSmallVein(gauge, site)
+      });
+      if (this.rng.chance(p)) {
+        const id = this.fluids.nextLineId++;
+        this.fluids.lines.push({
+          id,
+          kind: "iv",
+          site,
+          gauge,
+          patent: true,
+          infiltrated: false,
+          placedAt_s: this.t_s,
+          pressureBag: false,
+          flow_mL_per_min: flow,
+          bag: null,
+          infused_mL: 0,
+          ioLidoGiven: false
+        });
+        this.addLog("fluid", `IV ${gauge}g ${site} in, flash confirmed. Gravity ${flow} mL/min.`);
+      } else {
+        this.addLog("trap", `IV ${gauge}g ${site} missed (${Math.round(p * 100)} percent shot). Try again or go IO.`);
+      }
+    });
+  }
+
+  startIo(site: "tibial" | "humeral", needle_mm: number, lidoFirst: boolean): ActionResult {
+    if (this.atPatient("io_drill_ezio") < 1) return { ok: false, reason: "Need the EZ-IO drill at the patient." };
+    if (!this.take(`io_needle_${needle_mm}mm`)) {
+      return { ok: false, reason: `No ${needle_mm} mm needle at the patient.` };
+    }
+    if (!ioNeedleOk(site, needle_mm)) {
+      const want = site === "tibial" ? "25 mm" : "45 mm";
+      return { ok: false, reason: `${needle_mm} mm is the wrong needle for ${site} (Josh needs ${want}).` };
+    }
+    return this.start("io", `Start IO ${site} (${needle_mm} mm)`, 30, () => {
+      if (!this.rng.chance(0.95)) {
+        this.addLog("trap", `IO ${site} missed (5 percent miss). Reposition and try again.`);
+        return;
+      }
+      const id = this.fluids.nextLineId++;
+      const range = site === "humeral" ? IO_FLOW.humeral : IO_FLOW.tibial;
+      const pressureFlow = Math.round(this.rng.range(range[0], range[1]));
+      this.fluids.lines.push({
+        id,
+        kind: "io",
+        site,
+        needle_mm,
+        patent: true,
+        infiltrated: false,
+        placedAt_s: this.t_s,
+        pressureBag: false,
+        flow_mL_per_min: IO_FLOW.gravity,
+        bag: null,
+        infused_mL: 0,
+        ioLidoGiven: lidoFirst
+      });
+      this.addLog(
+        "fluid",
+        `IO ${site} in (${needle_mm} mm). Gravity poor (${IO_FLOW.gravity} mL/min); ` +
+          `with a pressure bag about ${pressureFlow} mL/min.`
+      );
+      // Remember the rolled pressure flow for applyPressureBag.
+      this.ioPressureFlows.set(id, pressureFlow);
+      if (!lidoFirst && this.vitals.gcs_total >= 14) {
+        this.pain_0_to_10 = 10;
+        this.addLog("trap", "IO flushed in a conscious patient with no lidocaine 40 mg first: pain 10/10.");
+      } else if (lidoFirst) {
+        this.addLog("fluid", "Lidocaine 40 mg IO before the flush (drug box).");
+      }
+    });
+  }
+
+  applyPressureBag(lineId: number): ActionResult {
+    if (this.atPatient("pressure_bag_300") < 1) {
+      return { ok: false, reason: "No pressure bag at the patient." };
+    }
+    const line = this.fluids.lines.find((l) => l.id === lineId);
+    if (line === undefined) return { ok: false, reason: `No line ${lineId}.` };
+    if (!line.patent || line.infiltrated) return { ok: false, reason: `Line ${lineId} is not running.` };
+    for (const other of this.fluids.lines) {
+      if (other.id !== lineId && other.pressureBag) {
+        other.pressureBag = false;
+        this.refreshLineFlow(other);
+      }
+    }
+    line.pressureBag = true;
+    this.refreshLineFlow(line);
+    this.addLog("fluid", `Pressure bag (300 mmHg) on line ${lineId}: now ${Math.round(line.flow_mL_per_min)} mL/min.`);
+    return { ok: true };
+  }
+
+  private refreshLineFlow(line: LineState): void {
+    if (line.kind === "iv" && line.gauge !== undefined) {
+      const base = IV_GRAVITY_FLOW[line.gauge] ?? 60;
+      line.flow_mL_per_min = line.pressureBag ? base * PRESSURE_BAG_X : base;
+    } else if (line.kind === "io") {
+      line.flow_mL_per_min = line.pressureBag ? (this.ioPressureFlows.get(line.id) ?? 55) : IO_FLOW.gravity;
+    }
+  }
+
+  hangFluids(lineId: number, fluid: "ns" | "lr" | "blood", drip: string): ActionResult {
+    const line = this.fluids.lines.find((l) => l.id === lineId);
+    if (line === undefined) return { ok: false, reason: `No line ${lineId}.` };
+    if (!line.patent || line.infiltrated) return { ok: false, reason: `Line ${lineId} is not running.` };
+    if (line.bag !== null) return { ok: false, reason: `Line ${lineId} already has a bag hanging.` };
+    const bagItem = fluid === "ns" ? "ns_1000ml" : fluid === "lr" ? "lr_1000ml" : "whole_blood_unit";
+    if (!this.take(bagItem)) return { ok: false, reason: `No ${fluid} bag at the patient.` };
+    if (fluid === "blood") {
+      if (!this.take("blood_tubing_filter")) {
+        return { ok: false, reason: "Blood needs blood tubing with a filter. Fetch it from the truck." };
+      }
+      if (this.atPatient("fluid_warmer") < 1) {
+        return { ok: false, reason: "Blood needs the warmer at 38 C. Fetch it from the truck." };
+      }
+    } else if (!this.take(drip === "micro60" ? "micro_drip_set" : "macro_drip_set")) {
+      return { ok: false, reason: "No drip set at the patient." };
+    }
+    const what = fluid === "blood" ? "whole blood (500 mL)" : `${fluid.toUpperCase()} 1,000 mL`;
+    return this.start("hang", `Hang ${what} on line ${lineId}`, 30, () => {
+      const target = this.fluids.lines.find((l) => l.id === lineId);
+      if (target === undefined || !target.patent || target.infiltrated) {
+        this.addLog("trap", `Line ${lineId} went bad while hanging the bag. Bag wasted.`);
+        return;
+      }
+      target.bag = {
+        fluid,
+        volumeTotal_mL: fluid === "blood" ? 500 : 1000,
+        volumeLeft_mL: fluid === "blood" ? 500 : 1000,
+        drip
+      };
+      this.refreshLineFlow(target);
+      this.addLog(
+        "fluid",
+        `${what} hanging on line ${lineId} at ${Math.round(target.flow_mL_per_min)} mL/min` +
+          `${target.pressureBag ? " (pressure bag)" : " (gravity)"}.`
+      );
+    });
+  }
+
+  pullLine(lineId: number): ActionResult {
+    const index = this.fluids.lines.findIndex((l) => l.id === lineId);
+    if (index < 0) return { ok: false, reason: `No line ${lineId}.` };
+    const line = this.fluids.lines[index];
+    if (line?.bag !== null && line?.bag !== undefined) {
+      this.addLog("fluid", `Line ${lineId} pulled with ${Math.round(line.bag.volumeLeft_mL)} mL still in the bag: bag wasted.`);
+    } else {
+      this.addLog("fluid", `Line ${lineId} pulled.`);
+    }
+    this.fluids.lines.splice(index, 1);
+    this.ioPressureFlows.delete(lineId);
+    return { ok: true };
+  }
+
+  // - Oct 29 drug prep loop (minimal: pick, prep, push at the standard dose) -
+
+  prepPush(drugId: string, presIndex: number, amount: number, syringeId: string, lineId: number | null): ActionResult {
+    const catalog = drugCatalog();
+    const entry = catalog.usable.find((u) => u.drug.id === drugId);
+    if (entry === undefined) {
+      if (catalog.noDose.includes(drugId)) {
+        return { ok: false, reason: `${drugId} has no single standard dose in drugs.json: unusable in this build (see TODO_CLINICAL).` };
+      }
+      return { ok: false, reason: `${drugId} has no token mapping in this build: unusable (see TODO_CLINICAL).` };
+    }
+    const pres = entry.presentations.find((p) => p.index === presIndex);
+    if (pres === undefined) return { ok: false, reason: "That presentation has no computable concentration." };
+    if (!Number.isFinite(amount) || amount <= 0) return { ok: false, reason: "Draw a positive amount." };
+    if (pres.math.maxUnits !== null && amount > pres.math.maxUnits * 4) {
+      return { ok: false, reason: `That is more than 4 ${pres.math.unitLabel === "mL" ? "vials" : "units"} worth: split the prep.` };
+    }
+    if (!this.take(syringeId)) return { ok: false, reason: `No ${syringeId} at the patient.` };
+    const routeUpper = entry.standard.route.toUpperCase();
+    const needsLine = routeUpper.startsWith("IV") || routeUpper.startsWith("IO");
+    let line: LineState | null = null;
+    if (needsLine) {
+      const candidates = this.fluids.lines.filter((l) => l.patent && !l.infiltrated);
+      if (candidates.length === 0) return { ok: false, reason: "IV/IO push needs a patent line. Start one first." };
+      line = lineId === null ? null : (candidates.find((l) => l.id === lineId) ?? null);
+      if (line === null) return { ok: false, reason: "Pick which line to push through." };
+    }
+    const doseMcg = amount * pres.math.mcgPer;
+    const ratio = doseMcg / entry.standard.mcg;
+    const lineNote = line !== null ? ` via line ${line.id}` : "";
+    return this.start("drug", `Prep and push ${entry.drug.name} (${formatDose(doseMcg)} ${entry.standard.route}${lineNote})`, 45, () => {
+      const push: ActiveDrug = {
+        drugId: entry.drug.id,
+        givenAt_s: this.t_s,
+        ratio_to_standard: Math.round(ratio * 100) / 100,
+        route: entry.standard.route,
+        onset_s: entry.pk_s[0],
+        peak_s: entry.pk_s[1],
+        duration_s: entry.pk_s[2],
+        tokens: entry.tokens,
+        toxic: ratio > 2
+      };
+      this.drugs.active.push(push);
+      if (ratio > 2) {
+        const dangers = entry.drug.dangers ?? ["unspecified toxicity"];
+        for (const danger of dangers) {
+          this.drugs.flags.push(`${entry.drug.id}: ${danger}`);
+        }
+        this.addLog(
+          "trap",
+          `${entry.drug.name} ${formatDose(doseMcg)} is ${push.ratio_to_standard}x standard: TOXICITY. ` +
+            `Effects capped at 2x. Flags: ${dangers.join(" / ")}`
+        );
+      } else {
+        this.addLog(
+          "drug",
+          `${entry.drug.name} ${formatDose(doseMcg)} ${entry.standard.route}${lineNote} pushed ` +
+            `(${push.ratio_to_standard}x standard). Peak in ${entry.pk_s[1]}s.`
+        );
+      }
+    });
+  }
+
+  // - Oct 29 manual vitals and monitor actions -
+
+  checkPulse(): ActionResult {
+    const irregular = this.vitals.rhythm === "bradycardic" || this.vitals.rhythm === "pea";
+    const seconds = irregular ? 60 : 20;
+    return this.start("exam_pulse", `Take pulse (${seconds}s)`, seconds, () => {
+      const point = pulsePointForSbp(this.vitals.sbp_mmhg);
+      if (point === "none") {
+        this.observed.hr = { value: "no pulse palpable", t_s: this.t_s, method: "carotid absent below ~60" };
+        this.addLog("exam", "Pulse: no carotid pulse palpable.");
+      } else {
+        const read = pulseRead(this.vitals.hr_bpm);
+        this.observed.hr = { value: `${read}`, t_s: this.t_s, method: `${point}, 30s x 2${irregular ? ", full 60s" : ""}` };
+        this.addLog("exam", `Pulse ${read} (${point}).`);
+      }
+    });
+  }
+
+  checkRR(): ActionResult {
+    return this.start("exam_rr", "Count RR (30s)", 30, () => {
+      const aware = this.t_s - this.lastTalkAt_s < 120;
+      const read = rrRead(this.vitals.rr_per_min, aware);
+      this.observed.rr = { value: `${read}`, t_s: this.t_s, method: aware ? "chest rise (patient aware, +4)" : "chest rise 30s x 2" };
+      this.addLog("exam", `RR ${read}${aware ? " (patient knew you were watching: +4)." : "."}`);
+    });
+  }
+
+  checkBpAusc(cuff: CuffFit, deflateFast: boolean): ActionResult {
+    const item = cuff === "correct" ? "bp_cuff_adult" : cuff === "small" ? "bp_cuff_peds" : "bp_cuff_large";
+    if (this.atPatient(item) < 1) return { ok: false, reason: `Need ${item} at the patient.` };
+    if (this.atPatient("stethoscope") < 1) return { ok: false, reason: "Need the stethoscope at the patient." };
+    return this.start("exam_bp", "Auscultated BP (50s)", 50, () => {
+      const read = bpAuscultatedRead(this.rng, this.vitals.sbp_mmhg, this.vitals.dbp_mmhg, cuff, deflateFast, this.config.roadside);
+      if ("inaudible" in read) {
+        this.observed.sbp = { value: "inaudible", t_s: this.t_s, method: "auscultated, roadside noise" };
+        this.observed.dbp = { value: "inaudible", t_s: this.t_s, method: "auscultated, roadside noise" };
+        this.addLog("exam", "Auscultated BP: inaudible over roadside noise. Fall back to palpated BP.");
+      } else {
+        this.observed.sbp = { value: `${read.sbp}`, t_s: this.t_s, method: "auscultated" };
+        this.observed.dbp = { value: `${read.dbp}`, t_s: this.t_s, method: "auscultated" };
+        this.addLog("exam", `BP ${read.sbp}/${read.dbp}. ${read.note}`);
+      }
+    });
+  }
+
+  checkBpPalp(): ActionResult {
+    if (this.atPatient("bp_cuff_adult") < 1) return { ok: false, reason: "Need a BP cuff at the patient." };
+    return this.start("exam_bpp", "Palpated BP (30s)", 30, () => {
+      if (pulsePointForSbp(this.vitals.sbp_mmhg) === "none" || this.vitals.sbp_mmhg < 80) {
+        this.observed.sbp = { value: "radial absent", t_s: this.t_s, method: "palpated, SBP below ~80" };
+        this.addLog("exam", "Palpated BP: no radial to feel. SBP below ~80.");
+        return;
+      }
+      const read = bpPalpatedRead(this.vitals.sbp_mmhg);
+      this.observed.sbp = { value: `${read}`, t_s: this.t_s, method: "palpated (SBP only, ~10 low)" };
+      this.addLog("exam", `Palpated SBP ${read} (reads about 10 low).`);
+    });
+  }
+
+  runNibp(): ActionResult {
+    if (this.atPatient("monitor_defib") < 1) return { ok: false, reason: "Need the monitor at the patient." };
+    this.monitor.movedDuringNibp = false;
+    return this.start("nibp", "NIBP auto cycle (40s)", 40, () => {
+      const irregular = this.vitals.rhythm === "bradycardic" || this.vitals.rhythm === "pea";
+      const read = nibpRead(this.vitals.sbp_mmhg, this.vitals.dbp_mmhg, this.monitor.movedDuringNibp, irregular);
+      if ("failed" in read) {
+        this.observed.sbp = { value: "---", t_s: this.t_s, method: "NIBP failed" };
+        this.addLog("exam", `NIBP: ${read.failed}`);
+      } else {
+        this.observed.sbp = { value: `${read.sbp}`, t_s: this.t_s, method: "NIBP" };
+        this.observed.dbp = { value: `${read.dbp}`, t_s: this.t_s, method: "NIBP" };
+        this.addLog("exam", `NIBP ${read.sbp}/${read.dbp}.`);
+      }
+    });
+  }
+
+  attachSpo2(): ActionResult {
+    if (this.monitor.spo2Attached) return { ok: false, reason: "SpO2 probe already on." };
+    if (this.atPatient("monitor_defib") < 1) return { ok: false, reason: "Need the monitor at the patient." };
+    this.monitor.spo2Attached = true;
+    this.addLog("exam", "SpO2 probe on the finger: monitor reads with a 30 s lag.");
+    return { ok: true };
+  }
+
+  readSpo2(): ActionResult {
+    if (!this.monitor.spo2Attached) return { ok: false, reason: "Put the SpO2 probe on first." };
+    return this.start("exam_spo2", "Read SpO2 (15s)", 15, () => {
+      const target = this.t_s - 30;
+      let lagged = this.vitals.spo2_pct;
+      for (const entry of this.monitor.spo2History) {
+        if (entry.t_s <= target) lagged = entry.value;
+        else break;
+      }
+      const unreliable = this.effectiveLoss_pct() > 30 || this.temp_C < 35;
+      const read = spo2Read(this.rng, lagged, unreliable);
+      if ("none" in read) {
+        this.observed.spo2 = { value: "no reading", t_s: this.t_s, method: "probe, shock/cold" };
+        this.addLog("exam", `SpO2: ${read.none}`);
+      } else {
+        this.observed.spo2 = { value: `${read.value}`, t_s: this.t_s, method: "probe, 30s lag" };
+        this.addLog("exam", `SpO2 ${read.value}. ${read.note}`);
+      }
+    });
+  }
+
+  attachEtco2(): ActionResult {
+    if (this.monitor.etco2Attached) return { ok: false, reason: "EtCO2 already attached." };
+    if (this.atPatient("waveform_etco2") < 1) return { ok: false, reason: "Need the EtCO2 module at the patient." };
+    if (this.atPatient("monitor_defib") < 1) return { ok: false, reason: "Need the monitor at the patient." };
+    this.monitor.etco2Attached = true;
+    this.addLog("exam", "Waveform EtCO2 attached: the only reliable ETT confirmation.");
+    return { ok: true };
+  }
+
+  checkCapRefill(): ActionResult {
+    return this.start("exam_cr", "Cap refill (8s)", 8, () => {
+      const read = capRefillRead(this.rng, this.vitals.capRefill_s, this.config.roadside && this.temp_C < 36.5);
+      this.observed.capRefill = { value: `${read} s`, t_s: this.t_s, method: "nail bed press" };
+      this.addLog("exam", `Cap refill ${read} s.`);
+    });
+  }
+
+  checkPupils(): ActionResult {
+    if (this.atPatient("penlight") < 1) return { ok: false, reason: "Need the penlight at the patient." };
+    return this.start("exam_pupil", "Pupil check (10s)", 10, () => {
+      this.observed.pupils = { value: "4 mm, equal, reactive", t_s: this.t_s, method: "penlight each eye + consensual" };
+      this.addLog("exam", "Pupils 4 mm, equal, reactive. (Engine has no pupil drug model yet.)");
+    });
+  }
+
+  checkGlucose(): ActionResult {
+    if (this.atPatient("glucometer") < 1) return { ok: false, reason: "Need the glucometer at the patient." };
+    return this.start("exam_glu", "Fingerstick glucose (12s)", 12, () => {
+      const shock = this.effectiveLoss_pct() > 30;
+      const read = glucoseRead(this.rng, this.vitals.glucose_mg_per_dL, shock);
+      this.observed.glucose = { value: `${read.value}`, t_s: this.t_s, method: "fingerstick" };
+      this.addLog("exam", `Glucose ${read.value} mg/dL. ${read.note}`);
+    });
+  }
+
+  checkTemp(method: "tympanic" | "oral" | "temporal"): ActionResult {
+    if (this.atPatient("thermometer") < 1) return { ok: false, reason: "Need the thermometer at the patient." };
+    return this.start("exam_temp", `Temperature ${method} (15s)`, 15, () => {
+      const coldOrSweaty = this.temp_C < 36.5 || this.effectiveLoss_pct() >= 15;
+      const read = tempRead(this.rng, this.vitals.temp_C, method, coldOrSweaty);
+      this.observed.temp = { value: `${read.value} C`, t_s: this.t_s, method };
+      this.addLog("exam", `Temp ${read.value} C (${method}). ${read.note}`);
+    });
+  }
+
+  checkSkin(): ActionResult {
+    return this.start("exam_skin", "Skin check (5s)", 5, () => {
+      this.observed.skin = { value: this.vitals.skin, t_s: this.t_s, method: "look + touch" };
+      this.addLog("exam", `Skin: ${this.vitals.skin}.`);
+    });
+  }
+
+  checkLungs(): ActionResult {
+    if (this.atPatient("stethoscope") < 1) return { ok: false, reason: "Need the stethoscope at the patient." };
+    return this.start("exam_lung", "Lung sounds (25s)", 25, () => {
+      const mainstem = this.airway.ett?.placement === "mainstem";
+      const value = mainstem ? "right present, LEFT ABSENT" : "equal bilateral, no wheeze";
+      this.observed.lungs = { value, t_s: this.t_s, method: "4 sites, roadside noise" };
+      this.addLog("exam", `Lungs: ${value} (roadside noise).${mainstem ? " Mainstem until proven otherwise." : ""}`);
+    });
+  }
+
+  checkGcs(): ActionResult {
+    return this.start("exam_gcs", "GCS assess (20s)", 20, () => {
+      const confound = this.vitals.pain_0_to_10 >= 7 ? " Pain confounds the verbal score." : "";
+      this.observed.gcs = { value: this.vitals.gcs_text, t_s: this.t_s, method: "eyes/verbal/motor" };
+      this.addLog("exam", `GCS ${this.vitals.gcs_text}.${confound}`);
     });
   }
 }

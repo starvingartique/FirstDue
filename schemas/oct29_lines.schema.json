@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://firstdue.game/schemas/oct29_lines.schema.json",
+  "title": "oct29_lines.json - Oct 29 IV/IO and fluids values",
+  "description": "IV catheters, IV start, IO, drip sets and the explicit fluid model from OCT28_MEDICAL_ANSWERS section 7.",
+  "type": "object",
+  "required": ["_meta", "ivCatheters", "pressureBag", "ivStart", "io", "dripSets", "fluids"],
+  "properties": {
+    "_meta": {
+      "type": "object",
+      "required": ["version", "status"],
+      "properties": {
+        "version": { "type": "string" },
+        "status": { "type": "string" }
+      }
+    },
+    "ivCatheters": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["gauge", "color", "gravityFlow_mL_per_min"],
+        "properties": {
+          "gauge": { "type": "integer" },
+          "color": { "type": "string" },
+          "gravityFlow_mL_per_min": { "type": "number" }
+        }
+      }
+    },
+    "pressureBag": { "type": "object" },
+    "ivStart": { "type": "object" },
+    "io": { "type": "object" },
+    "dripSets": { "type": "object" },
+    "fluids": { "type": "object" }
+  }
+}

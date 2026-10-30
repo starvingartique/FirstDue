@@ -14,17 +14,30 @@ export interface DrugPresentation {
   label: string;
   form: string;
   mg_per_mL?: number | null;
+  mcg_per_mL?: number | null;
+  g_per_mL?: number | null;
+  mg_per_tab?: number | null;
+  mg_per_dose?: number | null;
   volume_mL?: number;
   fixedDose_mg?: number;
+  fixedDose_mcg?: number;
+  fixedDose_g?: number;
+  notes?: string;
 }
 
 export interface DrugDosing {
   indication: string;
   route: string[];
+  device?: string;
+  lpm?: string;
   dose_mg?: number | string;
   dose_mcg?: number | string;
+  dose_g?: number | string;
+  dose_mL?: number | string;
+  dose_mL_per_kg?: number | string;
   dose_mcg_per_min?: string;
   dose_mg_per_kg?: number | string;
+  dose_mcg_per_kg?: number | string;
   repeat?: string;
   max?: string;
   notes?: string;
@@ -144,6 +157,35 @@ export interface EquipmentItem {
 export interface EquipmentFile {
   _meta: MetaBlock;
   equipment: EquipmentItem[];
+}
+
+// - Oct 29 kit depth (airway, lines/fluids, manual vitals) -
+
+export interface Oct29AirwayFile {
+  _meta: MetaBlock;
+  airwayDevices: Record<string, unknown>[];
+  bvm: Record<string, unknown>;
+  suction: Record<string, unknown>;
+  oxygenDelivery: Record<string, unknown>[];
+  fio2Table: Record<string, unknown>;
+  tank: Record<string, unknown>;
+  engineCoupling_TUNE: Record<string, unknown>;
+}
+
+export interface Oct29LinesFile {
+  _meta: MetaBlock;
+  ivCatheters: Record<string, unknown>[];
+  pressureBag: Record<string, unknown>;
+  ivStart: Record<string, unknown>;
+  io: Record<string, unknown>;
+  dripSets: Record<string, unknown>;
+  fluids: Record<string, unknown>;
+}
+
+export interface Oct29VitalsFile {
+  _meta: MetaBlock;
+  procedures: Record<string, unknown>[];
+  shockThresholds: Record<string, unknown>;
 }
 
 // - Oct 28 core conditions (separate from the DRAFT conditions.json) -

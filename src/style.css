@@ -208,6 +208,7 @@ body {
 
 #menu-tabs {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 6px;
   margin-top: 10px;
@@ -325,6 +326,85 @@ body {
 
 #menu-log div {
   margin: 2px 0;
+}
+
+.menu-num {
+  background: #101722;
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font-size: 12px;
+  padding: 4px 6px;
+  width: 90px;
+}
+
+.talk-log {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 8px 0;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.talk-empty {
+  font-size: 12px;
+  color: var(--dim);
+  font-style: italic;
+}
+
+.talk-player,
+.talk-josh {
+  font-size: 13px;
+  line-height: 1.4;
+  padding: 6px 9px;
+  border-radius: 6px;
+  max-width: 95%;
+}
+
+.talk-player {
+  align-self: flex-end;
+  background: rgba(232, 163, 61, 0.16);
+  border: 1px solid rgba(232, 163, 61, 0.4);
+}
+
+.talk-josh {
+  align-self: flex-start;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--line);
+}
+
+.talk-typing {
+  color: var(--dim);
+}
+
+.talk-row {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+#talk-input {
+  flex: 1;
+  background: #101722;
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font-size: 13px;
+  padding: 7px 9px;
+  min-width: 0;
+}
+
+.talk-send {
+  appearance: none;
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 7px 14px;
+  border-radius: 6px;
+  cursor: pointer;
 }
 
 #hud-bottom {

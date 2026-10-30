@@ -60,10 +60,10 @@ export class Hud {
   showRegion(region: RegionId | null): void {
     if (region === null) {
       this.regionTitle.textContent = "No region selected";
-      this.regionSub.textContent = "Click a body region, or pick Examine / Circulation below.";
+      this.regionSub.textContent = "Click a body region, or pick a tab below.";
     } else {
       this.regionTitle.textContent = `Region: ${REGION_LABELS[region]}`;
-      this.regionSub.textContent = "Examine tab follows this region. Circulation holds hemorrhage control.";
+      this.regionSub.textContent = "Examine tab follows this region. Other tabs hold the kit.";
     }
     for (const [id, button] of this.chipButtons) {
       button.classList.toggle("active", id === region);

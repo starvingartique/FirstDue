@@ -132,6 +132,34 @@ function gcsTextFor(gcs: number): string {
   return "E1 V1 M1 (3)";
 }
 
+export interface Oct29AirwayInput {
+  patency_0_to_1: number;
+  fio2_0_to_1: number;
+  /** Summed SpO2 penalties: patency loss, aspiration, esophageal/mainstem clocks, suction dip. */
+  spo2Penalty_pct: number;
+  /** SpO2 bonus from supplemental FiO2 (TUNE coupling). */
+  spo2Bonus_pct: number;
+  /** EtCO2 delta: patency rise, overvent drop, rebreathe rise. */
+  etco2Delta_mmhg: number;
+  /** Esophageal ETT forces EtCO2 to 0 with no waveform. Null = use derived. */
+  etco2Override_mmhg: number | null;
+  etco2Waveform: boolean;
+  /** SBP drop from overventilation (TUNE coupling). */
+  overventSbpDrop_mmhg: number;
+}
+
+export interface Oct29DrugInput {
+  hr_bpm: number;
+  sbp_mmhg: number;
+  rr_per_min: number;
+  spo2_pct: number;
+  gcs_points: number;
+  pain_0_to_10: number;
+  glucose_mg_per_dL: number;
+  /** 0-1 apnea factor: spontaneous RR scales by (1 - apnea). */
+  apnea_0_to_1: number;
+}
+
 export interface DeriveInput {
   loss_mL: number;
   /** Crash stress offset active (fades with analgesia, Oct 29 drugs). */
@@ -141,11 +169,31 @@ export interface DeriveInput {
   temp_C: number;
   pain_0_to_10: number;
   arrested: boolean;
+  /** Oct 29: loss minus retained fluids. Defaults to loss_mL (Oct 28 path). */
+  effectiveLoss_mL?: number;
+  airway?: Oct29AirwayInput;
+  drugs?: Oct29DrugInput;
 }
 
 export function deriveVitals(input: DeriveInput): Vitals {
+  // Displayed loss is blood on the ground; the anchors run on EFFECTIVE loss
+  // (loss minus retained fluids). With no fluids they are identical, so the
+  // Oct 28 curve, the 35 percent slip and the linear 50-55 decomp segment are
+  // untouched.
   const loss_pct = (input.loss_mL / BLOOD_VOLUME_ML) * 100;
-  const a = interpolate(loss_pct);
+  const effLoss_mL = input.effectiveLoss_mL ?? input.loss_mL;
+  const eff_pct = (Math.max(0, effLoss_mL) / BLOOD_VOLUME_ML) * 100;
+  const a = interpolate(eff_pct);
+  const drug = input.drugs ?? {
+    hr_bpm: 0,
+    sbp_mmhg: 0,
+    rr_per_min: 0,
+    spo2_pct: 0,
+    gcs_points: 0,
+    pain_0_to_10: 0,
+    glucose_mg_per_dL: 0,
+    apnea_0_to_1: 0
+  };
 
   let hr = a.hr;
   let rr = a.rr;
@@ -160,17 +208,38 @@ export function deriveVitals(input: DeriveInput): Vitals {
     const rise = Math.max(0, hr - 76);
     hr = 76 + rise * 0.4;
   }
+  // Oct 29 drug offsets apply after the shock curve and masking.
+  hr += drug.hr_bpm;
+  rr += drug.rr_per_min;
+  sbp += drug.sbp_mmhg;
+  rr *= 1 - Math.min(1, Math.max(0, drug.apnea_0_to_1));
+
+  const airway = input.airway;
+  sbp -= airway?.overventSbpDrop_mmhg ?? 0;
 
   const dbp = a.dbp;
   const map = dbp + (sbp - dbp) / 3;
   // SpO2 holds until late shock, then slides. EtCO2 falls as perfusion fails.
-  const spo2 = Math.max(60, 98 - Math.max(0, loss_pct - 30) * 0.15);
-  const etco2 = Math.max(10, 38 - Math.max(0, loss_pct - 15) * 0.25);
-  const gcs_total = Math.round(Math.min(15, Math.max(3, a.gcs)));
+  let spo2 = Math.max(60, 98 - Math.max(0, eff_pct - 30) * 0.15);
+  spo2 = spo2 - (airway?.spo2Penalty_pct ?? 0) + (airway?.spo2Bonus_pct ?? 0) + drug.spo2_pct;
+  spo2 = Math.min(100, Math.max(0, spo2));
+  let etco2 = Math.max(10, 38 - Math.max(0, eff_pct - 15) * 0.25);
+  etco2 += airway?.etco2Delta_mmhg ?? 0;
+  if (airway?.etco2Override_mmhg !== undefined && airway.etco2Override_mmhg !== null) {
+    etco2 = airway.etco2Override_mmhg;
+  }
+  etco2 = Math.max(0, etco2);
+  const gcs_total = Math.round(Math.min(15, Math.max(3, a.gcs + drug.gcs_points)));
+  const pain = Math.round(Math.min(10, Math.max(0, input.pain_0_to_10 + drug.pain_0_to_10)));
+  const glucose = Math.round(95 + drug.glucose_mg_per_dL);
+  const fio2 = airway?.fio2_0_to_1 ?? 0.21;
+  const patency = airway?.patency_0_to_1 ?? 1;
+  const retained = Math.max(0, input.loss_mL - Math.max(0, effLoss_mL));
+  const circulating = Math.round(BLOOD_VOLUME_ML - input.loss_mL + retained);
 
   let rhythm: Rhythm = "sinus";
   if (input.arrested) rhythm = "pea";
-  else if (loss_pct >= 50) rhythm = "bradycardic";
+  else if (eff_pct >= 50) rhythm = "bradycardic";
   else if (hr > 100) rhythm = "sinus_tach";
 
   const shockIndex = sbp > 0 ? hr / sbp : 9.9;
@@ -193,10 +262,15 @@ export function deriveVitals(input: DeriveInput): Vitals {
       mental: "PEA arrest",
       temp_C: input.temp_C,
       pain_0_to_10: 0,
+      glucose_mg_per_dL: glucose,
+      fio2_0_to_1: Math.round(fio2 * 100) / 100,
+      etco2Waveform: false,
+      airwayPatency_0_to_1: Math.round(patency * 100) / 100,
+      circulating_mL: circulating,
       rhythm,
       shockIndex: 9.9,
       shockFlag: "severe",
-      atlsClass: atlsClass(loss_pct),
+      atlsClass: atlsClass(eff_pct),
       loss_mL: Math.round(input.loss_mL),
       loss_pct: Math.round(loss_pct * 10) / 10,
       pulsePressure_mmhg: 0,
@@ -220,14 +294,19 @@ export function deriveVitals(input: DeriveInput): Vitals {
         ? `over 6 s, mottled`
         : `${(Math.round(a.capRefill_s * 10) / 10).toFixed(1)} s`,
     radial: radialForSbp(sbp),
-    skin: skinFor(loss_pct),
-    mental: mentalFor(loss_pct),
+    skin: skinFor(eff_pct),
+    mental: mentalFor(eff_pct),
     temp_C: Math.round(input.temp_C * 10) / 10,
-    pain_0_to_10: Math.round(input.pain_0_to_10),
+    pain_0_to_10: pain,
+    glucose_mg_per_dL: glucose,
+    fio2_0_to_1: Math.round(fio2 * 100) / 100,
+    etco2Waveform: airway?.etco2Waveform ?? false,
+    airwayPatency_0_to_1: Math.round(patency * 100) / 100,
+    circulating_mL: circulating,
     rhythm,
     shockIndex: Math.round(shockIndex * 100) / 100,
     shockFlag: shockFlagFor(shockIndex),
-    atlsClass: atlsClass(loss_pct),
+    atlsClass: atlsClass(eff_pct),
     loss_mL: Math.round(input.loss_mL),
     loss_pct: Math.round(loss_pct * 10) / 10,
     pulsePressure_mmhg: Math.round(sbp - dbp),

@@ -19,6 +19,9 @@ import environmentsJson from "../../data/calls/components/environments.json";
 import bystandersJson from "../../data/calls/components/bystanders.json";
 import complicationsJson from "../../data/calls/components/complications.json";
 import oct28ConditionsJson from "../../data/medical/oct28_conditions.json";
+import oct29AirwayJson from "../../data/medical/oct29_airway.json";
+import oct29LinesJson from "../../data/medical/oct29_lines.json";
+import oct29VitalsJson from "../../data/medical/oct29_vitals.json";
 import bikeDownJson from "../../data/calls/fixed/bike_down.json";
 import level1Json from "../../data/difficulty/level1.json";
 import level2Json from "../../data/difficulty/level2.json";
@@ -41,6 +44,9 @@ import type {
   MarchPawsFile,
   MechanismsFile,
   Oct28ConditionsFile,
+  Oct29AirwayFile,
+  Oct29LinesFile,
+  Oct29VitalsFile,
   PatientsFile,
   PhysiologyFile,
   TraumaLibraryFile
@@ -188,6 +194,57 @@ export function loadOct28Conditions(): Oct28ConditionsFile {
   });
 }
 
+export function loadOct29Airway(): Oct29AirwayFile {
+  return as<Oct29AirwayFile>("oct29_airway.json", oct29AirwayJson, (root) => {
+    checkMeta("oct29_airway.json", root);
+    const devices = checkEntries("oct29_airway.json", "airwayDevices", root, ["id", "name"]);
+    checkUniqueIds("oct29_airway.json", "airwayDevices", devices);
+    for (const key of ["bvm", "suction", "oxygenDelivery", "fio2Table", "tank", "engineCoupling_TUNE"]) {
+      if (root[key] === undefined) throw new DataError("oct29_airway.json", `missing required key "${key}"`);
+    }
+    // Josh's correct sizes must match section 7 exactly.
+    const byId = new Map(devices.map((d) => [d["id"], d]));
+    const opa = byId.get("opa");
+    if (opa?.["correctForJosh_mm"] !== 100) {
+      throw new DataError("oct29_airway.json", 'opa.correctForJosh_mm must be 100');
+    }
+    const ett = byId.get("ett");
+    const ettSizes = ett?.["correctForJosh_mm"];
+    if (!Array.isArray(ettSizes) || ettSizes[0] !== 7.5 || ettSizes[1] !== 8.0) {
+      throw new DataError("oct29_airway.json", 'ett.correctForJosh_mm must be [7.5, 8.0]');
+    }
+  });
+}
+
+export function loadOct29Lines(): Oct29LinesFile {
+  return as<Oct29LinesFile>("oct29_lines.json", oct29LinesJson, (root) => {
+    checkMeta("oct29_lines.json", root);
+    checkEntries("oct29_lines.json", "ivCatheters", root, ["gauge", "color", "gravityFlow_mL_per_min"]);
+    for (const key of ["pressureBag", "ivStart", "io", "dripSets", "fluids"]) {
+      if (!isObject(root[key])) throw new DataError("oct29_lines.json", `"${key}" must be an object`);
+    }
+    const fluids = root["fluids"] as Record<string, unknown>;
+    if (fluids["crystalloid_retained_mL_at_60min"] !== 250) {
+      throw new DataError("oct29_lines.json", '"fluids.crystalloid_retained_mL_at_60min" must be 250');
+    }
+    if (fluids["blood_retained_fraction"] !== 0.9) {
+      throw new DataError("oct29_lines.json", '"fluids.blood_retained_fraction" must be 0.9');
+    }
+  });
+}
+
+export function loadOct29Vitals(): Oct29VitalsFile {
+  return as<Oct29VitalsFile>("oct29_vitals.json", oct29VitalsJson, (root) => {
+    checkMeta("oct29_vitals.json", root);
+    const list = checkEntries("oct29_vitals.json", "procedures", root, ["id", "name", "time_engine_s", "error"]);
+    checkUniqueIds("oct29_vitals.json", "procedures", list);
+    if (list.length !== 13) throw new DataError("oct29_vitals.json", '"procedures" must hold 13 entries');
+    if (!isObject(root["shockThresholds"])) {
+      throw new DataError("oct29_vitals.json", '"shockThresholds" must be an object');
+    }
+  });
+}
+
 export function loadTraumaLibrary(): TraumaLibraryFile {
   return as<TraumaLibraryFile>("trauma_library.json", traumaJson, (root) => {
     checkMeta("trauma_library.json", root);
@@ -319,6 +376,9 @@ export function loadAll(): void {
   loadPhysiology();
   loadConditions();
   loadOct28Conditions();
+  loadOct29Airway();
+  loadOct29Lines();
+  loadOct29Vitals();
   loadInterventions();
   loadEquipment();
   loadTraumaLibrary();
