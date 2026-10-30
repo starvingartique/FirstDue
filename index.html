@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>First Due - Oct 30 UI + QoL</title>
+    <title>First Due - Oct 30 Bike down end-to-end</title>
   </head>
   <body>
     <div id="app">
@@ -25,6 +25,7 @@
             <button type="button" class="term-btn" data-terms="plain" title="Everyday words (T)">Plain</button>
           </div>
           <button type="button" id="tips-toggle" class="spot-btn" title="Coach tips under each section (H)">Tips</button>
+          <button type="button" id="package-btn" class="spot-btn" title="Package for transport (G)" hidden>Package</button>
           <nav id="spot-nav" aria-label="Camera spots">
             <button type="button" data-spot="patient" class="spot-btn active">1 Patient</button>
             <button type="button" data-spot="kit" class="spot-btn">2 Kit</button>
@@ -33,6 +34,8 @@
         </div>
       </header>
       <div id="paused-banner" hidden>PAUSED - press P to resume</div>
+      <div id="partner-hint" hidden></div>
+      <div id="flow-overlay" hidden></div>
       <aside id="region-panel" aria-live="polite">
         <div id="panel-head">
           <div id="region-title">No region selected</div>
@@ -56,7 +59,7 @@
         <p id="debug-note">True state, ticking every sim-second. Hidden from the player; F1 only.</p>
       </aside>
       <footer id="hud-bottom">
-        <span>Drag to look - Click body to select - 1/2/3 camera - E A B C M L N tabs, V talk - P pause - T wording - H tips - F1 debug</span>
+        <span>Drag to look - Click body to select - 1/2/3 camera - E A B C M L N tabs, V talk - G package - P pause - T wording - H tips - F1 debug</span>
       </footer>
       <div id="boot-error" hidden></div>
     </div>

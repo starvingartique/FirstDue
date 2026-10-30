@@ -13,6 +13,7 @@ export interface HudHandlers {
   onSpeed: (speed: number) => void;
   onTerms: (mode: TermMode) => void;
   onTips: () => void;
+  onPackage: () => void;
 }
 
 function el<T extends HTMLElement>(id: string): T {
@@ -32,6 +33,7 @@ export class Hud {
   private speedButtons = [...document.querySelectorAll<HTMLButtonElement>(".speed-btn")];
   private termButtons = [...document.querySelectorAll<HTMLButtonElement>(".term-btn")];
   private tipsButton = el<HTMLButtonElement>("tips-toggle");
+  private packageButton = el<HTMLButtonElement>("package-btn");
   private pausedBanner = el("paused-banner");
   private region: RegionId | null = null;
 
@@ -52,6 +54,7 @@ export class Hud {
       button.addEventListener("click", () => handlers.onTerms(button.dataset["terms"] === "plain" ? "plain" : "medical"));
     }
     this.tipsButton.addEventListener("click", () => handlers.onTips());
+    this.packageButton.addEventListener("click", () => handlers.onPackage());
     for (const button of this.spotButtons) {
       button.addEventListener("click", () => {
         const spot = button.dataset["spot"];
@@ -102,6 +105,10 @@ export class Hud {
       button.classList.toggle("active", button.dataset["terms"] === mode);
     }
     this.showRegion(this.region);
+  }
+
+  showPackage(visible: boolean): void {
+    this.packageButton.hidden = !visible;
   }
 
   showTips(on: boolean): void {

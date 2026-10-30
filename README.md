@@ -14,6 +14,35 @@ and the talking patient (Josh) through the server proxy. F1 stays debug-only.
 No Dispatch Engine, no FTO debrief, no destination/radio report, no
 infection/sepsis, no second patient, no art pass, no driving.
 
+## Oct 30 Bike down end-to-end (Prompt 4)
+
+Wiring only, no clinical value changed. Full run: level select (L1/L2) ->
+dispatch (fixed Bike down CAD text) -> size-up checklist -> care (the Oct
+28 + Oct 29 loop, untouched) -> package + destination (trauma / STEMI /
+stroke / nearest ED, logged not graded) -> 300 s transport skip with the
+engine ticking -> text radio report to the AI charge nurse (MIST follow-ups,
+same model and settings as Josh) -> handoff. Win = alive + bleed under 30
+mL/min + airway patent at handoff; lose = arrest anywhere on your watch.
+The end screen reuses the run report with new Level / Destination / Outcome
+rows. G or the Package button ends scene care.
+
+- L1: vitals auto-display, partner hints, deterioration x0.5 (named dial
+  L1_DETERIORATION_SCALE, TUNE flag for Wyatt). L2: manual vitals, no hints,
+  x1.0 exactly.
+- New files: src/ui/flow.ts, src/flow.css, server/routes/radio.ts,
+  server/prompts/radio.txt, scripts/oct30-test.ts (`npm.cmd run sim:test30`).
+- Live nurse check Oct 30: full MIST returns complete:true, thin report asks
+  follow-ups with complete:false, marker stripped server-side.
+- No Dispatch Engine (Oct 31), no FTO debrief (Nov 1), no second patient,
+  no driving, no ambulance interior, no art pass.
+
+New TODO_CLINICAL for Wyatt, in blocker order:
+
+1. Handoff airway bar (patency 0.8+, no esophageal tube) - invented Oct 30.
+2. Transport skip 300 s - scenario param, decides who survives transport.
+3. L1 deterioration x0.5 - the brief gives slow/real with no number.
+4. Destination correctness for a femoral bleed - not graded, needs a rule.
+
 ## Oct 30 UI + QoL pass (branch claude/ui-qol-terms)
 
 Presentation and bug fixes only. No clinical value changed.
@@ -204,9 +233,9 @@ cefazolin, ertapenem, moxifloxacin, ceftriaxone, piperacillin_tazobactam,
 metronidazole, cefepime, clindamycin, cefadroxil, cephalexin,
 amoxicillin_clavulanate, levetiracetam.
 
-## Parked for Oct 30 (not built today)
+## Parked for Oct 31 and Nov 1
 
-- Bike down end-to-end flow: dispatch, destination choice, radio report.
+- Oct 31: Dispatch Engine generator. Nov 1: AI FTO debrief.
 - Dispatch Engine, FTO debrief, infection/sepsis.
 - Drug infusions (push only today), same-line incompatibilities, max-dose
   tracking, scope-violation flags.

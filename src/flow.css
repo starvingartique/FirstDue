@@ -1,0 +1,296 @@
+/* Oct 30 run flow: phase cards over the scene, partner hint bar. Same
+   night-ops look as style.css: dark panels, one amber accent. */
+
+#flow-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(4, 6, 12, 0.72);
+  overflow-y: auto;
+}
+
+#flow-overlay[hidden] {
+  display: none;
+}
+
+#partner-hint {
+  position: absolute;
+  top: 56px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 30;
+  max-width: min(640px, calc(100vw - 400px));
+  padding: 7px 14px;
+  background: rgba(20, 32, 18, 0.88);
+  border: 1px solid #5da24a;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #d8ecd0;
+  pointer-events: none;
+}
+
+#partner-hint[hidden] {
+  display: none;
+}
+
+.flow-card {
+  width: 560px;
+  max-width: 100%;
+  max-height: calc(100vh - 60px);
+  overflow-y: auto;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 22px 24px;
+}
+
+.flow-card-wide {
+  width: 680px;
+}
+
+.flow-kicker {
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+
+.flow-title {
+  margin: 4px 0 12px;
+  font-size: 22px;
+}
+
+.flow-dispatch-head {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.flow-dispatch-head .flow-title {
+  margin: 0;
+  letter-spacing: 0.1em;
+}
+
+.flow-tone {
+  color: var(--accent);
+  font-weight: 700;
+  animation: flow-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes flow-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.25; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .flow-tone {
+    animation: none;
+  }
+}
+
+.flow-cad {
+  display: grid;
+  grid-template-columns: 90px 1fr;
+  gap: 6px 12px;
+  margin: 0 0 14px;
+  font-size: 14px;
+}
+
+.flow-dt {
+  color: var(--dim);
+  font-weight: 600;
+}
+
+.flow-dd {
+  margin: 0;
+}
+
+.flow-row {
+  display: flex;
+  gap: 14px;
+  margin-bottom: 12px;
+}
+
+.flow-level {
+  flex: 1;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.flow-level-name {
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.flow-list {
+  margin: 0 0 12px;
+  padding-left: 20px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.flow-list li {
+  margin-bottom: 4px;
+}
+
+.flow-note {
+  font-size: 13px;
+  color: var(--dim);
+  margin: 10px 0;
+}
+
+.flow-h {
+  font-weight: 700;
+  margin: 14px 0 6px;
+}
+
+.flow-checks {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.flow-check {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  font-size: 14px;
+  cursor: pointer;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+
+.flow-check input {
+  margin-top: 3px;
+}
+
+.flow-check-text {
+  flex: 1;
+}
+
+.flow-btn {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border: none;
+  font-size: 14px;
+  font-weight: 700;
+  padding: 9px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.flow-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.flow-btn-big {
+  width: 100%;
+  padding: 12px 16px;
+  font-size: 15px;
+}
+
+.flow-btn-ghost {
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--line);
+  font-weight: 600;
+}
+
+.flow-btn-row {
+  display: flex;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.flow-btn-row .flow-btn-big {
+  flex: 2;
+}
+
+.flow-progress {
+  height: 12px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  overflow: hidden;
+  margin: 12px 0;
+}
+
+.flow-progress-fill {
+  height: 100%;
+  width: 0;
+  background: var(--accent);
+  transition: width 0.1s linear;
+}
+
+.flow-status {
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.flow-radio-log {
+  max-height: 220px;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 10px;
+  margin-bottom: 10px;
+  font-size: 13px;
+}
+
+.flow-textarea {
+  width: 100%;
+  resize: vertical;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 14px;
+  font-family: inherit;
+}
+
+.flow-win {
+  margin: 4px 0 8px;
+  color: #7fd97f;
+  font-size: 24px;
+}
+
+.flow-lose {
+  margin: 4px 0 8px;
+  color: #ff9b9b;
+  font-size: 24px;
+}
+
+.flow-pass {
+  color: #7fd97f;
+}
+
+.flow-fail {
+  color: #ff9b9b;
+}
+
+.flow-card .report {
+  max-height: none;
+  overflow: visible;
+}
+
+@media (max-width: 900px) {
+  #partner-hint {
+    max-width: calc(100vw - 28px);
+    top: auto;
+    bottom: 44px;
+  }
+
+  .flow-row {
+    flex-direction: column;
+  }
+}

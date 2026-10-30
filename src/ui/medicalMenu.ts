@@ -134,6 +134,10 @@ export class MedicalMenu {
   private lastSeenLog = 0;
   private talkDraft = "";
   private notice: { text: string; until: number } | null = null;
+  // Oct 30 run context for the report rows. Set by the phase flow.
+  private runLevel = "not chosen";
+  private runDestination = "not chosen";
+  private runOutcome = "run in progress";
 
   constructor(private readonly sim: Sim) {
     this.talkClient = new TalkClient(sim);
@@ -174,6 +178,20 @@ export class MedicalMenu {
     this.tab = "talk";
     this.render(true);
     document.getElementById("talk-input")?.focus();
+  }
+
+  /** Oct 30 run context for the report rows. Updated by the phase flow. */
+  setRunInfo(info: { level: string; destination: string; outcome: string }): void {
+    this.runLevel = info.level;
+    this.runDestination = info.destination;
+    this.runOutcome = info.outcome;
+  }
+
+  /** The existing run report as a standalone element for the end screen. */
+  reportElement(): HTMLElement {
+    const report = this.buildReport();
+    applyTerms(report);
+    return report;
   }
 
   get tips(): boolean {
@@ -442,6 +460,9 @@ export class MedicalMenu {
     const traps = s.log.filter((e) => e.kind === "trap" && e.t_s > 0);
     const rows: [string, string][] = [
       ["Clock", `T+${fmtClock(s.t_s)}`],
+      ["Level", this.runLevel],
+      ["Destination", this.runDestination],
+      ["Outcome", this.runOutcome],
       ["First hands on the bleed", t(firstHands)],
       ["Bleeding controlled", this.controlledAt === null ? "NOT controlled" : `T+${fmtClock(this.controlledAt)}`],
       ["Blood lost at control", this.controlledAt === null ? "-" : `${Math.round(this.lossAtControl)} mL`],

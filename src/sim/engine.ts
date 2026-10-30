@@ -97,6 +97,13 @@ export interface TqOptions {
   writeTime: boolean;
 }
 
+/**
+ * L1 slow-deterioration dial from the brief difficulty table. The brief gives
+ * no number, so this stays a named TUNE flag for Wyatt: L1 accrues blood loss
+ * at half the engine rate, L2 stays 1.0 exactly (Oct 28 curve untouched).
+ */
+export const L1_DETERIORATION_SCALE = 0.5;
+
 export interface SecondTqOptions {
   /** Windlass half-turns on the second CAT. Under 3 never clamps (same rule as the first). Omitted = 3. */
   halfTurns?: number;
@@ -216,6 +223,8 @@ export class Sim {
   monitor: MonitorState = { spo2Attached: false, etco2Attached: false, spo2History: [], movedDuringNibp: false };
   /** Cert level for vitals display: L1 auto, L2 manual. Bike down runs L2. */
   level: 1 | 2 = 2;
+  /** Blood-loss accrual multiplier. L1 slow, L2 exactly 1.0. See setLevel. */
+  deteriorationScale = 1;
   lastTalkAt_s = -1000;
   talkCount = 0;
   private stressEasedLogged = false;
@@ -341,7 +350,9 @@ export class Sim {
     // Bleed accrues at the controlled rate. MAP from last tick keeps the
     // pressure scaling causal: the bleed slows as he crashes.
     const ratePerMin = this.bleedRate_mL_per_min();
-    this.loss_mL += ratePerMin / 60;
+    // L1 difficulty dial only: L2 multiplies by exactly 1.0, so the Oct 28
+    // bleed curve underneath is unchanged.
+    this.loss_mL += (ratePerMin / 60) * this.deteriorationScale;
 
     // Hypothermia slide: -0.5 C per 10 min exposed and wet (TUNE).
     const slide = this.wetClothing && !this.wrapped ? 1 : this.wetClothing || !this.wrapped ? 0.5 : 0;
@@ -1126,7 +1137,11 @@ export class Sim {
 
   setLevel(level: 1 | 2): void {
     this.level = level;
-    this.addLog("info", `Cert level ${level}: ${level === 1 ? "vitals auto-display." : "manual vitals."}`);
+    this.deteriorationScale = level === 1 ? L1_DETERIORATION_SCALE : 1;
+    this.addLog(
+      "info",
+      `Cert level ${level}: ${level === 1 ? "vitals auto-display, slow deterioration." : "manual vitals, real deterioration."}`
+    );
   }
 
   recordTalk(): void {
