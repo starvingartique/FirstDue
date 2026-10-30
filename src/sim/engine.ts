@@ -98,6 +98,8 @@ export interface TqOptions {
 }
 
 export interface SecondTqOptions {
+  /** Windlass half-turns on the second CAT. Under 3 never clamps (same rule as the first). Omitted = 3. */
+  halfTurns?: number;
   placement: "proximal" | "distal" | "over_wound" | "overlapping";
   loosenedFirst: boolean;
 }
@@ -607,6 +609,12 @@ export class Sim {
     if (gap) this.addLog("trap", "First TQ loosened to place the second: full bleed resumes during the gap.");
     return this.start("apply_tq2", "Apply second CAT proximal", 30, () => {
       this.tq.secondApplied = true;
+      const turns = o.halfTurns ?? 3;
+      if (turns < 3 && (o.placement === "proximal" || o.placement === "overlapping")) {
+        this.tq.secondPlacement = "loose";
+        this.addLog("trap", "Second TQ too loose: windlass not cranked enough to clamp. No effect, crank it or add another.");
+        return;
+      }
       this.tq.secondPlacement = o.placement;
       if (o.placement === "proximal") {
         this.tq.residualFlow_0_to_1 = 0;
@@ -864,8 +872,22 @@ export class Sim {
         }
       });
     }
-    this.fetches.push({ itemId, remaining_s: seconds, total_s: seconds, runner });
-    this.addLog("fetch", `${runner} to the truck for ${itemId} (${seconds}s round trip).`);
+    const partnerJobs = this.fetches.filter((f) => f.runner === runner);
+    const latest = partnerJobs.reduce((m, f) => Math.max(m, f.remaining_s), 0);
+    if (partnerJobs.length > 0 && latest > seconds / 2) {
+      // Still on the way out: grab this item on the same trip.
+      this.fetches.push({ itemId, remaining_s: latest, total_s: seconds, runner });
+      this.addLog("fetch", `${runner} adds ${itemId} to the current truck run (back in ${latest}s).`);
+      return { ok: true };
+    }
+    const wait = partnerJobs.length > 0 ? latest : 0;
+    this.fetches.push({ itemId, remaining_s: wait + seconds, total_s: seconds, runner });
+    this.addLog(
+      "fetch",
+      wait > 0
+        ? `${runner} heading back out for ${itemId} after this run (back in ${wait + seconds}s).`
+        : `${runner} to the truck for ${itemId} (${seconds}s round trip).`
+    );
     return { ok: true };
   }
 

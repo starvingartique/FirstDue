@@ -77,7 +77,7 @@ export interface TqState {
   appliedAt_s: number;
   /** Second TQ state. */
   secondApplied: boolean;
-  secondPlacement: "proximal" | "distal" | "over_wound" | "overlapping" | "none";
+  secondPlacement: "proximal" | "distal" | "over_wound" | "overlapping" | "loose" | "none";
   loosened: boolean;
   failedSlack: boolean;
 }

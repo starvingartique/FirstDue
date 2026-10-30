@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>First Due - Oct 29 Kit Depth + Patient Voice</title>
+    <title>First Due - Oct 30 UI + QoL</title>
   </head>
   <body>
     <div id="app">
@@ -11,21 +11,44 @@
       <div id="crosshair" aria-hidden="true"></div>
       <header id="hud-top">
         <div id="call-title">Loading call data...</div>
-        <div id="clock">T+00:00 since contact</div>
-        <nav id="spot-nav" aria-label="Camera spots">
-          <button type="button" data-spot="patient" class="spot-btn active">1 Patient</button>
-          <button type="button" data-spot="kit" class="spot-btn">2 Kit bags</button>
-          <button type="button" data-spot="bystander" class="spot-btn">3 Bystander</button>
-        </nav>
+        <div id="clock-wrap">
+          <div id="clock">T+00:00 since contact</div>
+          <div id="sim-speed" role="group" aria-label="Sim speed">
+            <button type="button" class="speed-btn" data-speed="0" title="Pause (P)">Pause</button>
+            <button type="button" class="speed-btn active" data-speed="1" title="Real time">1x</button>
+            <button type="button" class="speed-btn" data-speed="2" title="Double speed">2x</button>
+          </div>
+        </div>
+        <div id="hud-right">
+          <div id="term-toggle" role="group" aria-label="Wording">
+            <button type="button" class="term-btn" data-terms="medical" title="Medical terms, hover for plain meaning (T)">Medical</button>
+            <button type="button" class="term-btn" data-terms="plain" title="Everyday words (T)">Plain</button>
+          </div>
+          <button type="button" id="tips-toggle" class="spot-btn" title="Coach tips under each section (H)">Tips</button>
+          <nav id="spot-nav" aria-label="Camera spots">
+            <button type="button" data-spot="patient" class="spot-btn active">1 Patient</button>
+            <button type="button" data-spot="kit" class="spot-btn">2 Kit</button>
+            <button type="button" data-spot="bystander" class="spot-btn">3 Bystander</button>
+          </nav>
+        </div>
       </header>
+      <div id="paused-banner" hidden>PAUSED - press P to resume</div>
       <aside id="region-panel" aria-live="polite">
-        <div id="region-title">No region selected</div>
-        <div id="region-sub">Click a body region, or pick Examine / Circulation below.</div>
-        <nav id="menu-tabs" aria-label="Medical menu"></nav>
+        <div id="panel-head">
+          <div id="region-title">No region selected</div>
+          <div id="region-sub">Click a body region, or pick Examine / Circulation below.</div>
+          <details id="region-details">
+            <summary>Body regions</summary>
+            <div id="region-chips" aria-label="Body regions"></div>
+          </details>
+          <div id="march-strip" aria-label="MARCH priorities"></div>
+          <nav id="menu-tabs" aria-label="Medical menu"></nav>
+        </div>
         <div id="menu-body"></div>
-        <div id="action-status">T+00:00 - Hands free</div>
-        <div id="menu-log" aria-label="Recent events"></div>
-        <div id="region-chips" aria-label="Body regions"></div>
+        <div id="panel-foot">
+          <div id="action-status">T+00:00 - Hands free</div>
+          <div id="menu-log" aria-label="Recent events"></div>
+        </div>
       </aside>
       <aside id="debug-overlay" hidden>
         <h2>DEBUG - live engine state</h2>
@@ -33,7 +56,7 @@
         <p id="debug-note">True state, ticking every sim-second. Hidden from the player; F1 only.</p>
       </aside>
       <footer id="hud-bottom">
-        <span>Drag to look - Click body to select - F1 debug - 1/2/3 camera - V talk</span>
+        <span>Drag to look - Click body to select - 1/2/3 camera - E A B C M L N tabs, V talk - P pause - T wording - H tips - F1 debug</span>
       </footer>
       <div id="boot-error" hidden></div>
     </div>

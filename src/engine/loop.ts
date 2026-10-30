@@ -17,6 +17,8 @@ export interface LoopRefs {
   onResize: () => void;
   /** Fires once per sim-second for HUD, menu and overlay refresh. */
   onTick: () => void;
+  /** Sim speed: 0 = paused, 1 = real time, 2 = double. Rendering never stops. */
+  speed?: () => number;
 }
 
 export function startLoop(refs: LoopRefs): void {
@@ -38,7 +40,7 @@ export function startLoop(refs: LoopRefs): void {
     const t = clock.getElapsedTime();
 
     // Fixed 1 sim-second tick, decoupled from frame rate.
-    simDebt_s += dt;
+    simDebt_s += dt * (refs.speed?.() ?? 1);
     while (simDebt_s >= 1) {
       simDebt_s -= 1;
       refs.sim.tick();
