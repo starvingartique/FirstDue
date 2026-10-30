@@ -13,7 +13,8 @@ import { RegionHighlight } from "./patient/highlight";
 import type { RegionId } from "./patient/regions";
 import { Hud } from "./ui/hud";
 import { DebugOverlay } from "./ui/debug";
-import { MedicalMenu } from "./ui/medicalMenu";
+import { MedicalMenu, TAB_HOTKEYS } from "./ui/medicalMenu";
+import { getTermMode, setTermMode, type TermMode } from "./ui/terms";
 import { newBikeDownSim } from "./sim/scenario";
 import { loadAll, loadBikeDown } from "./data/loaders";
 
@@ -42,6 +43,8 @@ function main(): void {
   const highlight = new RegionHighlight(patient);
   const debug = new DebugOverlay(sim);
   const menu = new MedicalMenu(sim);
+  let speed = 1;
+  let lastRunSpeed = 1;
 
   const hud = new Hud({
     onSelectRegion: (region: RegionId) => {
@@ -52,8 +55,28 @@ function main(): void {
     onSelectSpot: (spot: SpotId) => {
       spotCamera.applySpot(spot);
       hud.showSpot(spot);
+    },
+    onSpeed: (next: number) => setSpeed(next),
+    onTerms: (mode: TermMode) => setTerms(mode),
+    onTips: () => {
+      menu.toggleTips();
+      hud.showTips(menu.tips);
     }
   });
+  const setSpeed = (next: number): void => {
+    if (next > 0) lastRunSpeed = next;
+    speed = next;
+    hud.showSpeed(speed);
+  };
+  const setTerms = (mode: TermMode): void => {
+    setTermMode(mode);
+    hud.showTerms(mode);
+    menu.retranslate();
+    debug.refresh();
+  };
+  hud.showSpeed(speed);
+  hud.showTerms(getTermMode());
+  hud.showTips(menu.tips);
   hud.showCall(call);
   hud.showRegion(null);
   hud.showSpot(spotCamera.getSpot());
@@ -75,7 +98,15 @@ function main(): void {
       hud.showSpot(spot);
     },
     onDebugKey: () => debug.toggle(),
-    onTalkKey: () => menu.openTalk()
+    onTalkKey: () => menu.openTalk(),
+    onHotkey: (key: string) => {
+      if (key === "p") setSpeed(speed === 0 ? lastRunSpeed : 0);
+      else if (key === "t") setTerms(getTermMode() === "medical" ? "plain" : "medical");
+      else if (key === "h") {
+        menu.toggleTips();
+        hud.showTips(menu.tips);
+      } else if (TAB_HOTKEYS[key] !== undefined) menu.setTab(TAB_HOTKEYS[key]);
+    }
   });
 
   startLoop({
@@ -85,6 +116,7 @@ function main(): void {
     patient,
     sim,
     onResize: () => spotCamera.onResize(),
+    speed: () => speed,
     onTick: () => {
       hud.showClock(sim.t_s);
       menu.refresh();

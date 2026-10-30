@@ -3,6 +3,12 @@
 // tabs land later. ACM rules hold: everything is present, nothing is greyed
 // out for being wrong, consequences are modeled instead of locks. Gameplay
 // UI never shows true engine vitals (F1 only) or the patient weight.
+//
+// Oct 30 QoL pass: picks in dropdowns survive re-renders, findings stay under
+// the button that produced them, sections collapse, the panel keeps its
+// scroll, the talk draft survives ticks, coach tips explain each section,
+// the full event log is one click away, and every string goes through the
+// Medical / Plain terminology layer.
 
 import type { RegionId } from "../patient/regions";
 import { REGION_LABELS } from "../patient/regions";
@@ -13,8 +19,10 @@ import type { CuffFit } from "../sim/exams";
 import { drugCatalog, formatDose, presentationMath } from "../sim/drugs";
 import { bvmRatePerMin, gttPerMin, tankMinutesLeft } from "../sim/airway";
 import { TalkClient } from "./talk";
+import { applyTerms } from "./terms";
+import { tipFor } from "./tips";
 
-type Tab = "examine" | "airway" | "breathing" | "circulation" | "meds" | "lines" | "monitor" | "talk";
+export type Tab = "examine" | "airway" | "breathing" | "circulation" | "meds" | "lines" | "monitor" | "talk";
 
 const TAB_LABELS: Record<Tab, string> = {
   examine: "Examine",
@@ -26,6 +34,19 @@ const TAB_LABELS: Record<Tab, string> = {
   monitor: "Monitor",
   talk: "Talk"
 };
+
+/** Single-key jumps to each tab (shown on the tab buttons). */
+export const TAB_HOTKEYS: Record<string, Tab> = {
+  e: "examine",
+  a: "airway",
+  b: "breathing",
+  c: "circulation",
+  m: "meds",
+  l: "lines",
+  n: "monitor"
+};
+
+const LOG_KINDS = ["all", "action", "bleed", "trap", "class", "fetch", "vitals", "movement", "reassess", "info"] as const;
 
 function el<T extends HTMLElement>(id: string): T {
   const node = document.getElementById(id);
@@ -39,11 +60,36 @@ function fmtClock(t_s: number): string {
   return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
+function loadSet(key: string): Set<string> {
+  try {
+    const raw = localStorage.getItem(key);
+    return new Set(raw ? (JSON.parse(raw) as string[]) : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function saveSet(key: string, set: Set<string>): void {
+  try {
+    localStorage.setItem(key, JSON.stringify([...set]));
+  } catch {
+    // Storage blocked: lasts for this session only.
+  }
+}
+
+/** Strip trailing "(30s, have 3)" style counters so keys stay stable. */
+function stableLabel(label: string): string {
+  return label.replace(/\s*\([^)]*\)\s*$/, "").trim();
+}
+
 interface SelectSpec {
   id: string;
   label: string;
   options: { value: string; label: string }[];
+  /** Controlled value (the menu owns it, e.g. the drug picker). */
   current?: string;
+  /** First-time value when the player has not picked yet. */
+  default?: string;
   onPick?: (value: string) => void;
 }
 
@@ -53,24 +99,59 @@ export class MedicalMenu {
   private signature = "";
   private tabsNav = el("menu-tabs");
   private body = el("menu-body");
+  private panel = el("region-panel");
   private status = el("action-status");
   private logBox = el("menu-log");
+  private march = el("march-strip");
   private readonly talkClient: TalkClient;
   private drugId = "fentanyl";
   private drugPres = 0;
 
+  // Where widgets land: the open section's container.
+  private target: HTMLElement = this.body;
+  private sectionKey = "";
+  // Player picks per dropdown, kept across re-renders.
+  private selState = new Map<string, string>();
+  // Findings produced by an action, shown under that action until replaced.
+  private findings = new Map<string, string[]>();
+  private capturing: string | null = null;
+  private collapsed = loadSet("fd.collapsed");
+  private tipsOn = (() => {
+    try {
+      return localStorage.getItem("fd.tips") !== "off";
+    } catch {
+      return true;
+    }
+  })();
+  private logOpen = false;
+  private reportOpen = false;
+  private controlledAt: number | null = null;
+  private lossAtControl = 0;
+  private rebleeds = 0;
+  private lineAt: number | null = null;
+  private hungAt: number | null = null;
+  private logFilter: (typeof LOG_KINDS)[number] = "all";
+  private lastSeenLog = 0;
+  private talkDraft = "";
+  private notice: { text: string; until: number } | null = null;
+
   constructor(private readonly sim: Sim) {
     this.talkClient = new TalkClient(sim);
     this.tabsNav.innerHTML = "";
+    const keyFor = (tab: Tab): string =>
+      tab === "talk" ? "V" : (Object.entries(TAB_HOTKEYS).find(([, t]) => t === tab)?.[0] ?? "").toUpperCase();
     for (const tab of Object.keys(TAB_LABELS) as Tab[]) {
       const button = document.createElement("button");
       button.type = "button";
       button.className = "tab-btn";
-      button.textContent = TAB_LABELS[tab];
-      button.addEventListener("click", () => {
-        this.tab = tab;
-        this.render(true);
-      });
+      button.dataset["tab"] = tab;
+      button.title = `Hotkey: ${keyFor(tab)}`;
+      const label = document.createElement("span");
+      label.textContent = TAB_LABELS[tab];
+      const key = document.createElement("kbd");
+      key.textContent = keyFor(tab);
+      button.append(label, key);
+      button.addEventListener("click", () => this.setTab(tab));
       this.tabsNav.appendChild(button);
     }
     this.render(true);
@@ -78,7 +159,14 @@ export class MedicalMenu {
 
   setRegion(region: RegionId | null): void {
     this.region = region;
+    if (region !== null && this.tab !== "examine") this.tab = "examine";
     this.render(true);
+  }
+
+  setTab(tab: Tab): void {
+    this.tab = tab;
+    this.render(true);
+    this.panel.scrollTop = 0;
   }
 
   /** V key: open Talk and focus the line to Josh. */
@@ -88,8 +176,42 @@ export class MedicalMenu {
     document.getElementById("talk-input")?.focus();
   }
 
+  get tips(): boolean {
+    return this.tipsOn;
+  }
+
+  toggleTips(): void {
+    this.tipsOn = !this.tipsOn;
+    try {
+      localStorage.setItem("fd.tips", this.tipsOn ? "on" : "off");
+    } catch {
+      // Session only.
+    }
+    this.render(true);
+  }
+
+  /** Terminology mode changed: rebuild everything from engine strings. */
+  private termsStamp = 0;
+
+  retranslate(): void {
+    this.termsStamp += 1;
+    this.render(true);
+  }
+
   /** Called every sim tick: cheap status refresh, full re-render on change. */
   refresh(): void {
+    // Debrief bookkeeping: when the bleed first came under control.
+    const rate = this.sim.bleedRate_mL_per_min();
+    if (rate < 30 && this.controlledAt === null && !this.sim.arrested) {
+      this.controlledAt = this.sim.t_s;
+      this.lossAtControl = this.sim.loss_mL;
+    } else if (rate >= 30 && this.controlledAt !== null) {
+      this.rebleeds += 1;
+      this.controlledAt = null;
+    }
+    const lines = this.sim.fluids.lines;
+    if (this.lineAt === null && lines.some((l) => l.patent)) this.lineAt = this.sim.t_s;
+    if (this.hungAt === null && lines.some((l) => l.bag !== null)) this.hungAt = this.sim.t_s;
     const sig = this.stateSignature();
     if (sig !== this.signature) this.render(false);
     this.renderStatus();
@@ -100,7 +222,7 @@ export class MedicalMenu {
     return [
       this.tab,
       this.region ?? "none",
-      s.tq.applied, s.tq.occluded, s.tq.placement, s.tq.secondApplied, s.tq.loosened, s.tq.failedSlack,
+      s.tq.applied, s.tq.occluded, s.tq.placement, s.tq.secondApplied, s.tq.secondPlacement, s.tq.loosened, s.tq.failedSlack,
       s.packing.stage, s.packing.loosened,
       s.pressure.active, s.pressure.bystanderShirt,
       s.dressing.applied, s.dressing.loosened,
@@ -117,17 +239,25 @@ export class MedicalMenu {
       Object.keys(s.observed).length,
       s.monitor.spo2Attached, s.monitor.etco2Attached,
       s.level, this.talkClient.turns.length, this.talkClient.sending,
-      this.drugId, this.drugPres
+      this.drugId, this.drugPres, this.findings.size, this.collapsed.size, this.tipsOn
     ].join("|");
   }
 
   private render(force: boolean): void {
     void force;
+    // Keep what the player was doing: scroll position and a half-typed line.
+    const scroll = this.panel.scrollTop;
+    const talk = document.getElementById("talk-input");
+    const talkFocused = talk !== null && document.activeElement === talk;
+    if (talk instanceof HTMLInputElement) this.talkDraft = talk.value;
+
     this.signature = this.stateSignature();
-    for (const btn of this.tabsNav.querySelectorAll(".tab-btn")) {
-      btn.classList.toggle("active", btn.textContent === TAB_LABELS[this.tab]);
+    for (const btn of this.tabsNav.querySelectorAll<HTMLButtonElement>(".tab-btn")) {
+      btn.classList.toggle("active", btn.dataset["tab"] === this.tab);
     }
     this.body.innerHTML = "";
+    this.target = this.body;
+    this.sectionKey = "";
     if (this.tab === "examine") this.renderExamine();
     else if (this.tab === "airway") this.renderAirway();
     else if (this.tab === "breathing") this.renderBreathing();
@@ -136,34 +266,266 @@ export class MedicalMenu {
     else if (this.tab === "lines") this.renderLines();
     else if (this.tab === "monitor") this.renderMonitor();
     else this.renderTalk();
+    applyTerms(this.body);
+    applyTerms(this.tabsNav);
     this.renderStatus();
+
+    this.panel.scrollTop = scroll;
+    const newTalk = document.getElementById("talk-input");
+    if (newTalk instanceof HTMLInputElement) {
+      newTalk.value = this.talkDraft;
+      if (talkFocused) newTalk.focus();
+    }
   }
+
+  // - status bar, MARCH strip, event log -
 
   private renderStatus(): void {
     const s = this.sim;
-    const bits = [`T+${fmtClock(s.t_s)}`, s.busy ? s.pendingLabel : "Hands free"];
-    if (s.tq.applied && s.tq.loosened) bits.push("TQ: REASSESS");
-    if (s.packing.loosened) bits.push("Packing: REASSESS");
-    if (s.dressing.applied && s.dressing.loosened) bits.push("Dressing: REASSESS");
-    if (s.airway.soiled) bits.push("AIRWAY: SUCTION");
-    if (s.o2.tankPsi <= 200 && s.o2.device !== "none") bits.push("O2: TANK EMPTY");
-    this.status.textContent = bits.join(" - ");
-    const tail = s.log.slice(-3);
-    this.logBox.innerHTML = "";
-    for (const e of tail) {
-      const div = document.createElement("div");
-      div.textContent = `T+${fmtClock(e.t_s)} [${e.kind}] ${e.text}`;
-      this.logBox.appendChild(div);
+    this.renderMarch();
+
+    // Status line plus a progress bar for the procedure in hand.
+    this.status.innerHTML = "";
+    const line = document.createElement("div");
+    line.className = "status-line";
+    const bits = [`T+${fmtClock(s.t_s)}`, s.busy && s.pending ? s.pending.label : "Hands free"];
+    this.status.classList.toggle("busy", s.busy);
+    line.textContent = bits.join(" - ");
+    this.status.appendChild(line);
+    if (s.busy && s.pending) {
+      const bar = document.createElement("div");
+      bar.className = "progress";
+      const fill = document.createElement("div");
+      fill.className = "progress-fill";
+      const done = 1 - s.pending.remaining_s / Math.max(1, s.pending.total_s);
+      fill.style.width = `${Math.round(done * 100)}%`;
+      bar.appendChild(fill);
+      const left = document.createElement("span");
+      left.className = "progress-left";
+      left.textContent = `${s.pending.remaining_s}s`;
+      bar.appendChild(left);
+      this.status.appendChild(bar);
     }
+    const alerts: string[] = [];
+    if (s.tq.applied && s.tq.loosened) alerts.push("TQ: REASSESS");
+    if (s.packing.loosened) alerts.push("Packing: REASSESS");
+    if (s.dressing.applied && s.dressing.loosened) alerts.push("Dressing: REASSESS");
+    if (s.airway.soiled) alerts.push("AIRWAY: SUCTION");
+    if (s.o2.tankPsi <= 200 && s.o2.device !== "none") alerts.push("O2: TANK EMPTY");
+    if (s.fetches.length > 0) {
+      const back = Math.max(...s.fetches.map((f) => f.remaining_s));
+      alerts.push(`Partner at truck: ${s.fetches.length} item${s.fetches.length > 1 ? "s" : ""}, back in ${back}s`);
+    }
+    if (this.notice !== null && this.notice.until > Date.now()) alerts.push(this.notice.text);
+    for (const a of alerts) {
+      const div = document.createElement("div");
+      div.className = a.startsWith("Cannot") ? "status-alert status-error" : "status-alert";
+      div.textContent = a;
+      this.status.appendChild(div);
+    }
+
+    applyTerms(this.status);
+    this.renderLog();
+  }
+
+  /** MARCH checklist from what the player has DONE, never from hidden truth. */
+  private renderMarch(): void {
+    const s = this.sim;
+    const steps: [string, string, boolean][] = [
+      ["M", "Massive bleeding", s.tq.applied || s.packing.stage !== "none" || s.pressure.active || s.dressing.applied],
+      ["A", "Airway", this.talkClient.turns.length > 0 || s.airway.adjunct !== null || s.airway.ett !== null],
+      ["R", "Respirations", s.observed.rr !== undefined || s.observed.lungs !== undefined || s.o2.device !== "none"],
+      ["C", "Circulation", s.fluids.lines.length > 0 && (s.observed.hr !== undefined || s.observed.sbp !== undefined || s.level === 1)],
+      ["H", "Hypothermia", s.wrapped || !s.wetClothing]
+    ];
+    const next = steps.findIndex((st) => !st[2]);
+    this.march.innerHTML = "";
+    steps.forEach(([letter, name, done], i) => {
+      const chip = document.createElement("span");
+      chip.className = `march-step${done ? " done" : ""}${i === next ? " next" : ""}`;
+      chip.title = `${name}: ${done ? "addressed" : i === next ? "next priority" : "not yet"}`;
+      chip.textContent = letter;
+      this.march.appendChild(chip);
+    });
+    const label = document.createElement("span");
+    label.className = "march-label";
+    label.textContent = next === -1 ? "MARCH covered: reassess" : `Next: ${steps[next][1]}`;
+    this.march.appendChild(label);
+    applyTerms(this.march);
+  }
+
+  private logSig = "";
+
+  private renderLog(): void {
+    const s = this.sim;
+    // Rebuild only when something changed, so the buttons are clickable and
+    // the full list keeps its scroll between ticks.
+    if (this.logOpen) this.lastSeenLog = s.log.length;
+    // Open report: refresh only its numbers each tick, keep the buttons.
+    const openReport = this.logBox.querySelector(".report");
+    if (this.reportOpen && openReport !== null && this.logSig.startsWith("R|")) {
+      const fresh = this.buildReport();
+      openReport.replaceWith(fresh);
+      applyTerms(fresh);
+      return;
+    }
+    const sig = `${this.reportOpen ? "R" : "L"}|${s.log.length}|${this.logOpen}|${this.logFilter}|${this.lastSeenLog}|${this.termsStamp}`;
+    if (sig === this.logSig) return;
+    this.logSig = sig;
+    const list0 = this.logBox.querySelector(".log-list");
+    const keepScroll = list0 === null ? 0 : list0.scrollTop;
+    this.logBox.innerHTML = "";
+    const head = document.createElement("div");
+    head.className = "log-head";
+    const toggle = document.createElement("button");
+    toggle.type = "button";
+    toggle.className = "log-toggle";
+    const unseen = s.log.length - this.lastSeenLog;
+    toggle.textContent = this.logOpen ? "Hide full log" : `Full log (${s.log.length})${unseen > 0 && !this.logOpen ? ` +${unseen}` : ""}`;
+    toggle.addEventListener("click", () => {
+      this.logOpen = !this.logOpen;
+      this.renderStatus();
+    });
+    const rep = document.createElement("button");
+    rep.type = "button";
+    rep.className = `log-toggle${this.reportOpen ? " active" : ""}`;
+    rep.textContent = this.reportOpen ? "Hide run report" : "Run report";
+    rep.addEventListener("click", () => {
+      this.reportOpen = !this.reportOpen;
+      this.logSig = "";
+      this.renderStatus();
+    });
+    head.append(rep, toggle);
+    this.logBox.appendChild(head);
+    if (this.reportOpen) {
+      this.logBox.appendChild(this.buildReport());
+      applyTerms(this.logBox);
+      return;
+    }
+
+    if (!this.logOpen) {
+      for (const e of s.log.slice(-4)) this.logBox.appendChild(this.logRow(e));
+      applyTerms(this.logBox);
+      return;
+    }
+    this.lastSeenLog = s.log.length;
+    const filters = document.createElement("div");
+    filters.className = "log-filters";
+    for (const kind of LOG_KINDS) {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = `log-filter${this.logFilter === kind ? " active" : ""}`;
+      b.textContent = kind;
+      b.addEventListener("click", () => {
+        this.logFilter = kind;
+        this.renderStatus();
+      });
+      filters.appendChild(b);
+    }
+    this.logBox.appendChild(filters);
+    const list = document.createElement("div");
+    list.className = "log-list";
+    const rows = s.log.filter((e) => this.logFilter === "all" || e.kind === this.logFilter);
+    for (const e of [...rows].reverse()) list.appendChild(this.logRow(e));
+    this.logBox.appendChild(list);
+    list.scrollTop = keepScroll;
+    applyTerms(this.logBox);
+  }
+
+  /** Debrief numbers for a tester: times, loss at control, traps sprung. */
+  private buildReport(): HTMLElement {
+    const s = this.sim;
+    const first = (re: RegExp): number | null => s.log.find((e) => re.test(e.text))?.t_s ?? null;
+    const t = (v: number | null): string => (v === null ? "not yet" : `T+${fmtClock(v)}`);
+    const firstHands = first(/^Start: (Apply CAT|Pack the wound|Apply pressure dressing)|^Direct pressure|^Bystander lets go/);
+    const classes = s.log.filter((e) => e.kind === "class").map((e) => `${e.text.replace(/^Shock class /, "").replace(/ at .*$/, "")} at T+${fmtClock(e.t_s)}`);
+    const traps = s.log.filter((e) => e.kind === "trap" && e.t_s > 0);
+    const rows: [string, string][] = [
+      ["Clock", `T+${fmtClock(s.t_s)}`],
+      ["First hands on the bleed", t(firstHands)],
+      ["Bleeding controlled", this.controlledAt === null ? "NOT controlled" : `T+${fmtClock(this.controlledAt)}`],
+      ["Blood lost at control", this.controlledAt === null ? "-" : `${Math.round(this.lossAtControl)} mL`],
+      ["Blood lost now", `${Math.round(s.loss_mL)} mL`],
+      ["Rebleeds", String(this.rebleeds)],
+      ["Shock class changes", classes.length === 0 ? "none" : classes.join(", ")],
+      ["Line in", t(this.lineAt)],
+      ["Blood or fluid running", t(this.hungAt)],
+      ["Wrapped / dried", s.wrapped || !s.wetClothing ? "yes" : "no"],
+      ["Arrest", s.arrested ? "YES" : "no"]
+    ];
+    const box = document.createElement("div");
+    box.className = "report";
+    const dl = document.createElement("dl");
+    for (const [k, v] of rows) {
+      const dt = document.createElement("dt");
+      dt.textContent = k;
+      const dd = document.createElement("dd");
+      dd.textContent = v;
+      dl.append(dt, dd);
+    }
+    box.appendChild(dl);
+    const h = document.createElement("div");
+    h.className = "report-h";
+    h.textContent = traps.length === 0 ? "Traps sprung: none" : `Traps sprung: ${traps.length}`;
+    box.appendChild(h);
+    for (const e of traps) box.appendChild(this.logRow(e));
+    return box;
+  }
+
+  private logRow(e: { t_s: number; kind: string; text: string }): HTMLElement {
+    const div = document.createElement("div");
+    div.className = `log-row log-${e.kind}`;
+    const t = document.createElement("span");
+    t.className = "log-t";
+    t.textContent = `T+${fmtClock(e.t_s)}`;
+    const k = document.createElement("span");
+    k.className = "log-k";
+    k.textContent = e.kind;
+    const x = document.createElement("span");
+    x.textContent = e.text;
+    div.append(t, k, x);
+    return div;
   }
 
   // - shared widgets -
 
   private section(title: string): HTMLElement {
+    const key = `${this.tab}|${title}`;
+    this.sectionKey = title;
     const h = document.createElement("h3");
     h.className = "menu-h";
+    const isCollapsed = this.collapsed.has(key);
+    h.classList.toggle("collapsed", isCollapsed);
     h.textContent = title;
+    h.tabIndex = 0;
+    h.setAttribute("role", "button");
+    h.setAttribute("aria-expanded", String(!isCollapsed));
+    const flip = (): void => {
+      if (this.collapsed.has(key)) this.collapsed.delete(key);
+      else this.collapsed.add(key);
+      saveSet("fd.collapsed", this.collapsed);
+      this.render(true);
+    };
+    h.addEventListener("click", flip);
+    h.addEventListener("keydown", (ev) => {
+      if (ev.key === "Enter" || ev.key === " ") {
+        ev.preventDefault();
+        flip();
+      }
+    });
     this.body.appendChild(h);
+    const box = document.createElement("div");
+    box.className = "menu-section";
+    box.hidden = isCollapsed;
+    this.body.appendChild(box);
+    this.target = box;
+    const tip = this.tipsOn ? tipFor(this.tab, title) : undefined;
+    if (tip !== undefined) {
+      const p = document.createElement("p");
+      p.className = "menu-tip";
+      p.textContent = tip;
+      box.appendChild(p);
+    }
     return h;
   }
 
@@ -171,10 +533,19 @@ export class MedicalMenu {
     const p = document.createElement("p");
     p.className = "menu-note";
     p.textContent = text;
-    this.body.appendChild(p);
+    this.target.appendChild(p);
   }
 
   private findingList(items: string[]): void {
+    // Inside an action: remember the findings so they survive the re-render.
+    if (this.capturing !== null) {
+      this.findings.set(this.capturing, items);
+      return;
+    }
+    this.target.appendChild(this.buildFindings(items));
+  }
+
+  private buildFindings(items: string[]): HTMLElement {
     const ul = document.createElement("ul");
     ul.className = "menu-findings";
     for (const item of items) {
@@ -182,12 +553,13 @@ export class MedicalMenu {
       li.textContent = item;
       ul.appendChild(li);
     }
-    this.body.appendChild(ul);
+    return ul;
   }
 
   private selects(specs: SelectSpec[]): Map<string, HTMLSelectElement> {
     const map = new Map<string, HTMLSelectElement>();
     for (const spec of specs) {
+      const key = `${this.tab}|${this.sectionKey}|${spec.id}`;
       const wrap = document.createElement("label");
       wrap.className = "menu-opt";
       const caption = document.createElement("span");
@@ -197,18 +569,20 @@ export class MedicalMenu {
         const opt = document.createElement("option");
         opt.value = o.value;
         opt.textContent = o.label;
-        if (spec.current !== undefined && o.value === spec.current) opt.selected = true;
         select.appendChild(opt);
       }
-      if (spec.onPick !== undefined) {
-        const pick = spec.onPick;
-        select.addEventListener("change", () => {
-          pick(select.value);
+      const remembered = this.selState.get(key);
+      const wanted = spec.current ?? remembered ?? spec.default;
+      if (wanted !== undefined && spec.options.some((o) => o.value === wanted)) select.value = wanted;
+      select.addEventListener("change", () => {
+        this.selState.set(key, select.value);
+        if (spec.onPick !== undefined) {
+          spec.onPick(select.value);
           this.render(true);
-        });
-      }
+        }
+      });
       wrap.append(caption, select);
-      this.body.appendChild(wrap);
+      this.target.appendChild(wrap);
       map.set(spec.id, select);
     }
     return map;
@@ -224,26 +598,42 @@ export class MedicalMenu {
     input.type = "number";
     input.min = "0";
     input.step = step;
-    input.value = value;
+    const key = `${this.tab}|${this.sectionKey}|${id}`;
+    input.value = this.selState.get(key) ?? value;
+    input.addEventListener("input", () => this.selState.set(key, input.value));
     input.className = "menu-num";
     wrap.append(caption, input);
-    this.body.appendChild(wrap);
+    this.target.appendChild(wrap);
     return input;
   }
 
   private action(label: string, run: () => { ok: boolean; reason?: string }): void {
+    const key = `${this.tab}|${this.region ?? "none"}|${this.sectionKey}|${stableLabel(label)}`;
     const button = document.createElement("button");
     button.type = "button";
     button.className = "menu-btn";
     button.textContent = label;
     button.addEventListener("click", () => {
-      const res = run();
+      this.capturing = key;
+      let res: { ok: boolean; reason?: string };
+      try {
+        res = run();
+      } finally {
+        this.capturing = null;
+      }
       if (!res.ok && res.reason) {
         this.sim.addLog("info", `Cannot: ${label} - ${res.reason}`);
+        this.notice = { text: `Cannot: ${res.reason}`, until: Date.now() + 4000 };
       }
       this.render(true);
     });
-    this.body.appendChild(button);
+    this.target.appendChild(button);
+    const found = this.findings.get(key);
+    if (found !== undefined) {
+      const list = this.buildFindings(found);
+      list.classList.add("menu-findings-result");
+      this.target.appendChild(list);
+    }
   }
 
   // - Examine -
@@ -518,7 +908,16 @@ export class MedicalMenu {
   private renderCirculation(): void {
     const s = this.sim;
     this.section("Hemorrhage status");
-    const tqText = !s.tq.applied
+    const tq2 = s.tq.secondApplied
+      ? s.tq.secondPlacement === "proximal"
+        ? " Second TQ proximal: clamped."
+        : s.tq.secondPlacement === "overlapping"
+          ? " Second TQ overlapping: neither locks."
+          : s.tq.secondPlacement === "loose"
+            ? " Second TQ too loose: no effect."
+            : " Second TQ below/over the wound: no effect."
+      : "";
+    const firstText = !s.tq.applied
       ? "Tourniquet: none on"
       : s.tq.placement === "venous_loose"
         ? "Tourniquet: VENOUS (too loose), bleed worse"
@@ -527,6 +926,9 @@ export class MedicalMenu {
           : s.tq.residualFlow_0_to_1 > 0 && !s.tq.secondApplied
             ? `Tourniquet: occluded, ${Math.round(s.tq.residualFlow_0_to_1 * 100)}% residual (2nd TQ?)`
             : "Tourniquet: occluded";
+    const tqText = s.tq.secondApplied && s.tq.secondPlacement === "proximal" && s.tq.placement !== "high_thigh"
+      ? `${firstText.replace(", bleed worse", "").replace(", ineffective", "")} (first),${tq2}`
+      : `${firstText}${tq2}`;
     this.note(
       `${tqText}${s.tq.applied && s.tq.loosened ? " - LOOSENED, reassess" : ""}. ` +
         `Packing: ${s.packing.stage}${s.packing.loosened ? " - LOOSENED" : ""}. ` +
@@ -540,7 +942,8 @@ export class MedicalMenu {
       { id: "strap", label: "Strap pull", options: [{ value: "tight", label: "Pulled tight" }, { value: "slack", label: "Left slack" }] },
       { id: "place", label: "Placement", options: [{ value: "high_thigh", label: "High thigh, groin crease" }, { value: "knee", label: "Over the knee" }] },
       {
-        id: "turns", label: "Half-turns", options: ["1", "2", "3", "4", "5"].map((n) => ({ value: n, label: `${n} half-turns` }))
+        id: "turns", label: "Half-turns", default: "3",
+        options: ["1", "2", "3", "4", "5"].map((n) => ({ value: n, label: `${n} half-turns` }))
       },
       { id: "time", label: "Write time", options: [{ value: "yes", label: "Write the time" }, { value: "no", label: "Skip it" }] }
     ]);
@@ -563,11 +966,16 @@ export class MedicalMenu {
           { value: "overlapping", label: "Overlapping windlasses" }
         ]
       },
+      {
+        id: "turns2", label: "Half-turns", default: "3",
+        options: ["1", "2", "3", "4", "5"].map((n) => ({ value: n, label: `${n} half-turns` }))
+      },
       { id: "loosen", label: "First TQ", options: [{ value: "keep", label: "Leave tight" }, { value: "loosen", label: "Loosen it to place" }] }
     ]);
     this.action(`Apply second CAT (30s, have ${s.atPatient("cat_tourniquet")})`, () =>
       s.applySecondTQ({
         placement: (tq2Sel.get("place2")?.value ?? "proximal") as "proximal" | "distal" | "over_wound" | "overlapping",
+        halfTurns: Number(tq2Sel.get("turns2")?.value ?? "3"),
         loosenedFirst: tq2Sel.get("loosen")?.value === "loosen"
       })
     );
@@ -1018,7 +1426,7 @@ export class MedicalMenu {
       typing.textContent = "Josh: ...";
       box.appendChild(typing);
     }
-    this.body.appendChild(box);
+    this.target.appendChild(box);
 
     const row = document.createElement("div");
     row.className = "talk-row";
@@ -1050,7 +1458,7 @@ export class MedicalMenu {
       event.stopPropagation();
     });
     row.append(input, send);
-    this.body.appendChild(row);
+    this.target.appendChild(row);
     this.note("Counting his breaths right after talking reads +4: he knows you are watching.");
   }
 }

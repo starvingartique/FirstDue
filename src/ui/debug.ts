@@ -3,6 +3,7 @@
 // shows true state for development and demo purposes.
 
 import type { Sim } from "../sim/engine";
+import { applyTerms } from "./terms";
 
 function fmtClock(t_s: number): string {
   const m = Math.floor(t_s / 60);
@@ -24,6 +25,11 @@ export class DebugOverlay {
     this.overlay = overlay;
     this.vitals = vitals;
     this.render();
+  }
+
+  /** Re-draw now (terminology mode changed). */
+  refresh(): void {
+    if (!this.overlay.hidden) this.render();
   }
 
   toggle(): void {
@@ -88,5 +94,6 @@ export class DebugOverlay {
       dd.textContent = value;
       this.vitals.append(dt, dd);
     }
+    applyTerms(this.vitals);
   }
 }

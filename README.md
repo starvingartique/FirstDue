@@ -14,6 +14,40 @@ and the talking patient (Josh) through the server proxy. F1 stays debug-only.
 No Dispatch Engine, no FTO debrief, no destination/radio report, no
 infection/sepsis, no second patient, no art pass, no driving.
 
+## Oct 30 UI + QoL pass (branch claude/ui-qol-terms)
+
+Presentation and bug fixes only. No clinical value changed.
+
+- Wording toggle (top bar, or T): Medical keeps clinical terms with a hover
+  tooltip giving the plain meaning; Plain rewrites them into everyday words.
+  Glossary lives in `src/ui/terms.ts`. Remembered between sessions.
+- Coach tips (Tips button, or H): one short "why" line under each section,
+  in `src/ui/tips.ts`. Never says which option is right in this call.
+- MARCH strip under the region title: tracks what the player has DONE
+  (never hidden truth) and highlights the next priority.
+- Sim speed: Pause / 1x / 2x in the top bar, P toggles pause.
+- Tab hotkeys: E A B C M L N, V talk. Hotkeys no longer fire while typing
+  (typing "1" in the drug amount used to switch the camera).
+- Panel: fixed header (region, MARCH, tabs) and footer (status, progress
+  bar, log); collapsible sections (remembered); body regions folded away.
+- Full event log with filters, plus a Run report (time to first hands on,
+  time bleeding controlled, loss at control, rebleeds, class changes, line
+  and fluid times, traps the player sprang).
+- Fixes: dropdown picks reset on every state change (now kept); Examine
+  findings vanished the instant they appeared (now stay under their
+  button); panel jumped to the top each change (scroll kept); talk draft
+  wiped mid-typing (kept); hemorrhage status still said "VENOUS, bleed
+  worse" after a second TQ fixed it.
+- Defaults: CAT half-turns now defaults to 3 (protocol). Under 3 is still
+  a pickable trap, but no longer the silent default.
+- Engine: second CAT takes half-turns (under 3 does not clamp, same rule as
+  the first). Partner truck runs are one trip: items added while the
+  partner is still outbound ride along, later ones queue after the run.
+
+Still open for Wyatt (TUNE, not changed here): untreated Josh reaches Class
+IV around 2 min from contact in play, faster than the 4 min target, because
+he starts at 1,100 mL lost and bleeds ~490 mL/min with the shirt held.
+
 ## Prereqs
 
 - Node.js 20 or newer (`node --version` to check)
