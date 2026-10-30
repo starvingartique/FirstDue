@@ -9,7 +9,8 @@ import "./flow.css";
 import { buildWorld } from "./engine/scene";
 import { SPOT_IDS, SpotCamera, type SpotId } from "./engine/camera";
 import { bindInput } from "./engine/input";
-import { pickRegion } from "./engine/raycast";
+import { pickKitItem, pickRegion } from "./engine/raycast";
+import { ProcedureHands } from "./engine/hands";
 import { startLoop } from "./engine/loop";
 import { buildPatient } from "./patient/body";
 import { RegionHighlight } from "./patient/highlight";
@@ -17,6 +18,7 @@ import type { RegionId } from "./patient/regions";
 import { Hud } from "./ui/hud";
 import { DebugOverlay } from "./ui/debug";
 import { MedicalMenu, TAB_HOTKEYS } from "./ui/medicalMenu";
+import { KIT_LINKS, KitLabels } from "./ui/kitLabels";
 import { getTermMode, setTermMode, type TermMode } from "./ui/terms";
 import { RunFlow, evaluateHandoff, type HandoffCheck } from "./ui/flow";
 import type { Sim } from "./sim/engine";
@@ -62,6 +64,25 @@ function main(): void {
   let speed = 1;
   let lastRunSpeed = 1;
 
+  // Kit labels and preview. Item taps open existing menu tabs only.
+  const kitRoot = scene.getObjectByName("kit");
+  if (kitRoot === undefined || kitRoot === null) throw new Error("missing kit group in scene");
+  const kitLabels = new KitLabels({
+    onSelect: (id) => {
+      const link = KIT_LINKS[id];
+      if (link !== null) menu?.setTab(link.tab);
+    },
+    onOpenAction: (id) => {
+      const link = KIT_LINKS[id];
+      if (link !== null) menu?.openKitAction(link.tab, link.section);
+    }
+  });
+
+  // First-person hands: visible only while a procedure runs, holding that
+  // procedure's kit item. Own scene group, never raycast.
+  const hands = new ProcedureHands(kitRoot);
+  scene.add(hands.group);
+
   const hud = new Hud({
     onSelectRegion: (region: RegionId) => {
       highlight.setSelected(region);
@@ -71,6 +92,7 @@ function main(): void {
     onSelectSpot: (spot: SpotId) => {
       spotCamera.applySpot(spot);
       hud.showSpot(spot);
+      kitLabels.setSpot(spot);
     },
     onSpeed: (next: number) => setSpeed(next),
     onTerms: (mode: TermMode) => setTerms(mode),
@@ -91,6 +113,7 @@ function main(): void {
     menu?.retranslate();
     debug?.refresh();
     flow.retranslate();
+    kitLabels.retranslate();
   };
   hud.showSpeed(speed);
   hud.showTerms(getTermMode());
@@ -168,6 +191,14 @@ function main(): void {
     onLook: (dx, dy) => spotCamera.addLook(dx, dy),
     onTap: (x, y) => {
       const hit = pickRegion(spotCamera.camera, patient.group, x, y);
+      if (hit === null) {
+        // No body region: a staged kit item may have been tapped.
+        const kitHit = pickKitItem(spotCamera.camera, kitRoot, x, y);
+        if (kitHit !== null) {
+          kitLabels.select(kitHit);
+          return;
+        }
+      }
       // Tapping empty ground clears the selection.
       highlight.setSelected(hit);
       hud.showRegion(highlight.getSelected());
@@ -178,6 +209,7 @@ function main(): void {
       const spot: SpotId = SPOT_IDS[index];
       spotCamera.applySpot(spot);
       hud.showSpot(spot);
+      kitLabels.setSpot(spot);
     },
     onDebugKey: () => debug?.toggle(),
     onTalkKey: () => menu?.openTalk(),
@@ -199,6 +231,8 @@ function main(): void {
     spotCamera.onResize();
   });
   renderer.setAnimationLoop(() => {
+    kitLabels.update(spotCamera.camera);
+    hands.update(spotCamera.camera, sim?.pending ?? null);
     renderer.render(scene, spotCamera.camera);
   });
 
@@ -226,6 +260,10 @@ function main(): void {
         sim: s,
         onResize: () => spotCamera.onResize(),
         speed: () => (flow.tickingSuspended ? 0 : speed),
+        onFrame: () => {
+          kitLabels.update(spotCamera.camera);
+          hands.update(spotCamera.camera, s.pending);
+        },
         onTick: () => {
           hud.showClock(s.t_s);
           m.refresh();

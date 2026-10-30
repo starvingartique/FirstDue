@@ -19,6 +19,8 @@ export interface LoopRefs {
   onTick: () => void;
   /** Sim speed: 0 = paused, 1 = real time, 2 = double. Rendering never stops. */
   speed?: () => number;
+  /** Per-frame UI hook (kit label projection). Runs even while paused. */
+  onFrame?: () => void;
 }
 
 export function startLoop(refs: LoopRefs): void {
@@ -62,6 +64,7 @@ export function startLoop(refs: LoopRefs): void {
       const pulse = rate > 30 && hr > 10 ? 1 + 0.12 * Math.max(0, Math.sin((t * hr) / 60 * Math.PI * 2)) : 1;
       refs.patient.wound.scale.set(pulse, 1, pulse);
     }
+    refs.onFrame?.();
     refs.renderer.render(refs.scene, refs.camera);
   });
 }

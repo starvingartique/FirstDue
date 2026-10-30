@@ -134,6 +134,8 @@ export class MedicalMenu {
   private lastSeenLog = 0;
   private talkDraft = "";
   private notice: { text: string; until: number } | null = null;
+  // Kit side pass: section jumped to from a kit preview, static highlight.
+  private kitFocus: string | null = null;
   // Oct 30 run context for the report rows. Set by the phase flow.
   private runLevel = "not chosen";
   private runDestination = "not chosen";
@@ -171,6 +173,20 @@ export class MedicalMenu {
     this.tab = tab;
     this.render(true);
     this.panel.scrollTop = 0;
+  }
+
+  /**
+   * Kit side pass: open a tab and jump to one of its existing sections.
+   * Instant scroll, static highlight, no animation. Never runs a procedure.
+   */
+  openKitAction(tab: Tab, section: string | null): void {
+    this.kitFocus = section === null ? null : `${tab}|${section}`;
+    this.setTab(tab);
+    if (section === null) return;
+    const head = [...this.body.querySelectorAll<HTMLHeadingElement>(".menu-h")].find(
+      (h) => h.dataset["kitSection"] === section
+    );
+    head?.scrollIntoView({ block: "start" });
   }
 
   /** V key: open Talk and focus the line to Josh. */
@@ -515,6 +531,8 @@ export class MedicalMenu {
     this.sectionKey = title;
     const h = document.createElement("h3");
     h.className = "menu-h";
+    h.dataset["kitSection"] = title;
+    if (this.kitFocus === key) h.classList.add("kit-focus");
     const isCollapsed = this.collapsed.has(key);
     h.classList.toggle("collapsed", isCollapsed);
     h.textContent = title;
