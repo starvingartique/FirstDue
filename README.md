@@ -66,6 +66,14 @@ drug data, physiology or intervention rules changed.
 - Hint feed (top right) for traps, bleeding, class changes, fetches and
   movement.
 - Kit spot labels show at-patient counts and an IN USE tag.
+- Body view (R, or tap any body part): every action for that body part,
+  grouped by category with sub-sections (leg: Examine + Circulation; arm:
+  Examine, Lines, Meds, Monitor; head/face: Examine, Airway, Breathing,
+  Monitor; chest: Examine, Breathing, Monitor). "Full tab" opens the whole
+  category. Procedures not modeled yet show as SOON rows and do nothing:
+  chest - needle decompression, vented chest seal, finger thoracostomy;
+  pelvis - pelvic binder. They need engine rules and medic sign-off first.
+- Diagram mirrored: the patient's left is on the viewer's left.
 - Fonts: Barlow / Barlow Condensed from Google Fonts, loaded non-blocking
   with system fallbacks.
 

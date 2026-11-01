@@ -24,9 +24,10 @@ import { tipFor } from "./tips";
 import { ICONS, iconForAction, type IconName } from "./icons";
 import { BodyMap } from "./bodyMap";
 
-export type Tab = "examine" | "airway" | "breathing" | "circulation" | "meds" | "lines" | "monitor" | "talk";
+export type Tab = "region" | "examine" | "airway" | "breathing" | "circulation" | "meds" | "lines" | "monitor" | "talk";
 
 const TAB_LABELS: Record<Tab, string> = {
+  region: "Body part",
   examine: "Examine",
   airway: "Airway",
   breathing: "Breathing",
@@ -39,6 +40,7 @@ const TAB_LABELS: Record<Tab, string> = {
 
 /** Short rail captions so every label fits the icon rail. */
 const RAIL_LABELS: Record<Tab, string> = {
+  region: "Body",
   examine: "Exam",
   airway: "Airway",
   breathing: "Breath",
@@ -51,6 +53,7 @@ const RAIL_LABELS: Record<Tab, string> = {
 
 /** Single-key jumps to each tab (shown on the tab buttons). */
 export const TAB_HOTKEYS: Record<string, Tab> = {
+  r: "region",
   e: "examine",
   a: "airway",
   b: "breathing",
@@ -58,6 +61,94 @@ export const TAB_HOTKEYS: Record<string, Tab> = {
   m: "meds",
   l: "lines",
   n: "monitor"
+};
+
+// - Body view: everything you can do on one body part, ACE style -
+
+/** One sub-section pulled from a category tab, optionally narrowed to some rows. */
+interface PlanSection {
+  /** Section title prefix, as the tab renders it. */
+  title: string;
+  /** Keep only action rows whose label matches. */
+  actions?: RegExp;
+  /** Keep only dropdowns whose caption matches. */
+  selects?: RegExp;
+}
+
+interface PlanCategory {
+  tab: Exclude<Tab, "region">;
+  sections: PlanSection[];
+  /** Procedures that belong here but are not modeled in this build yet. */
+  planned?: string[];
+}
+
+const EXAM: PlanCategory = { tab: "examine", sections: [{ title: "Examine:" }] };
+const HEAD_AIRWAY: PlanCategory = {
+  tab: "airway",
+  sections: [{ title: "Airway status" }, { title: "OPA / NPA" }, { title: "Supraglottic" }, { title: "Intubation" }, { title: "Suction" }]
+};
+const FACE_BREATHING: PlanCategory = { tab: "breathing", sections: [{ title: "Oxygen" }, { title: "BVM" }] };
+const HEAD_MONITOR: PlanCategory = {
+  tab: "monitor",
+  sections: [
+    { title: "Live monitor", actions: /etco2/i },
+    { title: "Manual vitals", actions: /pupils|gcs|temperature/i, selects: /method/i }
+  ]
+};
+const ARM: PlanCategory[] = [
+  EXAM,
+  { tab: "lines", sections: [{ title: "Lines" }, { title: "Start IV" }, { title: "Start IO" }, { title: "Fluids" }] },
+  { tab: "meds", sections: [{ title: "Drug box" }, { title: "On board" }] },
+  {
+    tab: "monitor",
+    sections: [
+      { title: "Live monitor", actions: /spo2|nibp/i },
+      { title: "Manual vitals", actions: /^(pulse|bp |cap refill|glucose)/i, selects: /cuff|deflate/i }
+    ]
+  }
+];
+const CHEST: PlanCategory[] = [
+  EXAM,
+  { ...FACE_BREATHING, planned: ["Needle decompression", "Vented chest seal", "Finger thoracostomy"] },
+  { tab: "monitor", sections: [{ title: "Manual vitals", actions: /^(rr|lung)/i }] }
+];
+
+/** What each body part offers, by category. */
+const REGION_PLAN: Record<RegionId, PlanCategory[]> = {
+  head: [EXAM, HEAD_AIRWAY, FACE_BREATHING, HEAD_MONITOR],
+  face: [EXAM, HEAD_AIRWAY, FACE_BREATHING, HEAD_MONITOR],
+  neck: [
+    EXAM,
+    { tab: "airway", sections: [{ title: "Airway status" }, { title: "Intubation" }, { title: "Suction" }] },
+    { tab: "monitor", sections: [{ title: "Manual vitals", actions: /^pulse/i }] }
+  ],
+  chest_left: CHEST,
+  chest_right: CHEST,
+  abd_ruq: [EXAM],
+  abd_luq: [EXAM],
+  abd_rlq: [EXAM],
+  abd_llq: [EXAM],
+  pelvis: [EXAM, { tab: "circulation", sections: [], planned: ["Pelvic binder"] }],
+  arm_left: ARM,
+  arm_right: ARM,
+  leg_left: [
+    EXAM,
+    {
+      tab: "circulation",
+      sections: [
+        { title: "Hemorrhage status" },
+        { title: "Tourniquet (CAT)" },
+        { title: "Second tourniquet" },
+        { title: "Packing" },
+        { title: "Direct pressure" },
+        { title: "Pressure dressing" },
+        { title: "Trap + reassessment" },
+        { title: "Kit" }
+      ]
+    }
+  ],
+  leg_right: [EXAM, { tab: "lines", sections: [{ title: "Lines" }, { title: "Start IO" }, { title: "Fluids" }] }],
+  back: [EXAM]
 };
 
 const LOG_KINDS = ["all", "action", "bleed", "trap", "class", "fetch", "vitals", "movement", "reassess", "info"] as const;
@@ -167,6 +258,12 @@ export class MedicalMenu {
   private collapsedPanel = false;
   private progressBox = el("acm-progress");
   private toastBox = el("acm-toasts");
+  /** Tab whose widgets are being drawn (differs from tab in the Body view). */
+  private ctxTab: Tab = "examine";
+  /** Body view filter: which sections of ctxTab to keep. */
+  private planFilter: PlanCategory | null = null;
+  private curPlanSection: PlanSection | null = null;
+  private readonly sink = document.createElement("div");
   /** Wired by main: body-map clicks select the region everywhere. */
   onPickRegion: ((region: RegionId) => void) | null = null;
 
@@ -221,7 +318,7 @@ export class MedicalMenu {
 
   setRegion(region: RegionId | null): void {
     this.region = region;
-    if (region !== null && this.tab !== "examine") this.tab = "examine";
+    if (region !== null) this.tab = "region";
     this.render(true);
   }
 
@@ -355,14 +452,9 @@ export class MedicalMenu {
     this.body.innerHTML = "";
     this.target = this.body;
     this.sectionKey = "";
-    if (this.tab === "examine") this.renderExamine();
-    else if (this.tab === "airway") this.renderAirway();
-    else if (this.tab === "breathing") this.renderBreathing();
-    else if (this.tab === "circulation") this.renderCirculation();
-    else if (this.tab === "meds") this.renderMeds();
-    else if (this.tab === "lines") this.renderLines();
-    else if (this.tab === "monitor") this.renderMonitor();
-    else this.renderTalk();
+    this.ctxTab = this.tab;
+    if (this.tab === "region") this.renderRegion();
+    else this.renderTab(this.tab);
     applyTerms(this.body);
     applyTerms(this.tabsNav);
     this.renderStatus();
@@ -480,6 +572,7 @@ export class MedicalMenu {
     const bleeding = s.bleedRate_mL_per_min() > 30;
     const anyControl = s.tq.applied || s.packing.stage !== "none" || s.pressure.active || s.dressing.applied;
     const state: Record<Tab, { cls: string; n?: number } | null> = {
+      region: this.region === null ? null : this.region === "leg_left" && bleeding ? { cls: "bad" } : { cls: "run" },
       examine: s.beltTrap && s.exposed ? { cls: "warn" } : null,
       airway: s.airway.soiled || s.airway.aspirated ? { cls: "bad" } : s.airway.adjunct !== null || s.airway.ett !== null ? { cls: "on" } : null,
       breathing: s.o2.device !== "none" ? { cls: s.o2.tankPsi <= 200 ? "bad" : "on" } : null,
@@ -685,9 +778,18 @@ export class MedicalMenu {
   // - shared widgets -
 
   private section(title: string): HTMLElement {
-    const key = `${this.tab}|${title}`;
+    const key = `${this.ctxTab}|${title}`;
     this.sectionKey = title;
     const h = document.createElement("h3");
+    if (this.planFilter !== null) {
+      const keep = this.planFilter.sections.find((ps) => title.startsWith(ps.title)) ?? null;
+      this.curPlanSection = keep;
+      if (keep === null) {
+        // Not for this body part: draw into the sink, which is thrown away.
+        this.target = this.sink;
+        return h;
+      }
+    }
     h.className = "menu-h";
     h.dataset["kitSection"] = title;
     if (this.kitFocus === key) h.classList.add("kit-focus");
@@ -716,7 +818,7 @@ export class MedicalMenu {
     box.hidden = isCollapsed;
     this.body.appendChild(box);
     this.target = box;
-    const tip = this.tipsOn ? tipFor(this.tab, title) : undefined;
+    const tip = this.tipsOn ? tipFor(this.ctxTab, title) : undefined;
     if (tip !== undefined) {
       const p = document.createElement("p");
       p.className = "menu-tip";
@@ -756,7 +858,8 @@ export class MedicalMenu {
   private selects(specs: SelectSpec[]): Map<string, HTMLSelectElement> {
     const map = new Map<string, HTMLSelectElement>();
     for (const spec of specs) {
-      const key = `${this.tab}|${this.sectionKey}|${spec.id}`;
+      const key = `${this.ctxTab}|${this.sectionKey}|${spec.id}`;
+      const keepSelect = this.curPlanSection?.selects === undefined || this.curPlanSection.selects.test(spec.label);
       const wrap = document.createElement("label");
       wrap.className = "menu-opt";
       const caption = document.createElement("span");
@@ -779,7 +882,7 @@ export class MedicalMenu {
         }
       });
       wrap.append(caption, select);
-      this.target.appendChild(wrap);
+      (keepSelect ? this.target : this.sink).appendChild(wrap);
       map.set(spec.id, select);
     }
     return map;
@@ -795,7 +898,7 @@ export class MedicalMenu {
     input.type = "number";
     input.min = "0";
     input.step = step;
-    const key = `${this.tab}|${this.sectionKey}|${id}`;
+    const key = `${this.ctxTab}|${this.sectionKey}|${id}`;
     input.value = this.selState.get(key) ?? value;
     input.addEventListener("input", () => this.selState.set(key, input.value));
     input.className = "menu-num";
@@ -806,7 +909,10 @@ export class MedicalMenu {
 
   private action(label: string, run: () => { ok: boolean; reason?: string }): void {
     const stable = stableLabel(label);
-    const key = `${this.tab}|${this.region ?? "none"}|${this.sectionKey}|${stable}`;
+    const key = `${this.ctxTab}|${this.region ?? "none"}|${this.sectionKey}|${stable}`;
+    // Body view: drop rows this body part does not offer.
+    const only = this.curPlanSection?.actions;
+    if (only !== undefined && this.target !== this.sink && !only.test(label)) return;
     const button = document.createElement("button");
     button.type = "button";
     button.className = "menu-btn";
@@ -874,7 +980,9 @@ export class MedicalMenu {
         this.notice = { text: `Cannot: ${res.reason}`, until: Date.now() + 4000 };
         button.classList.add("shake");
       } else if (res.ok) {
-        if (this.tab === "examine" && this.region !== null) this.examined.add(this.region);
+        if ((this.ctxTab === "examine" || this.tab === "region") && this.region !== null && this.sectionKey.startsWith("Examine")) {
+          this.examined.add(this.region);
+        }
         const now = this.sim.pending;
         if (now !== null && now !== wasPending) this.pendingOwner = { key, id: now.id };
         else this.doneAt.set(key, this.sim.t_s);
@@ -949,6 +1057,101 @@ export class MedicalMenu {
     }
   }
 
+
+  private renderTab(tab: Exclude<Tab, "region">): void {
+    if (tab === "examine") this.renderExamine();
+    else if (tab === "airway") this.renderAirway();
+    else if (tab === "breathing") this.renderBreathing();
+    else if (tab === "circulation") this.renderCirculation();
+    else if (tab === "meds") this.renderMeds();
+    else if (tab === "lines") this.renderLines();
+    else if (tab === "monitor") this.renderMonitor();
+    else this.renderTalk();
+  }
+
+  // - Body view (pick a body part, see everything for it) -
+
+  private renderRegion(): void {
+    const region = this.region;
+    if (region === null) {
+      const p = document.createElement("p");
+      p.className = "region-empty";
+      p.textContent = "Tap a body part on the patient or the diagram. Everything you can do there shows up here, sorted by category.";
+      this.body.appendChild(p);
+      return;
+    }
+    for (const cat of REGION_PLAN[region]) {
+      const head = this.categoryHeader(cat.tab);
+      const before = this.body.children.length;
+      this.ctxTab = cat.tab;
+      this.planFilter = cat;
+      this.curPlanSection = null;
+      this.target = this.sink;
+      try {
+        this.renderTab(cat.tab);
+      } finally {
+        this.planFilter = null;
+        this.curPlanSection = null;
+      }
+      if (cat.planned !== undefined && cat.planned.length > 0) {
+        const box = document.createElement("div");
+        box.className = "menu-section planned";
+        for (const name of cat.planned) box.appendChild(this.plannedRow(name));
+        this.body.appendChild(box);
+      }
+      // Nothing to show in this category for this body part right now.
+      if (this.body.children.length === before) head.remove();
+      this.sink.innerHTML = "";
+    }
+    this.ctxTab = "region";
+    this.target = this.body;
+  }
+
+  private categoryHeader(tab: Exclude<Tab, "region">): HTMLElement {
+    const h = document.createElement("div");
+    h.className = "region-cat";
+    const ic = document.createElement("span");
+    ic.className = "region-cat-ic";
+    ic.innerHTML = ICONS[tab as IconName];
+    const name = document.createElement("span");
+    name.className = "region-cat-name";
+    name.textContent = TAB_LABELS[tab];
+    const open = document.createElement("button");
+    open.type = "button";
+    open.className = "region-cat-open";
+    open.textContent = "Full tab";
+    open.title = `Open the whole ${TAB_LABELS[tab]} tab`;
+    open.addEventListener("click", () => this.setTab(tab));
+    h.append(ic, name, open);
+    this.body.appendChild(h);
+    return h;
+  }
+
+  /** A procedure that belongs on this body part but is not modeled yet. */
+  private plannedRow(name: string): HTMLElement {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "menu-btn is-soon";
+    const ic = document.createElement("span");
+    ic.className = "act-ic";
+    ic.innerHTML = ICONS[iconForAction(name)];
+    const n = document.createElement("span");
+    n.className = "act-name";
+    n.textContent = name;
+    const chips = document.createElement("span");
+    chips.className = "act-chips";
+    const badge = document.createElement("span");
+    badge.className = "act-badge soon";
+    badge.textContent = "SOON";
+    b.append(ic, n, chips, badge);
+    b.addEventListener("click", () => {
+      this.notice = { text: `${name}: not in this build yet`, until: Date.now() + 3000 };
+      b.classList.add("shake");
+      window.setTimeout(() => b.classList.remove("shake"), 350);
+      this.renderStatus();
+    });
+    return b;
+  }
 
   // - Examine -
 

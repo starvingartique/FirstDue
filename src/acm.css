@@ -1179,3 +1179,89 @@ body {
 .kit-label.in-use {
   border-color: var(--ok);
 }
+
+/* - Body view: categories for the picked body part - */
+
+.region-empty {
+  margin: 18px 4px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--dim);
+}
+
+.region-cat {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 14px -10px 2px;
+  padding: 7px 10px;
+  background: rgba(255, 255, 255, 0.06);
+  border-top: 1px solid var(--acm-line);
+  border-bottom: 1px solid var(--acm-line);
+}
+
+.region-cat:first-child {
+  margin-top: 0;
+  border-top: none;
+}
+
+.region-cat-ic {
+  display: grid;
+  place-items: center;
+  color: var(--accent);
+}
+
+.region-cat-name {
+  flex: 1;
+  font: 700 15px var(--cond);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.region-cat-open {
+  appearance: none;
+  border: 1px solid var(--acm-line);
+  background: transparent;
+  color: var(--dim);
+  font: 600 11px var(--cond);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 3px 7px;
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+.region-cat-open:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+/* Sub-sections inside a category sit one step in. */
+.region-cat ~ .menu-h {
+  margin-left: -4px;
+  font-size: 12px;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.05), transparent 70%);
+  border-left-color: rgba(232, 163, 61, 0.55);
+}
+
+.menu-section.planned {
+  margin-top: 6px;
+}
+
+.acm .menu-btn.is-soon {
+  opacity: 0.55;
+  border-style: dashed;
+  border-left-style: solid;
+  border-left-color: rgba(255, 255, 255, 0.15);
+}
+
+.acm .menu-btn.is-soon:hover {
+  opacity: 0.8;
+}
+
+.act-badge.soon {
+  padding: 3px 6px;
+  border-radius: 2px;
+  color: var(--dim);
+  border: 1px dashed var(--acm-line);
+}

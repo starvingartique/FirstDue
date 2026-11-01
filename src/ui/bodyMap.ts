@@ -14,7 +14,9 @@ import { ICONS, type IconName } from "./icons";
 
 const NS = "http://www.w3.org/2000/svg";
 
-// Front view: the patient's LEFT is on the viewer's RIGHT.
+// Shapes are authored as a front view (patient's left on the viewer's right),
+// then the whole figure is mirrored so the patient's LEFT sits on the
+// viewer's LEFT, the way the player reads it. Text is counter-flipped.
 const REGION_SHAPES: { id: RegionId; d: string }[] = [
   { id: "head", d: "M100 8c15 0 25 11 25 27s-9 30-25 30-25-14-25-30 10-27 25-27z" },
   { id: "face", d: "M88 34h24c2 0 3 1 3 3v12c0 7-7 13-15 13s-15-6-15-13V37c0-2 1-3 3-3z" },
@@ -92,8 +94,11 @@ export class BodyMap {
     root.appendChild(head);
 
     this.svgEl = svg("svg", { viewBox: "0 0 200 412", class: "body-svg", role: "img", "aria-label": "Body diagram" });
+    // Mirror group: everything inside is flipped left-right.
+    const flip = svg("g", { transform: "translate(200 0) scale(-1 1)" });
+    this.svgEl.appendChild(flip);
     this.outline = svg("g", { class: "body-outline" });
-    this.svgEl.appendChild(this.outline);
+    flip.appendChild(this.outline);
     for (const { id, d } of REGION_SHAPES) {
       const path = svg("path", { d, class: "rg", "data-region": id, tabindex: 0 });
       const title = svg("title", {});
@@ -106,26 +111,26 @@ export class BodyMap {
           this.onPick(id);
         }
       });
-      this.svgEl.appendChild(path);
+      flip.appendChild(path);
       this.shapes.set(id, path);
       // Wrap outline traces the same silhouette.
       this.outline.appendChild(svg("path", { d }));
     }
     this.markers = svg("g", { class: "markers" });
-    this.svgEl.appendChild(this.markers);
+    flip.appendChild(this.markers);
     root.appendChild(this.svgEl);
 
     const sides = document.createElement("div");
     sides.className = "pcard-sides";
     const r = document.createElement("span");
-    r.textContent = "R";
+    r.textContent = "L";
     this.backBtn = document.createElement("button");
     this.backBtn.type = "button";
     this.backBtn.className = "pcard-back";
     this.backBtn.textContent = "Back";
     this.backBtn.addEventListener("click", () => this.onPick("back"));
     const l = document.createElement("span");
-    l.textContent = "L";
+    l.textContent = "R";
     sides.append(r, this.backBtn, l);
     root.appendChild(sides);
 
@@ -185,7 +190,7 @@ export class BodyMap {
       g.appendChild(svg("rect", { x: 118 - half, y: y - 3, width: half * 2, height: 6, rx: 1, class: `mk-band ${cls}` }));
       g.appendChild(svg("rect", { x: 134 - (y - 242) * 0.02, y: y - 5, width: 4, height: 10, rx: 1, class: `mk-windlass ${cls}` }));
       if (label !== undefined) {
-        const t = svg("text", { x: 142, y: y + 3, class: `mk-label ${cls}` });
+        const t = svg("text", { x: -142, y: y + 3, transform: "scale(-1 1)", "text-anchor": "end", class: `mk-label ${cls}` });
         t.textContent = label;
         g.appendChild(t);
       }
@@ -255,7 +260,7 @@ export class BodyMap {
     }
     if (s.drugs.active.length > 0) {
       g.appendChild(svg("rect", { x: 160, y: 10, width: 34, height: 16, rx: 8, class: "mk-drugs" }));
-      const t = svg("text", { x: 177, y: 22, class: "mk-drugs-t" });
+      const t = svg("text", { x: -177, y: 22, transform: "scale(-1 1)", class: "mk-drugs-t" });
       t.textContent = `Rx ${s.drugs.active.length}`;
       g.appendChild(t);
     }

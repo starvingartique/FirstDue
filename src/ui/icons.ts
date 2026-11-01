@@ -6,6 +6,7 @@ const wrap = (inner: string): string =>
   `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${inner}</svg>`;
 
 export const ICONS = {
+  region: wrap('<circle cx="12" cy="4.5" r="2.2"/><path d="M8 8h8l-1 7h-1.5l-.5 7h-2l-.5-7H9z"/><path d="M8 8l-3 6M16 8l3 6"/>'),
   examine: wrap('<circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5"/>'),
   airway: wrap('<path d="M8 3v5a4 4 0 0 0 8 0V3"/><path d="M12 12v9"/><path d="M9 21h6"/>'),
   breathing: wrap('<path d="M12 4v8"/><path d="M12 12c-2 0-6 1-6 6 0 2 1 3 3 3s3-2 3-5"/><path d="M12 12c2 0 6 1 6 6 0 2-1 3-3 3s-3-2-3-5"/>'),
@@ -42,6 +43,8 @@ export function iconForAction(label: string): IconName {
   const l = label.toLowerCase();
   const rules: [RegExp, IconName][] = [
     [/remove|pull line|release|lift the edge|swap holder/, "remove"],
+    [/thoracostomy|decompression|chest seal/, "lines"],
+    [/binder/, "bandage"],
     [/cat|tourniquet|belt/, "tourniquet"],
     [/pack/, "gauze"],
     [/dressing/, "bandage"],

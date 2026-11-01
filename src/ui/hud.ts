@@ -83,7 +83,7 @@ export class Hud {
       this.regionSub.textContent = "Click a body region, or pick a tab below.";
     } else {
       this.regionTitle.textContent = `Region: ${REGION_LABELS[region]}`;
-      this.regionSub.textContent = "Examine tab follows this region. Other tabs hold the kit.";
+      this.regionSub.textContent = "Everything you can do here, by category. R returns to this view.";
     }
     for (const [id, button] of this.chipButtons) {
       button.classList.toggle("active", id === region);
