@@ -19,8 +19,10 @@ import type { CuffFit } from "../sim/exams";
 import { drugCatalog, formatDose, presentationMath } from "../sim/drugs";
 import { bvmRatePerMin, gttPerMin, tankMinutesLeft } from "../sim/airway";
 import { TalkClient } from "./talk";
-import { applyTerms } from "./terms";
+import { applyTerms, termText } from "./terms";
 import { tipFor } from "./tips";
+import { ICONS, iconForAction, type IconName } from "./icons";
+import { BodyMap } from "./bodyMap";
 
 export type Tab = "examine" | "airway" | "breathing" | "circulation" | "meds" | "lines" | "monitor" | "talk";
 
@@ -32,6 +34,18 @@ const TAB_LABELS: Record<Tab, string> = {
   meds: "Meds",
   lines: "Lines",
   monitor: "Monitor",
+  talk: "Talk"
+};
+
+/** Short rail captions so every label fits the icon rail. */
+const RAIL_LABELS: Record<Tab, string> = {
+  examine: "Exam",
+  airway: "Airway",
+  breathing: "Breath",
+  circulation: "Bleed",
+  meds: "Meds",
+  lines: "Lines",
+  monitor: "Vitals",
   talk: "Talk"
 };
 
@@ -100,6 +114,7 @@ export class MedicalMenu {
   private tabsNav = el("menu-tabs");
   private body = el("menu-body");
   private panel = el("region-panel");
+  private scroller = el("acm-content");
   private status = el("action-status");
   private logBox = el("menu-log");
   private march = el("march-strip");
@@ -141,9 +156,24 @@ export class MedicalMenu {
   private runDestination = "not chosen";
   private runOutcome = "run in progress";
 
+  // ACM gamified pass: body card, used markers, inline + center progress.
+  private bodyMap: BodyMap;
+  private examined = new Set<RegionId>();
+  /** Last completion time per action row key. */
+  private doneAt = new Map<string, number>();
+  /** Row that started the procedure in hand, for inline progress. */
+  private pendingOwner: { key: string; id: string } | null = null;
+  private toastSeen = -1;
+  private collapsedPanel = false;
+  private progressBox = el("acm-progress");
+  private toastBox = el("acm-toasts");
+  /** Wired by main: body-map clicks select the region everywhere. */
+  onPickRegion: ((region: RegionId) => void) | null = null;
+
   constructor(private readonly sim: Sim) {
     this.talkClient = new TalkClient(sim);
     this.tabsNav.innerHTML = "";
+    this.tabsNav.classList.add("acm-rail");
     const keyFor = (tab: Tab): string =>
       tab === "talk" ? "V" : (Object.entries(TAB_HOTKEYS).find(([, t]) => t === tab)?.[0] ?? "").toUpperCase();
     for (const tab of Object.keys(TAB_LABELS) as Tab[]) {
@@ -151,16 +181,42 @@ export class MedicalMenu {
       button.type = "button";
       button.className = "tab-btn";
       button.dataset["tab"] = tab;
-      button.title = `Hotkey: ${keyFor(tab)}`;
+      button.title = `${TAB_LABELS[tab]} (${keyFor(tab)})`;
+      const icon = document.createElement("span");
+      icon.className = "tab-ic";
+      icon.innerHTML = ICONS[tab as IconName];
       const label = document.createElement("span");
-      label.textContent = TAB_LABELS[tab];
+      label.className = "tab-label";
+      label.textContent = RAIL_LABELS[tab];
       const key = document.createElement("kbd");
       key.textContent = keyFor(tab);
-      button.append(label, key);
-      button.addEventListener("click", () => this.setTab(tab));
+      const dot = document.createElement("i");
+      dot.className = "tab-dot";
+      button.append(icon, label, key, dot);
+      button.addEventListener("click", () => {
+        if (this.collapsedPanel) this.toggleCollapsed();
+        this.setTab(tab);
+      });
       this.tabsNav.appendChild(button);
     }
+    this.bodyMap = new BodyMap(el("patient-card"), (region) => {
+      if (this.onPickRegion !== null) this.onPickRegion(region);
+      else this.setRegion(region);
+    });
+    const fold = el("acm-collapse");
+    fold.innerHTML = ICONS.collapse;
+    fold.addEventListener("click", () => this.toggleCollapsed());
+    this.toastSeen = sim.log.length;
     this.render(true);
+  }
+
+  /** X key / chevron: fold the menu to the rail, like closing the ACE menu. */
+  toggleCollapsed(): void {
+    this.collapsedPanel = !this.collapsedPanel;
+    this.panel.classList.toggle("collapsed", this.collapsedPanel);
+    const btn = el("acm-collapse");
+    btn.innerHTML = this.collapsedPanel ? ICONS.expand : ICONS.collapse;
+    btn.title = this.collapsedPanel ? "Open medical menu (X)" : "Fold medical menu (X)";
   }
 
   setRegion(region: RegionId | null): void {
@@ -172,7 +228,7 @@ export class MedicalMenu {
   setTab(tab: Tab): void {
     this.tab = tab;
     this.render(true);
-    this.panel.scrollTop = 0;
+    this.scroller.scrollTop = 0;
   }
 
   /**
@@ -229,11 +285,16 @@ export class MedicalMenu {
 
   retranslate(): void {
     this.termsStamp += 1;
+    this.bodyMap.invalidate();
     this.render(true);
   }
 
   /** Called every sim tick: cheap status refresh, full re-render on change. */
   refresh(): void {
+    if (this.pendingOwner !== null && this.sim.pending?.id !== this.pendingOwner.id) {
+      this.doneAt.set(this.pendingOwner.key, this.sim.t_s);
+      this.pendingOwner = null;
+    }
     // Debrief bookkeeping: when the bleed first came under control.
     const rate = this.sim.bleedRate_mL_per_min();
     if (rate < 30 && this.controlledAt === null && !this.sim.arrested) {
@@ -273,14 +334,16 @@ export class MedicalMenu {
       Object.keys(s.observed).length,
       s.monitor.spo2Attached, s.monitor.etco2Attached,
       s.level, this.talkClient.turns.length, this.talkClient.sending,
-      this.drugId, this.drugPres, this.findings.size, this.collapsed.size, this.tipsOn
+      this.drugId, this.drugPres, this.findings.size, this.collapsed.size, this.tipsOn,
+      this.doneAt.size, this.examined.size, this.pendingOwner?.key ?? "", s.fluids.lines.some((l) => l.pressureBag),
+      s.monitor.etco2Attached, s.pressure.holder ?? ""
     ].join("|");
   }
 
   private render(force: boolean): void {
     void force;
     // Keep what the player was doing: scroll position and a half-typed line.
-    const scroll = this.panel.scrollTop;
+    const scroll = this.scroller.scrollTop;
     const talk = document.getElementById("talk-input");
     const talkFocused = talk !== null && document.activeElement === talk;
     if (talk instanceof HTMLInputElement) this.talkDraft = talk.value;
@@ -304,7 +367,7 @@ export class MedicalMenu {
     applyTerms(this.tabsNav);
     this.renderStatus();
 
-    this.panel.scrollTop = scroll;
+    this.scroller.scrollTop = scroll;
     const newTalk = document.getElementById("talk-input");
     if (newTalk instanceof HTMLInputElement) {
       newTalk.value = this.talkDraft;
@@ -326,20 +389,10 @@ export class MedicalMenu {
     this.status.classList.toggle("busy", s.busy);
     line.textContent = bits.join(" - ");
     this.status.appendChild(line);
-    if (s.busy && s.pending) {
-      const bar = document.createElement("div");
-      bar.className = "progress";
-      const fill = document.createElement("div");
-      fill.className = "progress-fill";
-      const done = 1 - s.pending.remaining_s / Math.max(1, s.pending.total_s);
-      fill.style.width = `${Math.round(done * 100)}%`;
-      bar.appendChild(fill);
-      const left = document.createElement("span");
-      left.className = "progress-left";
-      left.textContent = `${s.pending.remaining_s}s`;
-      bar.appendChild(left);
-      this.status.appendChild(bar);
-    }
+    this.renderProgress();
+    this.renderRailDots();
+    this.renderToasts();
+    this.bodyMap.update(s, this.region, this.examined);
     const alerts: string[] = [];
     if (s.tq.applied && s.tq.loosened) alerts.push("TQ: REASSESS");
     if (s.packing.loosened) alerts.push("Packing: REASSESS");
@@ -360,6 +413,111 @@ export class MedicalMenu {
 
     applyTerms(this.status);
     this.renderLog();
+  }
+
+  /** ACE-style center bar for the procedure in hand, plus partner jobs. */
+  private renderProgress(): void {
+    const s = this.sim;
+    const bars: { label: string; done: number; left: number; main: boolean }[] = [];
+    if (s.pending !== null) {
+      bars.push({
+        label: s.pending.label,
+        done: 1 - s.pending.remaining_s / Math.max(1, s.pending.total_s),
+        left: s.pending.remaining_s,
+        main: true
+      });
+    }
+    if (s.packing.stage === "holding" && s.packing.holder === "partner" && s.packing.holdRemaining_s > 0) {
+      bars.push({ label: "Partner holding packing pressure", done: 1 - s.packing.holdRemaining_s / 180, left: s.packing.holdRemaining_s, main: false });
+    }
+    if (s.fetches.length > 0) {
+      const job = s.fetches.reduce((a, b) => (a.remaining_s >= b.remaining_s ? a : b));
+      bars.push({
+        label: `Partner to truck (${s.fetches.length} item${s.fetches.length > 1 ? "s" : ""})`,
+        done: 1 - Math.min(1, job.remaining_s / Math.max(1, job.total_s)),
+        left: job.remaining_s,
+        main: false
+      });
+    }
+    this.progressBox.hidden = bars.length === 0;
+    this.progressBox.innerHTML = "";
+    for (const b of bars) {
+      const row = document.createElement("div");
+      row.className = `acp${b.main ? " main" : ""}`;
+      const lab = document.createElement("div");
+      lab.className = "acp-label";
+      const name = document.createElement("span");
+      name.textContent = b.label;
+      lab.appendChild(name);
+      const t = document.createElement("span");
+      t.className = "acp-left";
+      t.textContent = `${b.left}s`;
+      lab.appendChild(t);
+      const track = document.createElement("div");
+      track.className = "acp-track";
+      const fill = document.createElement("div");
+      fill.className = "acp-fill";
+      fill.style.width = `${Math.max(2, Math.round(b.done * 100))}%`;
+      track.appendChild(fill);
+      row.append(lab, track);
+      this.progressBox.appendChild(row);
+    }
+    applyTerms(this.progressBox);
+
+    // Inline fill on the row that started the procedure.
+    if (this.pendingOwner !== null && s.pending !== null) {
+      const row = this.body.querySelector<HTMLElement>(`.menu-btn[data-key="${CSS.escape(this.pendingOwner.key)}"]`);
+      if (row !== null) {
+        row.classList.add("is-running");
+        row.style.setProperty("--p", `${Math.round((1 - s.pending.remaining_s / Math.max(1, s.pending.total_s)) * 100)}%`);
+      }
+    }
+  }
+
+  /** Rail status dots: red alert, amber check, green in use, blue running. */
+  private renderRailDots(): void {
+    const s = this.sim;
+    const bleeding = s.bleedRate_mL_per_min() > 30;
+    const anyControl = s.tq.applied || s.packing.stage !== "none" || s.pressure.active || s.dressing.applied;
+    const state: Record<Tab, { cls: string; n?: number } | null> = {
+      examine: s.beltTrap && s.exposed ? { cls: "warn" } : null,
+      airway: s.airway.soiled || s.airway.aspirated ? { cls: "bad" } : s.airway.adjunct !== null || s.airway.ett !== null ? { cls: "on" } : null,
+      breathing: s.o2.device !== "none" ? { cls: s.o2.tankPsi <= 200 ? "bad" : "on" } : null,
+      circulation: bleeding ? { cls: "bad" } : (s.tq.applied && s.tq.loosened) || s.packing.loosened ? { cls: "warn" } : anyControl ? { cls: "on" } : null,
+      meds: s.drugs.flags.length > 0 ? { cls: "bad", n: s.drugs.active.length } : s.drugs.active.length > 0 ? { cls: "on", n: s.drugs.active.length } : null,
+      lines: s.fluids.lines.some((l) => l.infiltrated) ? { cls: "bad" } : s.fluids.lines.some((l) => l.bag !== null) ? { cls: "run" } : s.fluids.lines.length > 0 ? { cls: "on" } : null,
+      monitor: s.monitor.spo2Attached || s.monitor.etco2Attached ? { cls: "on" } : null,
+      talk: this.talkClient.sending ? { cls: "run" } : null
+    };
+    for (const btn of this.tabsNav.querySelectorAll<HTMLButtonElement>(".tab-btn")) {
+      const st = state[btn.dataset["tab"] as Tab];
+      const dot = btn.querySelector<HTMLElement>(".tab-dot");
+      if (dot === null) continue;
+      dot.className = `tab-dot${st !== null ? ` ${st.cls}` : ""}`;
+      dot.textContent = st?.n !== undefined && st.n > 0 ? String(st.n) : "";
+    }
+  }
+
+  /** Arma-style hint feed for events that matter (not every click). */
+  private renderToasts(): void {
+    const s = this.sim;
+    if (this.toastSeen > s.log.length) this.toastSeen = s.log.length;
+    const fresh = s.log.slice(this.toastSeen).filter((e) => ["trap", "bleed", "class", "fetch", "reassess", "arrest", "movement"].includes(e.kind));
+    this.toastSeen = s.log.length;
+    for (const e of fresh) {
+      const t = document.createElement("div");
+      t.className = `toast toast-${e.kind}`;
+      const k = document.createElement("span");
+      k.className = "toast-k";
+      k.textContent = e.kind;
+      const x = document.createElement("span");
+      x.textContent = termText(e.text);
+      t.append(k, x);
+      this.toastBox.prepend(t);
+      window.setTimeout(() => t.classList.add("out"), 5000);
+      window.setTimeout(() => t.remove(), 5600);
+    }
+    while (this.toastBox.children.length > 4) this.toastBox.lastElementChild?.remove();
   }
 
   /** MARCH checklist from what the player has DONE, never from hidden truth. */
@@ -647,12 +805,63 @@ export class MedicalMenu {
   }
 
   private action(label: string, run: () => { ok: boolean; reason?: string }): void {
-    const key = `${this.tab}|${this.region ?? "none"}|${this.sectionKey}|${stableLabel(label)}`;
+    const stable = stableLabel(label);
+    const key = `${this.tab}|${this.region ?? "none"}|${this.sectionKey}|${stable}`;
     const button = document.createElement("button");
     button.type = "button";
     button.className = "menu-btn";
-    button.textContent = label;
+    button.dataset["key"] = key;
+    button.title = label;
+
+    // Row: icon | name | chips | state badge, with an inline progress fill.
+    const ic = document.createElement("span");
+    ic.className = "act-ic";
+    ic.innerHTML = ICONS[iconForAction(label)];
+    const name = document.createElement("span");
+    name.className = "act-name";
+    name.textContent = stable;
+    const chips = document.createElement("span");
+    chips.className = "act-chips";
+    const paren = label.match(/\(([^)]*)\)\s*$/);
+    if (paren !== null) {
+      for (const part of paren[1].split(/,\s*/)) {
+        const chip = document.createElement("span");
+        const have = part.match(/^(?:have|truck|tubes:|blankets:|cabinet)\s*:?\s*(\d+)$/i);
+        if (/^\d+\s*s$/.test(part)) {
+          chip.className = "chip-t";
+          chip.textContent = part.replace(/\s/g, "");
+        } else if (have !== null) {
+          chip.className = `chip-n${have[1] === "0" ? " empty" : ""}`;
+          chip.textContent = `x${have[1]}`;
+          chip.title = part;
+        } else if (/risky/i.test(part)) {
+          chip.className = "chip-w";
+          chip.textContent = part;
+        } else {
+          chip.className = "chip-x";
+          chip.textContent = part;
+        }
+        chips.appendChild(chip);
+      }
+    }
+    const badge = document.createElement("span");
+    badge.className = "act-badge";
+    const live = this.activeState(stable);
+    const done = this.doneAt.get(key);
+    if (live !== null) {
+      badge.textContent = live.text;
+      badge.classList.add(live.cls);
+      button.classList.add(`is-${live.cls}`);
+    } else if (done !== undefined) {
+      badge.innerHTML = `${ICONS.check}<span>${fmtClock(done)}</span>`;
+      badge.classList.add("done");
+      button.classList.add("is-done");
+    }
+    button.append(ic, name, chips, badge);
+    if (this.pendingOwner?.key === key) button.classList.add("is-running");
+
     button.addEventListener("click", () => {
+      const wasPending = this.sim.pending;
       this.capturing = key;
       let res: { ok: boolean; reason?: string };
       try {
@@ -663,6 +872,12 @@ export class MedicalMenu {
       if (!res.ok && res.reason) {
         this.sim.addLog("info", `Cannot: ${label} - ${res.reason}`);
         this.notice = { text: `Cannot: ${res.reason}`, until: Date.now() + 4000 };
+        button.classList.add("shake");
+      } else if (res.ok) {
+        if (this.tab === "examine" && this.region !== null) this.examined.add(this.region);
+        const now = this.sim.pending;
+        if (now !== null && now !== wasPending) this.pendingOwner = { key, id: now.id };
+        else this.doneAt.set(key, this.sim.t_s);
       }
       this.render(true);
     });
@@ -674,6 +889,66 @@ export class MedicalMenu {
       this.target.appendChild(list);
     }
   }
+
+  /** Live "in use" state for a row, from what the player has done. */
+  private activeState(stable: string): { text: string; cls: "on" | "warn" | "run" } | null {
+    const s = this.sim;
+    const has = (fn: () => boolean): boolean => fn();
+    switch (stable) {
+      case "Apply CAT high and tight":
+        if (!s.tq.applied) return null;
+        return s.tq.placement === "high_thigh" && !s.tq.loosened ? { text: "ON", cls: "on" } : { text: "CHECK", cls: "warn" };
+      case "Apply second CAT":
+        if (!s.tq.secondApplied) return null;
+        return s.tq.secondPlacement === "proximal" ? { text: "ON", cls: "on" } : { text: "CHECK", cls: "warn" };
+      case "Pack the wound":
+        if (s.packing.stage === "none") return null;
+        return s.packing.stage === "set" ? { text: "SET", cls: "on" } : s.packing.stage === "failed" ? { text: "FAILED", cls: "warn" } : { text: "PACKED", cls: "run" };
+      case "Hold pressure 3 min":
+        return s.packing.stage === "holding" ? { text: "HOLDING", cls: "run" } : s.packing.stage === "set" ? { text: "DONE", cls: "on" } : null;
+      case "Start direct pressure":
+        return s.pressure.active ? { text: "HOLDING", cls: "run" } : null;
+      case "Apply pressure dressing":
+        return s.dressing.applied ? (s.dressing.tightness === "correct" ? { text: "ON", cls: "on" } : { text: "CHECK", cls: "warn" }) : null;
+      case "Remove the bystander belt":
+        return null;
+      case "Expose with shears":
+        return s.exposed ? { text: "DONE", cls: "on" } : null;
+      case "Remove wet clothing":
+        return s.wetClothing ? null : { text: "DONE", cls: "on" };
+      case "Wrap for hypothermia":
+        return s.wrapped ? { text: "ON", cls: "on" } : null;
+      case "Insert OPA":
+        return s.airway.adjunct?.kind === "opa" ? { text: "IN", cls: "on" } : null;
+      case "Insert NPA":
+        return s.airway.adjunct?.kind === "npa" ? { text: "IN", cls: "on" } : null;
+      case "Place supraglottic":
+        return s.airway.adjunct?.kind === "igel" || s.airway.adjunct?.kind === "kinglt" ? { text: "IN", cls: "on" } : null;
+      case "Intubate":
+        return s.airway.ett !== null ? { text: "IN", cls: s.airway.ett.placement === "tracheal" ? "on" : "warn" } : null;
+      case "Secure the tube":
+        return s.airway.ett?.secured === true ? { text: "DONE", cls: "on" } : null;
+      case "Apply O2":
+        return s.o2.device !== "none" ? { text: s.o2.tankPsi <= 200 ? "EMPTY" : "ON", cls: s.o2.tankPsi <= 200 ? "warn" : "on" } : null;
+      case "Pre-inflate NRB reservoir":
+        return s.o2.reservoirInflated ? { text: "DONE", cls: "on" } : null;
+      case "Attempt IV":
+        return has(() => s.fluids.lines.some((l) => l.kind === "iv")) ? { text: "IN", cls: "on" } : null;
+      case "Drill IO":
+        return has(() => s.fluids.lines.some((l) => l.kind === "io")) ? { text: "IN", cls: "on" } : null;
+      case "Hang bag":
+        return has(() => s.fluids.lines.some((l) => l.bag !== null)) ? { text: "RUNNING", cls: "run" } : null;
+      case "Apply pressure bag":
+        return has(() => s.fluids.lines.some((l) => l.pressureBag)) ? { text: "ON", cls: "on" } : null;
+      case "Attach SpO2 probe":
+        return s.monitor.spo2Attached ? { text: "ON", cls: "on" } : null;
+      case "Attach waveform EtCO2":
+        return s.monitor.etco2Attached ? { text: "ON", cls: "on" } : null;
+      default:
+        return null;
+    }
+  }
+
 
   // - Examine -
 

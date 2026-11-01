@@ -13,6 +13,46 @@ import type { SpotId } from "../engine/camera";
 import { KIT_ANCHORS, type KitItemId } from "../engine/kit";
 import type { Tab } from "./medicalMenu";
 import { applyTerms } from "./terms";
+import type { Sim } from "../sim/engine";
+
+/** Stash id behind each kit item, for the at-patient count. */
+const KIT_STASH: Partial<Record<KitItemId, string>> = {
+  cat: "cat_tourniquet",
+  kerlix: "plain_gauze_roll_kerlix",
+  zfold: "hemostatic_gauze_zfold",
+  dressing: "pressure_bandage_6in",
+  nrb: "non_rebreather",
+  ns: "ns_1000ml",
+  blanket: "hypothermia_wrap_blanket"
+};
+
+/** "In use" from what the player has applied. */
+function kitInUse(id: KitItemId, s: Sim): boolean {
+  switch (id) {
+    case "cat":
+      return s.tq.applied;
+    case "kerlix":
+      return s.packing.stage !== "none" && s.packing.gauze === "plain";
+    case "zfold":
+      return s.packing.stage !== "none" && s.packing.gauze === "hemostatic";
+    case "dressing":
+      return s.dressing.applied;
+    case "nrb":
+      return s.o2.device === "non_rebreather";
+    case "o2":
+      return s.o2.device !== "none";
+    case "ns":
+      return s.fluids.lines.some((l) => l.bag?.fluid === "ns");
+    case "blanket":
+      return s.wrapped;
+    case "airway":
+      return s.airway.adjunct !== null || s.airway.ett !== null;
+    case "drugs":
+      return s.drugs.active.length > 0;
+    default:
+      return false;
+  }
+}
 
 export const KIT_ITEM_IDS: KitItemId[] = [
   "cat",
@@ -145,10 +185,45 @@ export class KitLabels {
     if (spot !== "kit") this.hidePreview();
   }
 
+  private usageSig = "";
+  private lastSim: Sim | null = null;
+
+  /** Count and IN USE tags on each label. Cheap; only redraws on change. */
+  updateUsage(s: Sim): void {
+    this.lastSim = s;
+    const sig = [...this.buttons.keys()]
+      .map((id) => `${KIT_STASH[id] !== undefined ? s.atPatient(KIT_STASH[id] as string) : "-"}${kitInUse(id, s) ? "u" : ""}`)
+      .join(",");
+    if (sig === this.usageSig) return;
+    this.usageSig = sig;
+    for (const [id, button] of this.buttons) {
+      button.querySelector(".kit-tag")?.remove();
+      button.querySelector(".kit-count")?.remove();
+      const stash = KIT_STASH[id];
+      if (stash !== undefined) {
+        const n = s.atPatient(stash);
+        const c = document.createElement("span");
+        c.className = `kit-count${n === 0 ? " empty" : ""}`;
+        c.textContent = `x${n}`;
+        button.appendChild(c);
+      }
+      const used = kitInUse(id, s);
+      button.classList.toggle("in-use", used);
+      if (used) {
+        const t = document.createElement("span");
+        t.className = "kit-tag";
+        t.textContent = "IN USE";
+        button.appendChild(t);
+      }
+    }
+  }
+
   /** Medical / Plain toggle changed: rebuild every string from source. */
   retranslate(): void {
     for (const [id, button] of this.buttons) button.textContent = KIT_LABELS[id];
     applyTerms(this.layer);
+    this.usageSig = "";
+    if (this.lastSim !== null) this.updateUsage(this.lastSim);
     if (this.selected !== null) this.renderPreview(this.selected);
   }
 

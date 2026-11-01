@@ -6,6 +6,7 @@
 
 import "./style.css";
 import "./flow.css";
+import "./acm.css";
 import { buildWorld } from "./engine/scene";
 import { SPOT_IDS, SpotCamera, type SpotId } from "./engine/camera";
 import { bindInput } from "./engine/input";
@@ -220,6 +221,7 @@ function main(): void {
         menu?.toggleTips();
         hud.showTips(menu?.tips ?? true);
       } else if (key === "g") openPackage();
+      else if (key === "x") menu?.toggleCollapsed();
       else if (TAB_HOTKEYS[key] !== undefined) menu?.setTab(TAB_HOTKEYS[key]);
     }
   });
@@ -247,6 +249,11 @@ function main(): void {
       sim = s;
       debug = new DebugOverlay(s);
       menu = new MedicalMenu(s);
+      menu.onPickRegion = (region: RegionId) => {
+        highlight.setSelected(region);
+        hud.showRegion(highlight.getSelected());
+        menu?.setRegion(highlight.getSelected());
+      };
       menu.setRunInfo({ level: flow.record.levelLabel, destination: "not chosen", outcome: "run in progress" });
       spotCamera.applySpot("patient");
       hud.showSpot("patient");
@@ -266,6 +273,7 @@ function main(): void {
         },
         onTick: () => {
           hud.showClock(s.t_s);
+          kitLabels.updateUsage(s);
           m.refresh();
           flow.updateHint(s);
           if (

@@ -3,7 +3,10 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>First Due - Oct 30 Bike down end-to-end</title>
+    <title>First Due - Oct 31 ACM gamified UI</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet" media="print" onload="this.media='all'" />
   </head>
   <body>
     <div id="app">
@@ -36,30 +39,44 @@
       <div id="paused-banner" hidden>PAUSED - press P to resume</div>
       <div id="partner-hint" hidden></div>
       <div id="flow-overlay" hidden></div>
-      <aside id="region-panel" aria-live="polite">
+      <aside id="region-panel" class="acm" aria-live="polite">
         <div id="panel-head">
-          <div id="region-title">No region selected</div>
-          <div id="region-sub">Click a body region, or pick Examine / Circulation below.</div>
-          <details id="region-details">
+          <div class="acm-titlebar">
+            <div class="acm-title-text">
+              <div id="region-title">No region selected</div>
+              <div id="region-sub">Click a body region, or pick Examine / Circulation below.</div>
+            </div>
+            <button type="button" id="acm-collapse" title="Fold medical menu (X)"></button>
+          </div>
+          <details id="region-details" hidden>
             <summary>Body regions</summary>
             <div id="region-chips" aria-label="Body regions"></div>
           </details>
-          <div id="march-strip" aria-label="MARCH priorities"></div>
-          <nav id="menu-tabs" aria-label="Medical menu"></nav>
         </div>
-        <div id="menu-body"></div>
+        <div id="acm-main">
+          <nav id="menu-tabs" aria-label="Medical menu"></nav>
+          <div id="acm-content">
+            <div id="menu-body"></div>
+          </div>
+        </div>
         <div id="panel-foot">
           <div id="action-status">T+00:00 - Hands free</div>
           <div id="menu-log" aria-label="Recent events"></div>
         </div>
       </aside>
+      <aside id="patient-side" aria-label="Patient card">
+        <div id="march-strip" aria-label="MARCH priorities"></div>
+        <div id="patient-card"></div>
+      </aside>
+      <div id="acm-progress" hidden></div>
+      <div id="acm-toasts" aria-live="polite"></div>
       <aside id="debug-overlay" hidden>
         <h2>DEBUG - live engine state</h2>
         <dl id="debug-vitals"></dl>
         <p id="debug-note">True state, ticking every sim-second. Hidden from the player; F1 only.</p>
       </aside>
       <footer id="hud-bottom">
-        <span>Drag to look - Click body to select - 1/2/3 camera - E A B C M L N tabs, V talk - G package - P pause - T wording - H tips - F1 debug</span>
+        <span>Drag to look - Click body to select - 1/2/3 camera - E A B C M L N tabs, V talk - X fold menu - G package - P pause - T wording - H tips - F1 debug</span>
       </footer>
       <div id="boot-error" hidden></div>
     </div>

@@ -43,6 +43,32 @@ New TODO_CLINICAL for Wyatt, in blocker order:
 3. L1 deterioration x0.5 - the brief gives slow/real with no number.
 4. Destination correctness for a femoral bleed - not graded, needs a rule.
 
+## Oct 31 ACM gamified UI (branch claude/acm-gamified-ui)
+
+Arma / ACE medical menu feel. Presentation only: no clinical values, timings,
+drug data, physiology or intervention rules changed.
+
+- Left: category rail with icons, hotkeys and status lights (red pulse =
+  visible bleeding or airway alert, amber = reassess, green = in use, blue =
+  running, number = drugs on board). X (or the chevron) folds the menu to
+  the rail.
+- Action rows: icon, name, time and stock chips (x0 shows red), and a live
+  state badge (ON / SET / IN / RUNNING / CHECK) or a done tick with the sim
+  time. The row that started a procedure fills like a progress bar. Refused
+  actions shake.
+- Right: patient card with a clickable front body diagram (Back button
+  under it). Shows wounds once examined or exposed, tourniquet bands with
+  the written time, belt, packing, dressing, pressure, IV/IO sites, airway,
+  O2 mask, probes, wrap outline and a drug badge, plus an "On patient" list.
+  Visible-bleed only (same cut as the 3D wound pulse), never vitals.
+- Mid-screen ACE progress bar for the procedure in hand, with smaller bars
+  for the partner's packing hold and truck run.
+- Hint feed (top right) for traps, bleeding, class changes, fetches and
+  movement.
+- Kit spot labels show at-patient counts and an IN USE tag.
+- Fonts: Barlow / Barlow Condensed from Google Fonts, loaded non-blocking
+  with system fallbacks.
+
 ## Oct 30 UI + QoL pass (branch claude/ui-qol-terms)
 
 Presentation and bug fixes only. No clinical value changed.
