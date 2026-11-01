@@ -1,16 +1,98 @@
 {
   "_meta": {
-    "version": "0.0.1",
-    "status": "SKELETON - Dispatch Engine v1 lands Oct 31",
-    "sourceNote": "WEIGHT_EST - distributions estimated until NEMSIS data confirms them"
+    "version": "0.1.0",
+    "status": "Dispatch Engine v1. Seeded estimates, not NEMSIS data.",
+    "sourceNote": "WEIGHT_EST: every distribution below is a seeded estimate. Replace with NEMSIS Public-Release Research Dataset distributions when access arrives. Never present these as NEMSIS data.",
+    "samplerRule": "The sampler draws age uniform in ageRange, sex by sexSplit, weight uniform in weight_kg. V1 is adult-only (18+): the engine runs adult physiology (80 kg dosing, 5600 mL volume) for every patient, and weight is narrative-only until the engine supports weight-based physiology."
   },
   "distributions": [
     {
-      "complaintId": "placeholder_complaint",
-      "ageRange": "WEIGHT_EST",
-      "sexSplit": { "note": "WEIGHT_EST" },
-      "weight_kg": { "note": "WEIGHT_EST" },
-      "notes": "Placeholder. Oct 31 sampler reads this file."
+      "complaintId": "fall",
+      "ageRange": [65, 95],
+      "ageTag": "WEIGHT_EST",
+      "sexSplit": { "M": 0.4, "F": 0.6 },
+      "sexTag": "WEIGHT_EST",
+      "weight_kg": { "min": 55, "max": 95 },
+      "weightTag": "WEIGHT_EST",
+      "sourceNote": "WEIGHT_EST: elderly fallers skew older and female.",
+      "notes": "Ground-level elderly falls dominate this complaint."
+    },
+    {
+      "complaintId": "mvc",
+      "ageRange": [18, 45],
+      "ageTag": "WEIGHT_EST",
+      "sexSplit": { "M": 0.7, "F": 0.3 },
+      "sexTag": "WEIGHT_EST",
+      "weight_kg": { "min": 60, "max": 100 },
+      "weightTag": "WEIGHT_EST",
+      "sourceNote": "WEIGHT_EST: crash patients skew young and male.",
+      "notes": ""
+    },
+    {
+      "complaintId": "assault",
+      "ageRange": [18, 40],
+      "ageTag": "WEIGHT_EST",
+      "sexSplit": { "M": 0.75, "F": 0.25 },
+      "sexTag": "WEIGHT_EST",
+      "weight_kg": { "min": 60, "max": 100 },
+      "weightTag": "WEIGHT_EST",
+      "sourceNote": "WEIGHT_EST: assault patients skew young and male.",
+      "notes": ""
+    },
+    {
+      "complaintId": "stabbing",
+      "ageRange": [18, 35],
+      "ageTag": "WEIGHT_EST",
+      "sexSplit": { "M": 0.8, "F": 0.2 },
+      "sexTag": "WEIGHT_EST",
+      "weight_kg": { "min": 60, "max": 100 },
+      "weightTag": "WEIGHT_EST",
+      "sourceNote": "WEIGHT_EST: stabbing patients skew young and male.",
+      "notes": ""
+    },
+    {
+      "complaintId": "gunshot",
+      "ageRange": [18, 35],
+      "ageTag": "WEIGHT_EST",
+      "sexSplit": { "M": 0.85, "F": 0.15 },
+      "sexTag": "WEIGHT_EST",
+      "weight_kg": { "min": 60, "max": 100 },
+      "weightTag": "WEIGHT_EST",
+      "sourceNote": "WEIGHT_EST: gunshot patients skew young and male.",
+      "notes": ""
+    },
+    {
+      "complaintId": "chest_pain",
+      "ageRange": [45, 85],
+      "ageTag": "WEIGHT_EST",
+      "sexSplit": { "M": 0.6, "F": 0.4 },
+      "sexTag": "WEIGHT_EST",
+      "weight_kg": { "min": 60, "max": 110 },
+      "weightTag": "WEIGHT_EST",
+      "sourceNote": "WEIGHT_EST: chest pain skews older with cardiac risk factors.",
+      "notes": ""
+    },
+    {
+      "complaintId": "overdose",
+      "ageRange": [20, 50],
+      "ageTag": "WEIGHT_EST",
+      "sexSplit": { "M": 0.65, "F": 0.35 },
+      "sexTag": "WEIGHT_EST",
+      "weight_kg": { "min": 55, "max": 100 },
+      "weightTag": "WEIGHT_EST",
+      "sourceNote": "WEIGHT_EST: overdose skews young to middle adult.",
+      "notes": ""
+    },
+    {
+      "complaintId": "allergic_reaction",
+      "ageRange": [18, 55],
+      "ageTag": "WEIGHT_EST",
+      "sexSplit": { "M": 0.5, "F": 0.5 },
+      "sexTag": "WEIGHT_EST",
+      "weight_kg": { "min": 55, "max": 100 },
+      "weightTag": "WEIGHT_EST",
+      "sourceNote": "WEIGHT_EST: allergy spans adult ages with no strong sex skew.",
+      "notes": "V1 floor is 18: peds physiology is out of scope for the v1 engine."
     }
   ]
 }

@@ -1,17 +1,78 @@
 {
   "_meta": {
-    "version": "0.0.1",
-    "status": "SKELETON - Dispatch Engine v1 lands Oct 31",
-    "sourceNote": "WEIGHT_EST - weights estimated"
+    "version": "0.1.0",
+    "status": "Dispatch Engine v1. Only v1Ready complications can be drawn.",
+    "sourceNote": "WEIGHT_EST: every weight below is a seeded estimate.",
+    "samplerRule": "L1 draws no complication. L2 draws 0 to 1: 60% none, else one v1Ready complication weighted by weight among eligible entries (re_bleed needs a femoral bleed in the skeleton). Non-ready entries are listed with their reason so the LLM and the Nov 2 engine know what is coming."
   },
   "complications": [
     {
-      "id": "placeholder_vomiting",
-      "label": "TODO - first real entry: vomiting",
-      "trigger": "TODO_CLINICAL - what triggers this mid-call twist",
-      "engineEffect": "TODO_CLINICAL - what the engine does when it fires",
-      "weight": "WEIGHT_EST",
-      "minLevel": 1
+      "id": "vomiting",
+      "label": "Vomiting mid-call",
+      "trigger": "Spontaneous, 3 to 8 minutes into patient contact",
+      "onset_s": [180, 480],
+      "engineEffect": "modeled: fires the shared vomit path (airway soiled, patency down, aspirates unless a cuffed ETT protects). Suction is the fix.",
+      "v1Ready": true,
+      "requiresCondition": null,
+      "weight": 0.5,
+      "weightTag": "WEIGHT_EST",
+      "minLevel": 2,
+      "sourceNote": "WEIGHT_EST: seeded estimate. Engine path already modeled for OPA and BVM vomit events."
+    },
+    {
+      "id": "re_bleed",
+      "label": "Re-bleed: control slips",
+      "trigger": "Active hemorrhage control loosens 5 to 10 minutes in (movement, reassessment miss)",
+      "onset_s": [300, 600],
+      "engineEffect": "modeled: sets the loosened flags on whatever control is active (tourniquet, packing, dressing). Reassessment is the fix.",
+      "v1Ready": true,
+      "requiresCondition": "femoral_arterial_bleed",
+      "weight": 0.3,
+      "weightTag": "WEIGHT_EST",
+      "minLevel": 2,
+      "sourceNote": "WEIGHT_EST: seeded estimate. Loosened-flag consequences already modeled for patient movement."
+    },
+    {
+      "id": "combativeness",
+      "label": "Combativeness",
+      "trigger": "Patient turns combative mid-call (hypoxia, head injury, intoxication)",
+      "onset_s": [240, 540],
+      "engineEffect": "none_v1",
+      "v1Ready": false,
+      "v1Note": "No agitation or restraint engine exists in v1, so this cannot fire honestly. Nov 2 scope.",
+      "requiresCondition": null,
+      "weight": 0.2,
+      "weightTag": "WEIGHT_EST",
+      "minLevel": 2,
+      "sourceNote": "WEIGHT_EST: seeded estimate. Listed for Nov 2; never drawn in v1."
+    },
+    {
+      "id": "rhythm_change",
+      "label": "Rhythm change",
+      "trigger": "Monitor rhythm degrades mid-call",
+      "onset_s": [240, 540],
+      "engineEffect": "none_v1",
+      "v1Ready": false,
+      "v1Note": "Rhythm is derived from the shock curve in v1; no primary rhythm engine exists. Nov 2 scope.",
+      "requiresCondition": null,
+      "weight": 0.15,
+      "weightTag": "WEIGHT_EST",
+      "minLevel": 2,
+      "sourceNote": "WEIGHT_EST: seeded estimate. Listed for Nov 2; never drawn in v1."
+    },
+    {
+      "id": "re_sedation",
+      "label": "Re-sedation after naloxone",
+      "trigger": "Patient re-sedates as naloxone wears off",
+      "onset_s": [1200, 2400],
+      "engineEffect": "none_v1",
+      "v1Ready": false,
+      "v1Note": "Naloxone PK is modeled but the underlying toxidrome apnea is not, so re-sedation has nothing to return to. Nov 2 scope.",
+      "requiresCondition": null,
+      "weight": 0.15,
+      "weightTag": "WEIGHT_EST",
+      "minLevel": 2,
+      "sourceNote": "WEIGHT_EST: seeded estimate. Listed for Nov 2; never drawn in v1."
     }
   ]
 }

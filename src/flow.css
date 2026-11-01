@@ -258,6 +258,17 @@
   font-family: inherit;
 }
 
+.flow-seed {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 14px;
+  font-family: inherit;
+}
+
 .flow-win {
   margin: 4px 0 8px;
   color: #7fd97f;

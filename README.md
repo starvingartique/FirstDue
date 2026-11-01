@@ -70,7 +70,7 @@ Engine changes, with values marked TUNE for Wyatt sign-off.
   kit, cric kit, LifeFlow (last four have no action yet).
 - Indicators: Y set ring and warmer on the body diagram, Y set units and
   saline left, warmer line, staged boxes in "On patient".
-- Tests: scripts/oct31-test.ts (npm run sim:test31).
+- Tests: scripts/oct31-kit-test.ts (npm run sim:test31kit).
 
 ## Oct 31 ACM gamified UI (branch claude/acm-gamified-ui)
 

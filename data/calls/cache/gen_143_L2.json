@@ -1,0 +1,107 @@
+{
+  "id": "gen_143_L2",
+  "seed": 143,
+  "patient": {
+    "name": "Mark D.",
+    "nameLocked": false,
+    "age": 39,
+    "sex": "M",
+    "weight_kg": 80,
+    "weightNote": "V1: weight is narrative-only; the engine runs 80 kg adult physiology for every patient.",
+    "complaint": "allergic_reaction"
+  },
+  "dispatch": {
+    "nature": "Allergic reaction",
+    "address": "1420 Meadow Park picnic area",
+    "cadText": "Caller at picnic says man stung by bee, face puffing up, trouble breathing. Caller thinks he might have fainted but still talking. Says maybe ate peanuts too, not sure. Crowd gathering.",
+    "updates": [
+      "Crowd getting loud, PD en route"
+    ]
+  },
+  "scene": {
+    "location": "park",
+    "timeOfDay": "morning",
+    "weather": "clear",
+    "mechanism": "allergy_causes",
+    "mechanismSubtype": "insect_sting",
+    "hazards": [
+      "uneven ground",
+      "distance from the truck"
+    ],
+    "description": "Morning park picnic area, clear sky, tables and food out, uneven grass, truck parked far on path."
+  },
+  "backstory": "Anxious and restless, talks fast between breaths and keeps swatting at the air. Scared he will stop breathing and keeps asking if he is going to be okay. Gets frustrated when asked to sit still.",
+  "injuries": [],
+  "conditions": [
+    "crash_stress_offset"
+  ],
+  "conditionsNote": "Dispatch Engine v1: generatorReady conditions only; see skeleton.",
+  "marchFocus": [
+    "R",
+    "C",
+    "H",
+    "P"
+  ],
+  "bystander": {
+    "archetypeId": "hostile_crowd",
+    "label": "Hostile crowd",
+    "notes": "Films everything, shouts advice, closes in. One loud voice leads; the rest follow. PD is coming but not here."
+  },
+  "levels": [
+    2
+  ],
+  "skeleton": {
+    "version": "dispatch-v1",
+    "seed": 143,
+    "level": 2,
+    "complaintId": "allergic_reaction",
+    "mechanismId": "allergy_causes",
+    "subtypeId": "insect_sting",
+    "conditionIds": [
+      "crash_stress_offset"
+    ],
+    "patient": {
+      "age": 39,
+      "sex": "M",
+      "weight_kg": 80
+    },
+    "comorbidityIds": [],
+    "homeMeds": [],
+    "environmentId": "park_picnic",
+    "timeOfDay": "morning",
+    "weather": "clear",
+    "bystanderId": "hostile_crowd",
+    "complication": null
+  },
+  "persona": "Anxious and restless, talks fast between breaths and keeps swatting at the air. Scared he will stop breathing and keeps asking if he is going to be okay. Gets frustrated when asked to sit still.",
+  "historyCard": {
+    "SAMPLE": {
+      "signs_symptoms": "Swelling at sting on forearm with itching and tight throat and trouble breathing",
+      "allergies": "Bee stings cause swelling before, never this bad",
+      "medications": "Takes nothing daily, no home meds",
+      "past_history": "No ongoing illness, prior local reaction to insect sting",
+      "last_meal": "Picnic snacks this morning before sting",
+      "events": "Stung while eating outdoors at picnic, swelling started after"
+    },
+    "OPQRST": {
+      "onset": "Sudden after sting at picnic a short time ago",
+      "provokes": "Swallowing and deep breaths feel worse, sitting still helps a little",
+      "quality": "Itchy sting site with tight scratchy throat and chest tightness",
+      "radiates": "Swelling spreading up arm, tightness in throat and chest",
+      "severity_words": "Scary and getting worse, throat feels like closing, fear taking over",
+      "time": "Started minutes after sting and has worsened since"
+    },
+    "secrets": [
+      {
+        "fact": "Has epi pen in bag nearby but has not used it, afraid of needles",
+        "revealWhen": "Ask about epi pen or allergy kit or bag"
+      }
+    ]
+  },
+  "bystanderLines": [
+    "We got you on video, do something right now, he cant breathe.",
+    "Back off, I know first aid, give him water and let him walk it off."
+  ],
+  "expectedPathway": "Scene safety with distance from truck and uneven ground, manage hostile crowd and request PD. Primary assessment for airway and breathing, allergy with anaphylaxis signs. Ask about epi pen use, assist per protocol, oxygen, rapid transport, monitor airway, reassess, calm fearful patient.",
+  "complication": null
+}

@@ -1,6 +1,7 @@
 // Hono proxy. All Meta API calls go through here so the key never touches
-// the client. Routes: /api/health, /api/chat, /api/test, /api/patient, /api/radio.
-// Transcribe, TTS, generate-call and debrief routes land with their milestones.
+// the client. Routes: /api/health, /api/chat, /api/test, /api/patient,
+// /api/radio, /api/generate-call. Transcribe, TTS and debrief routes land
+// with their milestones.
 
 import { Hono } from "hono";
 import { cors } from "hono/cors";
@@ -10,6 +11,7 @@ import { chatRoutes } from "./routes/chat";
 import { patientRoutes } from "./routes/patient";
 import { radioRoutes } from "./routes/radio";
 import { testRoutes } from "./routes/test";
+import { generateCallRoutes } from "./routes/generate-call";
 
 const config = loadConfig();
 const app = new Hono();
@@ -29,6 +31,7 @@ app.route("/api", chatRoutes(config));
 app.route("/api", patientRoutes(config));
 app.route("/api", radioRoutes(config));
 app.route("/api", testRoutes(config));
+app.route("/api", generateCallRoutes(config));
 
 app.notFound((c) => c.json({ error: "not found" }, 404));
 app.onError((error, c) => {

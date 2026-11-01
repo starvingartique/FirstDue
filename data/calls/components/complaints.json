@@ -1,16 +1,74 @@
 {
   "_meta": {
-    "version": "0.0.1",
-    "status": "SKELETON - weights are WEIGHT_EST until NEMSIS data lands",
-    "sourceNote": "WEIGHT_EST - replace with NEMSIS Public-Release Research Dataset when access arrives"
+    "version": "0.1.0",
+    "status": "Dispatch Engine v1. Seeded estimates, not NEMSIS data.",
+    "sourceNote": "WEIGHT_EST: every frequency weight below is a seeded estimate. Replace with NEMSIS Public-Release Research Dataset weights when access arrives. Never present these as NEMSIS data.",
+    "samplerRule": "The sampler draws one complaint weighted by weight within minLevel <= level. L1 stays to the simpler four; L2 may draw all eight."
   },
   "complaints": [
     {
-      "id": "placeholder_fall",
-      "label": "TODO - first real entry: fall",
-      "weight": "WEIGHT_EST",
-      "sourceNote": "WEIGHT_EST",
+      "id": "fall",
+      "label": "Fall",
+      "weight": 22,
+      "weightTag": "WEIGHT_EST",
+      "sourceNote": "WEIGHT_EST: seeded estimate. Ground-level falls in the elderly dominate real 911 volume; this weight keeps them common without drowning the mix.",
       "minLevel": 1
+    },
+    {
+      "id": "mvc",
+      "label": "Motor vehicle crash",
+      "weight": 14,
+      "weightTag": "WEIGHT_EST",
+      "sourceNote": "WEIGHT_EST: seeded estimate. Covers car, motorcycle, pedestrian-struck and bicycle subtypes via complaintMechanisms.",
+      "minLevel": 1
+    },
+    {
+      "id": "chest_pain",
+      "label": "Chest pain",
+      "weight": 12,
+      "weightTag": "WEIGHT_EST",
+      "sourceNote": "WEIGHT_EST: seeded estimate. V1 physiology is the stress-response placeholder only; coronary pathophysiology is Nov 2 scope.",
+      "minLevel": 1
+    },
+    {
+      "id": "assault",
+      "label": "Assault",
+      "weight": 8,
+      "weightTag": "WEIGHT_EST",
+      "sourceNote": "WEIGHT_EST: seeded estimate. Blunt assault and sports-impact subtypes; penetrating assault is under stabbing and gunshot.",
+      "minLevel": 1
+    },
+    {
+      "id": "overdose",
+      "label": "Overdose",
+      "weight": 7,
+      "weightTag": "WEIGHT_EST",
+      "sourceNote": "WEIGHT_EST: seeded estimate. V1 toxidrome is narrative-only (history card, persona, scene clues); engine pathophysiology is Nov 2 scope.",
+      "minLevel": 2
+    },
+    {
+      "id": "allergic_reaction",
+      "label": "Allergic reaction",
+      "weight": 4,
+      "weightTag": "WEIGHT_EST",
+      "sourceNote": "WEIGHT_EST: seeded estimate. V1 physiology is the stress-response placeholder only; anaphylactic-shock pathophysiology is Nov 2 scope.",
+      "minLevel": 2
+    },
+    {
+      "id": "stabbing",
+      "label": "Stabbing",
+      "weight": 3,
+      "weightTag": "WEIGHT_EST",
+      "sourceNote": "WEIGHT_EST: seeded estimate. V1 models the leg-stab subset (femoral bleed); torso-stab pathophysiology is narrative-only until Nov 2.",
+      "minLevel": 2
+    },
+    {
+      "id": "gunshot",
+      "label": "Gunshot",
+      "weight": 2,
+      "weightTag": "WEIGHT_EST",
+      "sourceNote": "WEIGHT_EST: seeded estimate. V1 models the extremity subset (femoral bleed); torso and head pathophysiology is narrative-only until Nov 2.",
+      "minLevel": 2
     }
   ]
 }
