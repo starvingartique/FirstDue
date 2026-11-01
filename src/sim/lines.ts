@@ -22,8 +22,28 @@ export const PRESSURE_BAG_X = 1.75;
 export const IO_FLOW = {
   humeral: [80, 150] as const,
   tibial: [30, 80] as const,
+  /**
+   * Sternal (FAST1-style) with a pressure bag. TUNE: set equal to humeral.
+   * Cadaver data (DTIC ADA597324) found the sternum gave the most consistent
+   * and highest flow at 300 mmHg, but no mL/min figure was pulled for this.
+   */
+  sternal: [80, 150] as const,
   gravity: 10
 };
+
+/**
+ * Blood set (filtered Y tubing) limits. Hospital standard is a new set every
+ * 4 h, and many sites cap units per set (1-6 seen in practice). TUNE for
+ * Wyatt: 4 units or 4 h, whichever comes first.
+ */
+export const BLOOD_SET_MAX_UNITS = 4;
+export const BLOOD_SET_MAX_S = 4 * 3600;
+/** Saline used to prime the Y set and warmer cartridge (TUNE). */
+export const BLOOD_SET_PRIME_ML = 40;
+/** Saline flush per blood unit (Carlos: about 10 mL; TUNE). */
+export const BLOOD_FLUSH_ML_PER_UNIT = 10;
+/** Whole blood unit volume (about 500 mL per unit, per EMS protocols). */
+export const BLOOD_UNIT_ML = 500;
 
 export interface IvAttemptInput {
   shock: boolean;
@@ -46,7 +66,9 @@ export function isLargeGaugeSmallVein(gauge: number, site: IvSite): boolean {
 }
 
 /** IO needle fit for Josh. Wrong needle fails deterministically, no guessing. */
-export function ioNeedleOk(site: "tibial" | "humeral", needle_mm: number): boolean {
+export function ioNeedleOk(site: "tibial" | "humeral" | "sternal", needle_mm: number): boolean {
+  // FAST1-style sternal devices set their own depth: no needle choice.
+  if (site === "sternal") return true;
   if (site === "tibial") return needle_mm === 25;
   return needle_mm === 45;
 }

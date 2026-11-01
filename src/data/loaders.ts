@@ -173,8 +173,10 @@ export function loadEquipment(): EquipmentFile {
     const cat = list.find((entry) => entry["id"] === "cat_tourniquet");
     if (cat === undefined) throw new DataError("equipment.json", 'missing "cat_tourniquet"');
     const q = cat["quantities"];
-    if (!isObject(q) || q["belt"] !== 1 || q["jump_bag"] !== 2 || q["cabinet"] !== 4) {
-      throw new DataError("equipment.json", '"cat_tourniquet" quantities must be belt 1, jump 2, cabinet 4');
+    // Oct 31: kit and truck loaded to ALS levels. Still require one CAT on
+    // the belt and per-stash numbers, not the old 1/2/4 pin.
+    if (!isObject(q) || q["belt"] !== 1 || typeof q["jump_bag"] !== "number" || typeof q["cabinet"] !== "number") {
+      throw new DataError("equipment.json", '"cat_tourniquet" needs quantities with belt 1 and numeric jump_bag and cabinet');
     }
   });
 }

@@ -79,8 +79,10 @@ export function newTestSim(seed = 1027, startLoss_mL = 0): Sim {
   sim.stock("macro_drip_set", 0, 2, 4);
   sim.stock("micro_drip_set", 0, 1, 3);
   sim.stock("pressure_bag_300", 0, 1, 1);
-  sim.stock("fluid_warmer", 0, 0, 1);
-  sim.stock("blood_tubing_filter", 0, 0, 2);
+  sim.stock("fluid_warmer", 0, 1, 0);
+  sim.stock("y_tubing_blood", 0, 2, 0);
+  sim.stock("ns_250ml", 0, 2, 0);
+  sim.stock("io_fast1", 0, 1, 1);
   sim.stock("ns_1000ml", 0, 3, 4);
   sim.stock("lr_1000ml", 0, 2, 2);
   sim.stock("whole_blood_unit", 0, 0, 2);
@@ -95,5 +97,7 @@ export function newTestSim(seed = 1027, startLoss_mL = 0): Sim {
   sim.stock("glucometer", 0, 1, 0);
   sim.stock("thermometer", 0, 1, 0);
   sim.stock("monitor_defib", 0, 1, 0);
+  // Headless checks run with every truck box already at the patient.
+  for (const box of ["narc_box", "blood_cooler", "blood_kit", "rsi_kit", "cc_box"]) sim.staged.add(box);
   return sim;
 }

@@ -43,6 +43,35 @@ New TODO_CLINICAL for Wyatt, in blocker order:
 3. L1 deterioration x0.5 - the brief gives slow/real with no number.
 4. Destination correctness for a femoral bleed - not graded, needs a rule.
 
+## Oct 31 kit, blood and IO pass (branch claude/acm-gamified-ui)
+
+Engine changes, with values marked TUNE for Wyatt sign-off.
+
+- Bug fix: a refused action no longer eats kit. Any action that grabbed an
+  item and then failed (busy, wrong IO needle, missing second item) refunds
+  it. This was the "partner fetched it and it vanished" report, together
+  with the old hang-fluid label that showed the truck count, not what was
+  at the patient (now "here N, truck M").
+- Sternal IO (FAST1-style): no drill or needle choice, one attempt per
+  patient, lidocaine option, pressure-bag flow TUNE = humeral range.
+- Y tubing replaces blood tubing: filtered Y set primed with normal saline
+  through the warmer (45 s). Blood on one spike, NS on the other. The set
+  stays on the line for up to 4 units or 4 h (TUNE), 10 mL NS flush per
+  unit (TUNE, Carlos), 40 mL to prime (TUNE). Nothing but NS and blood goes
+  through it. 1 unit (500 mL) or 2 units back to back.
+- Drip sets stay on the line: only the first crystalloid bag needs one.
+- Warmer: reusable device, one line at a time, shown on the line.
+- Truck boxes staged in one partner trip: narc box, blood cooler, blood kit
+  (Y sets, warmer, NS 250, pressure bag), RSI kit, critical care box, OB,
+  CBRN. Drugs follow their drugs.json location: narcotics_safe drugs need
+  the narc box, rsi_kit the RSI kit, cc_box the CC box.
+- Kit bag and truck loaded to ALS levels (Loyola EMSS ALS inventory as the
+  reference). New stock: NS 250, FAST1, pelvic binder, needle decompression
+  kit, cric kit, LifeFlow (last four have no action yet).
+- Indicators: Y set ring and warmer on the body diagram, Y set units and
+  saline left, warmer line, staged boxes in "On patient".
+- Tests: scripts/oct31-test.ts (npm run sim:test31).
+
 ## Oct 31 ACM gamified UI (branch claude/acm-gamified-ui)
 
 Arma / ACE medical menu feel. Presentation only: no clinical values, timings,

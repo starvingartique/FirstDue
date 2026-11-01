@@ -141,10 +141,10 @@ function finishPending(sim: Sim): void {
   check("reassess restores control", !sim.tq.loosened, "control restored");
 }
 
-// 7. Cabinet fetch costs 45-60 s, jump bag items are immediate.
+// 7. Cabinet fetch costs 45-60 s, jump bag items are immediate (Oct 31 kit: belt 1 + jump 4).
 {
   const sim = newBikeDownSim();
-  check("jump CAT immediate", sim.atPatient("cat_tourniquet") === 3, `have=${sim.atPatient("cat_tourniquet")}`);
+  check("jump CAT immediate", sim.atPatient("cat_tourniquet") === 5, `have=${sim.atPatient("cat_tourniquet")}`);
   check("SAM JT not at patient", sim.atPatient("junctional_tourniquet_samjt") === 0, "cabinet only");
   const fetch = sim.fetchFromTruck("junctional_tourniquet_samjt", "partner");
   const job = sim.fetches[0];

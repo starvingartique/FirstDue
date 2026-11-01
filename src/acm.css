@@ -1265,3 +1265,15 @@ body {
   color: var(--dim);
   border: 1px dashed var(--acm-line);
 }
+
+/* Y set ring on a line site; warm (amber) when the warmer is inline. */
+.mk-yset {
+  fill: none;
+  stroke: var(--run);
+  stroke-width: 1.4;
+  stroke-dasharray: 3 2;
+}
+
+.mk-yset.warm {
+  stroke: #ff9a3c;
+}

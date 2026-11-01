@@ -48,6 +48,7 @@ const P = {
   ivHand: [170, 240],
   ioHumeral: [149, 98],
   ioTibial: [83, 352],
+  ioSternal: [100, 100],
   mouth: [100, 52],
   nose: [100, 45],
   spo2: [30, 248]
@@ -168,7 +169,8 @@ export class BodyMap {
       bleeding, legSeen, s.beltTrap, s.tq.applied, s.tq.placement, s.tq.timeWritten, s.tq.secondApplied, s.tq.secondPlacement,
       s.tq.loosened, s.packing.stage, Math.ceil(s.packing.holdRemaining_s / 10), s.pressure.active, s.pressure.bystanderShirt,
       s.pressure.holder, s.dressing.applied, s.dressing.tightness, s.legCongested(),
-      s.fluids.lines.map((l) => `${l.id}${l.kind}${l.site}${l.infiltrated}${l.pressureBag}${Math.round((l.bag?.volumeLeft_mL ?? -1) / 25)}`).join(","),
+      s.fluids.lines.map((l) => `${l.id}${l.kind}${l.site}${l.infiltrated}${l.pressureBag}${Math.round((l.bag?.volumeLeft_mL ?? -1) / 25)}${l.ySet?.units ?? "n"}${Math.round(l.ySet?.salineLeft_mL ?? 0)}${l.warmer}`).join(","),
+      [...s.staged].join("+"),
       s.airway.adjunct?.kind, s.airway.ett?.placement, s.airway.ett?.secured, s.airway.soiled,
       s.o2.device, s.o2.flow_L_per_min, Math.round(s.o2.tankPsi / 100), s.monitor.spo2Attached, s.monitor.etco2Attached,
       s.wrapped, s.wetClothing, s.drugs.active.length, examined.has("arm_right"), s.fetches.length, s.arrested
@@ -236,12 +238,16 @@ export class BodyMap {
     for (const line of s.fluids.lines) {
       const pos =
         line.kind === "io"
-          ? line.site === "humeral" ? P.ioHumeral : P.ioTibial
+          ? line.site === "humeral" ? P.ioHumeral : line.site === "sternal" ? P.ioSternal : P.ioTibial
           : line.site === "hand" ? P.ivHand : line.site === "forearm" ? P.ivForearm : P.ivAc;
       const cls = line.infiltrated ? "bad" : line.bag !== null ? "run" : "ok";
       g.appendChild(svg(line.kind === "io" ? "rect" : "circle", line.kind === "io"
         ? { x: pos[0] - 4, y: pos[1] - 4, width: 8, height: 8, transform: `rotate(45 ${pos[0]} ${pos[1]})`, class: `mk-line ${cls}` }
         : { cx: pos[0], cy: pos[1], r: 4, class: `mk-line ${cls}` }));
+      // Y set + warmer on this line: a ring around the site.
+      if (line.ySet !== null) {
+        g.appendChild(svg("circle", { cx: pos[0], cy: pos[1], r: 8, class: `mk-yset${line.warmer ? " warm" : ""}` }));
+      }
     }
     if (s.airway.adjunct !== null || s.airway.ett !== null) {
       const [x, y] = P.mouth;
@@ -301,7 +307,17 @@ export class BodyMap {
     for (const line of s.fluids.lines) {
       const where = line.kind === "io" ? `IO ${line.site}${line.needle_mm !== undefined ? ` ${line.needle_mm} mm` : ""}` : `${line.gauge ?? ""}g IV ${line.site}`;
       const bag = line.bag === null ? "" : `, ${line.bag.fluid === "blood" ? "blood" : line.bag.fluid.toUpperCase()} ${Math.round(line.bag.volumeLeft_mL)} mL left${line.pressureBag ? " +PB" : ""}`;
-      items.push({ icon: line.bag !== null ? "drop" : "lines", text: `${where}${line.infiltrated ? " INFILTRATED" : ""}${bag}`, state: line.infiltrated ? "bad" : line.bag !== null ? "run" : "ok" });
+      const whereTxt = line.site === "sternal" ? "IO sternal FAST1" : where;
+      items.push({ icon: line.bag !== null ? "drop" : "lines", text: `${whereTxt}${line.infiltrated ? " INFILTRATED" : ""}${bag}`, state: line.infiltrated ? "bad" : line.bag !== null ? "run" : "ok" });
+      if (line.ySet !== null) {
+        const spent = line.ySet.units >= 4;
+        items.push({
+          icon: "drop",
+          text: `Y tubing on line ${line.id}: ${line.ySet.units}/4 units, NS ${Math.round(line.ySet.salineLeft_mL)} mL${spent ? ", replace" : ""}`,
+          state: spent ? "warn" : "ok"
+        });
+      }
+      if (line.warmer) items.push({ icon: "vitals", text: `Fluid warmer 38 C on line ${line.id}`, state: line.bag?.fluid === "blood" ? "run" : "ok" });
     }
     if (s.airway.ett !== null) {
       items.push({ icon: "airway", text: `ETT ${s.airway.ett.size_mm} at ${s.airway.ett.depth_cm} cm${s.airway.ett.secured ? ", secured" : ", unsecured"}`, state: s.airway.ett.secured ? "ok" : "warn" });
@@ -318,6 +334,10 @@ export class BodyMap {
     for (const d of s.drugs.active) items.push({ icon: "syringe", text: `${d.drugId} ${d.route}`, state: d.toxic ? "bad" : "ok" });
     if (!s.wetClothing) items.push({ icon: "blanket", text: "Wet clothing off", state: "ok" });
     if (s.wrapped) items.push({ icon: "blanket", text: "Wrapped for hypothermia", state: "ok" });
+    if (s.staged.size > 0) {
+      const names: Record<string, string> = { narc_box: "Narc box", blood_cooler: "Blood cooler", blood_kit: "Blood kit", rsi_kit: "RSI kit", cc_box: "CC box", ob_kit: "OB kit", cbrn_kit: "CBRN kit" };
+      items.push({ icon: "truck", text: `Staged: ${[...s.staged].map((b) => names[b] ?? b).join(", ")}`, state: "ok" });
+    }
     if (s.fetches.length > 0) {
       const back = Math.max(...s.fetches.map((f) => f.remaining_s));
       items.push({ icon: "truck", text: `Partner at truck: ${s.fetches.length} item${s.fetches.length > 1 ? "s" : ""}, ${back}s`, state: "run" });

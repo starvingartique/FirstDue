@@ -13,7 +13,8 @@
 import type { RegionId } from "../patient/regions";
 import { REGION_LABELS } from "../patient/regions";
 import { loadOct28Conditions, loadTraumaLibrary } from "../data/loaders";
-import type { Sim } from "../sim/engine";
+import { TRUCK_BOXES, type Sim } from "../sim/engine";
+import { BLOOD_SET_MAX_UNITS, BLOOD_SET_MAX_S } from "../sim/lines";
 import type { Holder } from "../sim/types";
 import type { CuffFit } from "../sim/exams";
 import { drugCatalog, formatDose, presentationMath } from "../sim/drugs";
@@ -97,7 +98,7 @@ const HEAD_MONITOR: PlanCategory = {
 };
 const ARM: PlanCategory[] = [
   EXAM,
-  { tab: "lines", sections: [{ title: "Lines" }, { title: "Start IV" }, { title: "Start IO" }, { title: "Fluids" }] },
+  { tab: "lines", sections: [{ title: "Lines" }, { title: "Start IV" }, { title: "Start IO" }, { title: "Fluids" }, { title: "Blood" }] },
   { tab: "meds", sections: [{ title: "Drug box" }, { title: "On board" }] },
   {
     tab: "monitor",
@@ -110,6 +111,7 @@ const ARM: PlanCategory[] = [
 const CHEST: PlanCategory[] = [
   EXAM,
   { ...FACE_BREATHING, planned: ["Needle decompression", "Vented chest seal", "Finger thoracostomy"] },
+  { tab: "lines", sections: [{ title: "Lines" }, { title: "Start IO" }, { title: "Fluids" }, { title: "Blood" }] },
   { tab: "monitor", sections: [{ title: "Manual vitals", actions: /^(rr|lung)/i }] }
 ];
 
@@ -147,7 +149,7 @@ const REGION_PLAN: Record<RegionId, PlanCategory[]> = {
       ]
     }
   ],
-  leg_right: [EXAM, { tab: "lines", sections: [{ title: "Lines" }, { title: "Start IO" }, { title: "Fluids" }] }],
+  leg_right: [EXAM, { tab: "lines", sections: [{ title: "Lines" }, { title: "Start IO" }, { title: "Fluids" }, { title: "Blood" }] }],
   back: [EXAM]
 };
 
@@ -1048,6 +1050,11 @@ export class MedicalMenu {
         return has(() => s.fluids.lines.some((l) => l.bag !== null)) ? { text: "RUNNING", cls: "run" } : null;
       case "Apply pressure bag":
         return has(() => s.fluids.lines.some((l) => l.pressureBag)) ? { text: "ON", cls: "on" } : null;
+      case "Prime Y tubing + warmer":
+      case "Replace the Y set":
+        return s.fluids.lines.some((l) => l.ySet !== null) ? { text: "ON", cls: "on" } : null;
+      case "Hang whole blood":
+        return s.fluids.lines.some((l) => l.bag?.fluid === "blood") ? { text: "RUNNING", cls: "run" } : null;
       case "Attach SpO2 probe":
         return s.monitor.spo2Attached ? { text: "ON", cls: "on" } : null;
       case "Attach waveform EtCO2":
@@ -1590,9 +1597,12 @@ export class MedicalMenu {
           { value: "junctional_tourniquet_samjt", label: "SAM JT" },
           { value: "hypothermia_wrap_blanket", label: "Wrap blanket" },
           { value: "o2_tank_m", label: "O2 M cylinder" },
-          { value: "whole_blood_unit", label: "Whole blood" },
-          { value: "blood_tubing_filter", label: "Blood tubing" },
-          { value: "fluid_warmer", label: "Fluid warmer" },
+          { value: "whole_blood_unit", label: `Whole blood (truck ${s.cabinetLeft("whole_blood_unit")})` },
+          { value: "y_tubing_blood", label: `Y tubing (truck ${s.cabinetLeft("y_tubing_blood")})` },
+          { value: "ns_250ml", label: `NS 250 mL (truck ${s.cabinetLeft("ns_250ml")})` },
+          { value: "fluid_warmer", label: `Fluid warmer (truck ${s.cabinetLeft("fluid_warmer")})` },
+          { value: "io_fast1", label: `FAST1 sternal IO (truck ${s.cabinetLeft("io_fast1")})` },
+          { value: "ns_1000ml", label: `NS 1 L (truck ${s.cabinetLeft("ns_1000ml")})` },
           { value: "cpap_unit", label: "CPAP" }
         ]
       },
@@ -1606,6 +1616,46 @@ export class MedicalMenu {
     this.action("Fetch from the truck (50s round trip)", () =>
       s.fetchFromTruck(fetchSel.get("item")?.value ?? "cat_tourniquet", (fetchSel.get("runner")?.value ?? "partner") as Holder)
     );
+    this.renderStaging();
+  }
+
+  /** Truck boxes: one partner trip brings the whole box to the patient. */
+  private renderStaging(): void {
+    const s = this.sim;
+    this.section("Truck: stage boxes at the patient");
+    const staged = [...s.staged].map((id) => TRUCK_BOXES[id]?.label ?? id);
+    const coming = s.fetches.filter((f) => f.itemId.startsWith("box:")).map((f) => TRUCK_BOXES[f.itemId.slice(4)]?.label ?? f.itemId);
+    this.note(`At the patient: ${staged.length > 0 ? staged.join(", ") : "jump bag and drug box only"}.${coming.length > 0 ? ` On the way: ${coming.join(", ")}.` : ""}`);
+    const left = Object.entries(TRUCK_BOXES).filter(([id]) => !s.staged.has(id));
+    if (left.length === 0) {
+      this.note("Everything is off the truck.");
+      return;
+    }
+    const sel = this.selects([
+      { id: "box", label: "Box", options: left.map(([id, b]) => ({ value: id, label: b.label })) },
+      {
+        id: "brunner", label: "Runner", options: [
+          { value: "partner", label: "Partner (you stay free)" },
+          { value: "player", label: "You (50s)" }
+        ]
+      }
+    ]);
+    this.action("Stage it (50s round trip)", () =>
+      s.stageBox(sel.get("box")?.value ?? left[0][0], (sel.get("brunner")?.value ?? "partner") as Holder)
+    );
+  }
+
+  /** One-click partner run for a box the current section needs. */
+  private stageShortcut(boxId: string): void {
+    const s = this.sim;
+    const box = TRUCK_BOXES[boxId];
+    if (box === undefined || s.staged.has(boxId)) return;
+    const coming = s.fetches.some((f) => f.itemId === `box:${boxId}`);
+    if (coming) {
+      this.note(`${box.label}: partner is bringing it.`);
+      return;
+    }
+    this.action(`Partner: bring the ${box.label} (50s)`, () => s.stageBox(boxId, "partner"));
   }
 
   // - Medications (minimal prep loop) -
@@ -1627,10 +1677,18 @@ export class MedicalMenu {
     }
     if (presEntry.index !== this.drugPres) this.drugPres = presEntry.index;
     const presentation = usable.drug.presentations[presEntry.index];
+    const reach = s.drugReachable(usable.drug.location);
+    if (!reach.ok && reach.box !== undefined) {
+      this.note(`${usable.drug.name} lives in the ${TRUCK_BOXES[reach.box]?.label ?? "truck"}. Stage it to draw this.`);
+      this.stageShortcut(reach.box);
+    }
     this.selects([
       {
         id: "drug", label: "Drug", current: this.drugId,
-        options: catalog.usable.map((u) => ({ value: u.drug.id, label: u.drug.name })),
+        options: catalog.usable.map((u) => {
+          const r = s.drugReachable(u.drug.location);
+          return { value: u.drug.id, label: r.ok ? u.drug.name : `${u.drug.name} (in ${TRUCK_BOXES[r.box ?? ""]?.label ?? "truck"})` };
+        }),
         onPick: (value) => {
           this.drugId = value;
           this.drugPres = 0;
@@ -1702,10 +1760,14 @@ export class MedicalMenu {
         ? "no bag"
         : `${line.bag.fluid} ${Math.round(line.bag.volumeLeft_mL)}/${line.bag.volumeTotal_mL} mL (${line.bag.drip})`;
       const gtt = line.bag === null ? "" : ` ${Math.round(gttPerMin(line.flow_mL_per_min * 60, line.bag.drip === "micro60" ? 60 : 15))} gtt/min ref`;
+      const dev = line.site === "sternal" ? " FAST1" : line.gauge !== undefined ? ` ${line.gauge}g` : ` ${line.needle_mm}mm`;
+      const yset = line.ySet === null
+        ? ""
+        : ` Y set ${line.ySet.units}/${BLOOD_SET_MAX_UNITS} units, NS ${Math.round(line.ySet.salineLeft_mL)} mL${line.warmer ? ", warmer 38 C" : ""}.`;
       this.note(
-        `Line ${line.id}: ${line.kind} ${line.site}${line.gauge !== undefined ? ` ${line.gauge}g` : ` ${line.needle_mm}mm`}` +
+        `Line ${line.id}: ${line.kind} ${line.site}${dev}` +
           `${line.infiltrated ? " INFILTRATED" : ""}${line.pressureBag ? " +pressure bag" : ""}, ` +
-          `${Math.round(line.flow_mL_per_min)} mL/min, ${bag}.${gtt}`
+          `${Math.round(line.flow_mL_per_min)} mL/min, ${bag}.${gtt}${line.dripSet !== null ? ` Drip set on (${line.dripSet === "micro_drip_set" ? "micro" : "macro"}).` : ""}${yset}`
       );
     }
 
@@ -1733,12 +1795,13 @@ export class MedicalMenu {
     );
 
     this.section("Start IO (30s, 95 percent)");
-    this.note("Josh: 25 mm tibial, 45 mm humeral. No fracture, burn, prior IO or prosthesis at either site.");
+    this.note("Josh: 25 mm tibial, 45 mm humeral, or sternal FAST1 (sets its own depth, one attempt). No fracture, burn, prior IO or prosthesis at any site.");
     const ioSel = this.selects([
       {
         id: "site", label: "Site", options: [
           { value: "tibial", label: "Tibial" },
-          { value: "humeral", label: "Humeral" }
+          { value: "humeral", label: "Humeral" },
+          { value: "sternal", label: `Sternal FAST1 (have ${s.atPatient("io_fast1")})${s.sternalTried ? " - used" : ""}` }
         ]
       },
       {
@@ -1756,7 +1819,7 @@ export class MedicalMenu {
     ]);
     this.action("Drill IO", () =>
       s.startIo(
-        (ioSel.get("site")?.value ?? "tibial") as "tibial" | "humeral",
+        (ioSel.get("site")?.value ?? "tibial") as "tibial" | "humeral" | "sternal",
         Number(ioSel.get("needle")?.value ?? "25"),
         ioSel.get("lido")?.value === "yes"
       )
@@ -1773,9 +1836,8 @@ export class MedicalMenu {
         },
         {
           id: "fluid", label: "Bag", options: [
-            { value: "ns", label: `NS 1 L (have ${s.atPatient("ns_1000ml")})` },
-            { value: "lr", label: `LR 1 L (have ${s.atPatient("lr_1000ml")})` },
-            { value: "blood", label: `Whole blood (truck ${s.cabinetLeft("whole_blood_unit")})` }
+            { value: "ns", label: `NS 1 L (here ${s.atPatient("ns_1000ml")}, truck ${s.cabinetLeft("ns_1000ml")})` },
+            { value: "lr", label: `LR 1 L (here ${s.atPatient("lr_1000ml")}, truck ${s.cabinetLeft("lr_1000ml")})` }
           ]
         },
         {
@@ -1790,7 +1852,7 @@ export class MedicalMenu {
       this.action("Hang bag (30s)", () =>
         s.hangFluids(
           Number(hangSel.get("line")?.value ?? "-1"),
-          (hangSel.get("fluid")?.value ?? "ns") as "ns" | "lr" | "blood",
+          (hangSel.get("fluid")?.value ?? "ns") as "ns" | "lr",
           hangSel.get("drip")?.value ?? "macro15"
         )
       );
@@ -1801,7 +1863,8 @@ export class MedicalMenu {
       ]);
       this.action("Apply pressure bag (300 mmHg)", () => s.applyPressureBag(Number(pbSel.get("line")?.value ?? "-1")));
     }
-    this.note("Blood needs blood tubing with a filter plus the warmer at 38 C (both truck fetch). Crystal: +1 L now, ~250 mL at 60 min.");
+    this.note("Drip sets stay on the line: the next bag on the same line reuses it. Crystal: +1 L now, ~250 mL at 60 min.");
+    this.renderBlood(running);
     if (s.fluids.lines.length > 0) {
       const pullSel = this.selects([
         {
@@ -1810,6 +1873,38 @@ export class MedicalMenu {
       ]);
       this.action("Pull line (stops its bag)", () => s.pullLine(Number(pullSel.get("line")?.value ?? "-1")));
     }
+  }
+
+  /** Whole blood: filtered Y tubing primed with NS through the warmer. */
+  private renderBlood(running: Sim["fluids"]["lines"]): void {
+    const s = this.sim;
+    this.section("Blood (Y tubing + warmer)");
+    const warmerOn = s.fluids.lines.find((l) => l.warmer);
+    this.note(
+      `Here: blood ${s.atPatient("whole_blood_unit")} (cooler ${s.cabinetLeft("whole_blood_unit")}), Y sets ${s.atPatient("y_tubing_blood")}, ` +
+        `NS 250 ${s.atPatient("ns_250ml")}, warmer ${s.atPatient("fluid_warmer") > 0 ? (warmerOn ? `on line ${warmerOn.id}` : "ready") : "on truck"}.`
+    );
+    this.stageShortcut("blood_cooler");
+    this.stageShortcut("blood_kit");
+    if (running.length === 0) {
+      this.note("Get a line first. Blood goes on its own line: nothing but NS and blood through blood tubing.");
+      return;
+    }
+    const lineSel = this.selects([
+      { id: "bline", label: "Line", options: running.map((l) => ({ value: String(l.id), label: `Line ${l.id} (${l.kind} ${l.site})${l.ySet ? " - Y set" : ""}` })) }
+    ]);
+    const picked = (): number => Number(lineSel.get("bline")?.value ?? "-1");
+    const cur = running.find((l) => l.id === Number(lineSel.get("bline")?.value ?? "-1")) ?? running[0];
+    const spent = cur.ySet !== null && (cur.ySet.units >= BLOOD_SET_MAX_UNITS || s.t_s - cur.ySet.placedAt_s >= BLOOD_SET_MAX_S);
+    if (cur.ySet !== null) {
+      const age = Math.floor((s.t_s - cur.ySet.placedAt_s) / 60);
+      this.note(`Line ${cur.id} Y set: ${cur.ySet.units}/${BLOOD_SET_MAX_UNITS} units, ${age} min old, NS ${Math.round(cur.ySet.salineLeft_mL)} mL.${spent ? " SPENT: replace it." : ""}`);
+    }
+    this.action(cur.ySet === null ? "Prime Y tubing + warmer (45s)" : "Replace the Y set (45s)", () => s.setupBloodLine(picked()));
+    const unitSel = this.selects([
+      { id: "units", label: "Units", default: "1", options: [{ value: "1", label: "1 unit (500 mL)" }, { value: "2", label: "2 units back to back (1,000 mL)" }] }
+    ]);
+    this.action("Hang whole blood (30s)", () => s.hangFluids(picked(), "blood", "y_set", Number(unitSel.get("units")?.value ?? "1")));
   }
 
   // - Monitor and manual vitals -

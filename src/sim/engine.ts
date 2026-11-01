@@ -27,7 +27,12 @@ import {
   ioNeedleOk,
   ivSuccessP,
   IV_GRAVITY_FLOW,
-  retainedFluids_mL
+  retainedFluids_mL,
+  BLOOD_SET_MAX_UNITS,
+  BLOOD_SET_MAX_S,
+  BLOOD_SET_PRIME_ML,
+  BLOOD_FLUSH_ML_PER_UNIT,
+  BLOOD_UNIT_ML
 } from "./lines";
 import { drugCatalog, effectFactor, formatDose } from "./drugs";
 import {
@@ -103,6 +108,35 @@ export interface TqOptions {
  * at half the engine rate, L2 stays 1.0 exactly (Oct 28 curve untouched).
  */
 export const L1_DETERIORATION_SCALE = 0.5;
+
+/**
+ * Boxes that live on the truck and get staged at the patient on a long
+ * scene: one partner trip brings the whole box. Drug locations match the
+ * "location" field in drugs.json; items are equipment stash ids.
+ */
+export const TRUCK_BOXES: Record<string, { label: string; drugLocations: string[]; items: string[] }> = {
+  narc_box: { label: "Narc box", drugLocations: ["narcotics_safe"], items: [] },
+  blood_cooler: { label: "Blood cooler", drugLocations: ["blood_cooler"], items: ["whole_blood_unit"] },
+  blood_kit: {
+    label: "Blood kit (Y tubing, warmer, saline)",
+    drugLocations: [],
+    items: ["y_tubing_blood", "fluid_warmer", "ns_250ml", "pressure_bag_300"]
+  },
+  rsi_kit: { label: "RSI kit", drugLocations: ["rsi_kit"], items: [] },
+  cc_box: { label: "Critical care box", drugLocations: ["cc_box"], items: [] },
+  ob_kit: { label: "OB kit", drugLocations: ["ob_kit"], items: [] },
+  cbrn_kit: { label: "CBRN kit", drugLocations: ["cbrn_kit"], items: [] }
+};
+
+/** Drug locations that are with the crew at the patient from the start. */
+const AT_PATIENT_DRUG_LOCATIONS = new Set(["drug_box", "jump_bag", "airway_bag", "iv_cabinet", "onboard"]);
+
+/** Every action that can grab kit. A failed attempt refunds what it took. */
+const KIT_ACTIONS = [
+  "exposeWound", "applyTQ", "applySecondTQ", "packWound", "applyDressing", "applyWrap", "insertOpa", "insertNpa",
+  "placeSupraglottic", "intubate", "suctionAirway", "applyO2", "swapTank", "startIv", "startIo", "hangFluids",
+  "setupBloodLine", "prepPush", "fetchFromTruck", "stageBox"
+] as const;
 
 export interface SecondTqOptions {
   /** Windlass half-turns on the second CAT. Under 3 never clamps (same rule as the first). Omitted = 3. */
@@ -230,6 +264,12 @@ export class Sim {
   private stressEasedLogged = false;
   /** Rolled IO pressure-bag flows by line id (seeded at placement, logged). */
   private ioPressureFlows = new Map<number, number>();
+  /** Truck boxes staged at the patient (see TRUCK_BOXES). */
+  staged = new Set<string>();
+  /** One sternal IO attempt per patient. */
+  sternalTried = false;
+  /** Items taken during the current action call, refunded if it fails. */
+  private txn: { itemId: string; from: "belt" | "jump" | "fetched" }[] | null = null;
 
   pending: PendingAction | null = null;
   private pendingDone: (() => void) | null = null;
@@ -267,6 +307,31 @@ export class Sim {
     if (config.beltTrap) {
       this.addLog("trap", "Belt cinched mid-thigh: venous tourniquet (x1.3 bleed). Leg purple and swollen.");
     }
+    // Refund kit on refusal: an action that fails (busy, wrong size, missing
+    // a second item) must not eat what it already pulled from the bag.
+    const self = this as unknown as Record<string, (...args: unknown[]) => ActionResult>;
+    for (const name of KIT_ACTIONS) {
+      const orig = self[name];
+      if (typeof orig !== "function") continue;
+      self[name] = (...args: unknown[]): ActionResult => {
+        if (this.txn !== null) return orig.apply(this, args);
+        this.txn = [];
+        try {
+          const res = orig.apply(this, args);
+          if (!res.ok) this.refundTxn();
+          return res;
+        } finally {
+          this.txn = null;
+        }
+      };
+    }
+  }
+
+  private refundTxn(): void {
+    for (const t of this.txn ?? []) {
+      const s = this.stashes.get(t.itemId);
+      if (s !== undefined) s[t.from] += 1;
+    }
   }
 
   // - inventory -
@@ -292,19 +357,56 @@ export class Sim {
     if (TOOL_ITEMS.has(itemId)) {
       return s.belt + s.jump + s.fetched > 0;
     }
-    if (s.belt > 0) {
-      s.belt -= 1;
-      return true;
+    const from: "belt" | "jump" | "fetched" | null = s.belt > 0 ? "belt" : s.jump > 0 ? "jump" : s.fetched > 0 ? "fetched" : null;
+    if (from === null) return false;
+    s[from] -= 1;
+    this.txn?.push({ itemId, from });
+    return true;
+  }
+
+  /** Whether a drug is reachable: drug box at the patient, or its truck box staged. */
+  drugReachable(location: string | undefined): { ok: boolean; box?: string } {
+    const token = (location ?? "drug_box").split(/[\s(+]/)[0].trim();
+    if (AT_PATIENT_DRUG_LOCATIONS.has(token)) return { ok: true };
+    for (const [id, box] of Object.entries(TRUCK_BOXES)) {
+      if (box.drugLocations.includes(token)) return this.staged.has(id) ? { ok: true } : { ok: false, box: id };
     }
-    if (s.jump > 0) {
-      s.jump -= 1;
-      return true;
+    return { ok: true };
+  }
+
+  /** Partner (or player) brings a whole box off the truck in one trip. */
+  stageBox(boxId: string, runner: Holder): ActionResult {
+    const box = TRUCK_BOXES[boxId];
+    if (box === undefined) return { ok: false, reason: `Unknown box ${boxId}.` };
+    if (this.staged.has(boxId)) return { ok: false, reason: `${box.label} is already at the patient.` };
+    const key = `box:${boxId}`;
+    if (this.fetches.some((f) => f.itemId === key)) return { ok: false, reason: `${box.label} is already on its way.` };
+    const seconds = this.config.fetch_s;
+    if (runner === "player") {
+      return this.start("fetch", `Bring the ${box.label} from the truck`, seconds, () => this.landBox(boxId));
     }
-    if (s.fetched > 0) {
-      s.fetched -= 1;
-      return true;
+    const jobs = this.fetches.filter((f) => f.runner === runner);
+    const latest = jobs.reduce((m, f) => Math.max(m, f.remaining_s), 0);
+    const ride = jobs.length > 0 && latest > seconds / 2;
+    const remaining = ride ? latest : (jobs.length > 0 ? latest : 0) + seconds;
+    this.fetches.push({ itemId: key, remaining_s: remaining, total_s: seconds, runner });
+    this.addLog("fetch", `${runner} ${ride ? "grabs" : "heads to the truck for"} the ${box.label} (back in ${remaining}s).`);
+    return { ok: true };
+  }
+
+  private landBox(boxId: string): void {
+    const box = TRUCK_BOXES[boxId];
+    if (box === undefined || this.staged.has(boxId)) return;
+    this.staged.add(boxId);
+    const moved: string[] = [];
+    for (const itemId of box.items) {
+      const s = this.stashes.get(itemId);
+      if (s === undefined || s.cabinet <= 0) continue;
+      moved.push(`${itemId} x${s.cabinet}`);
+      s.fetched += s.cabinet;
+      s.cabinet = 0;
     }
-    return false;
+    this.addLog("fetch", `${box.label} staged at the patient${moved.length > 0 ? `: ${moved.join(", ")}` : ""}.`);
   }
 
   get busy(): boolean {
@@ -393,6 +495,11 @@ export class Sim {
       const job = this.fetches[i];
       job.remaining_s -= 1;
       if (job.remaining_s <= 0) {
+        if (job.itemId.startsWith("box:")) {
+          this.landBox(job.itemId.slice(4));
+          this.fetches.splice(i, 1);
+          continue;
+        }
         const s = this.stashes.get(job.itemId);
         if (s && s.cabinet > 0) {
           s.cabinet -= 1;
@@ -1463,7 +1570,10 @@ export class Sim {
           flow_mL_per_min: flow,
           bag: null,
           infused_mL: 0,
-          ioLidoGiven: false
+          ioLidoGiven: false,
+          ySet: null,
+          warmer: false,
+          dripSet: null
         });
         this.addLog("fluid", `IV ${gauge}g ${site} in, flash confirmed. Gravity ${flow} mL/min.`);
       } else {
@@ -1472,7 +1582,8 @@ export class Sim {
     });
   }
 
-  startIo(site: "tibial" | "humeral", needle_mm: number, lidoFirst: boolean): ActionResult {
+  startIo(site: "tibial" | "humeral" | "sternal", needle_mm: number, lidoFirst: boolean): ActionResult {
+    if (site === "sternal") return this.startSternalIo(lidoFirst);
     if (this.atPatient("io_drill_ezio") < 1) return { ok: false, reason: "Need the EZ-IO drill at the patient." };
     if (!this.take(`io_needle_${needle_mm}mm`)) {
       return { ok: false, reason: `No ${needle_mm} mm needle at the patient.` };
@@ -1501,7 +1612,10 @@ export class Sim {
         flow_mL_per_min: IO_FLOW.gravity,
         bag: null,
         infused_mL: 0,
-        ioLidoGiven: lidoFirst
+        ioLidoGiven: lidoFirst,
+        ySet: null,
+        warmer: false,
+        dripSet: null
       });
       this.addLog(
         "fluid",
@@ -1516,6 +1630,95 @@ export class Sim {
       } else if (lidoFirst) {
         this.addLog("fluid", "Lidocaine 40 mg IO before the flush (drug box).");
       }
+    });
+  }
+
+  /**
+   * Sternal IO, FAST1-style: no drill, the device sets its own depth, one
+   * attempt per patient (QAS CPP). Josh has no sternal fracture or chest
+   * wound, so no site contraindication applies on this call.
+   */
+  private startSternalIo(lidoFirst: boolean): ActionResult {
+    if (this.sternalTried) return { ok: false, reason: "Sternal IO is one attempt per patient. Go humeral or tibial." };
+    if (!this.take("io_fast1")) return { ok: false, reason: "No FAST1 sternal IO at the patient. Fetch one from the truck." };
+    return this.start("io", "Start IO sternal (FAST1)", 30, () => {
+      this.sternalTried = true;
+      if (!this.rng.chance(0.95)) {
+        this.addLog("trap", "Sternal IO failed to seat (5 percent miss, TUNE). One attempt per patient: go humeral or tibial.");
+        return;
+      }
+      const id = this.fluids.nextLineId++;
+      const pressureFlow = Math.round(this.rng.range(IO_FLOW.sternal[0], IO_FLOW.sternal[1]));
+      this.fluids.lines.push({
+        id,
+        kind: "io",
+        site: "sternal",
+        patent: true,
+        infiltrated: false,
+        placedAt_s: this.t_s,
+        pressureBag: false,
+        flow_mL_per_min: IO_FLOW.gravity,
+        bag: null,
+        infused_mL: 0,
+        ioLidoGiven: lidoFirst,
+        ySet: null,
+        warmer: false,
+        dripSet: null
+      });
+      this.ioPressureFlows.set(id, pressureFlow);
+      this.addLog(
+        "fluid",
+        `Sternal IO in (FAST1), 10 mL NS flush clean. Gravity poor (${IO_FLOW.gravity} mL/min); with a pressure bag about ${pressureFlow} mL/min.`
+      );
+      if (!lidoFirst && this.vitals.gcs_total >= 14) {
+        this.pain_0_to_10 = 10;
+        this.addLog("trap", "Sternal IO flushed in a conscious patient with no lidocaine first: pain 10/10.");
+      } else if (lidoFirst) {
+        this.addLog("fluid", "Lidocaine 40 mg IO before the flush (drug box).");
+      }
+    });
+  }
+
+  /**
+   * Prime filtered Y blood tubing with normal saline through the warmer on
+   * one line. The set and warmer stay on the line for the next units.
+   */
+  setupBloodLine(lineId: number): ActionResult {
+    const line = this.fluids.lines.find((l) => l.id === lineId);
+    if (line === undefined) return { ok: false, reason: `No line ${lineId}.` };
+    if (!line.patent || line.infiltrated) return { ok: false, reason: `Line ${lineId} is not running.` };
+    if (line.bag !== null) return { ok: false, reason: `Line ${lineId} has a bag running. Let it finish or pull it first.` };
+    const set = line.ySet;
+    const spent = set !== null && (set.units >= BLOOD_SET_MAX_UNITS || this.t_s - set.placedAt_s >= BLOOD_SET_MAX_S);
+    if (set !== null && !spent) return { ok: false, reason: `Line ${lineId} already has a good Y set (${set.units}/${BLOOD_SET_MAX_UNITS} units).` };
+    if (this.atPatient("fluid_warmer") < 1) return { ok: false, reason: "No fluid warmer at the patient. Stage the blood kit." };
+    const warmerElsewhere = this.fluids.lines.find((l) => l.warmer && l.id !== lineId);
+    if (warmerElsewhere !== undefined) {
+      return { ok: false, reason: `The warmer is on line ${warmerElsewhere.id}. One warmer, one line.` };
+    }
+    if (!this.take("y_tubing_blood")) return { ok: false, reason: "No Y tubing at the patient. Stage the blood kit or fetch one." };
+    // Keep the saline already spiked when swapping a spent set.
+    let saline = set?.salineLeft_mL ?? 0;
+    if (saline < BLOOD_SET_PRIME_ML + BLOOD_FLUSH_ML_PER_UNIT) {
+      if (this.take("ns_250ml")) saline = 250;
+      else if (this.take("ns_1000ml")) saline = 1000;
+      else return { ok: false, reason: "Need a normal saline bag for the Y set (NS only through blood tubing)." };
+    }
+    const label = spent ? `Replace the Y set on line ${lineId}` : `Prime Y tubing + warmer on line ${lineId}`;
+    return this.start("yset", label, 45, () => {
+      const target = this.fluids.lines.find((l) => l.id === lineId);
+      if (target === undefined || !target.patent || target.infiltrated) {
+        this.addLog("trap", `Line ${lineId} went bad while priming the Y set. Set wasted.`);
+        return;
+      }
+      target.ySet = { placedAt_s: this.t_s, units: 0, salineLeft_mL: Math.max(0, saline - BLOOD_SET_PRIME_ML) };
+      target.warmer = true;
+      target.dripSet = null;
+      this.addLog(
+        "fluid",
+        `Y tubing primed with NS through the warmer (38 C) on line ${lineId}. Saline spike ${Math.round(target.ySet.salineLeft_mL)} mL left. ` +
+          `Good for ${BLOOD_SET_MAX_UNITS} units or 4 h.`
+      );
     });
   }
 
@@ -1547,41 +1750,70 @@ export class Sim {
     }
   }
 
-  hangFluids(lineId: number, fluid: "ns" | "lr" | "blood", drip: string): ActionResult {
+  hangFluids(lineId: number, fluid: "ns" | "lr" | "blood", drip: string, units = 1): ActionResult {
     const line = this.fluids.lines.find((l) => l.id === lineId);
     if (line === undefined) return { ok: false, reason: `No line ${lineId}.` };
     if (!line.patent || line.infiltrated) return { ok: false, reason: `Line ${lineId} is not running.` };
     if (line.bag !== null) return { ok: false, reason: `Line ${lineId} already has a bag hanging.` };
-    const bagItem = fluid === "ns" ? "ns_1000ml" : fluid === "lr" ? "lr_1000ml" : "whole_blood_unit";
-    if (!this.take(bagItem)) return { ok: false, reason: `No ${fluid} bag at the patient.` };
-    if (fluid === "blood") {
-      if (!this.take("blood_tubing_filter")) {
-        return { ok: false, reason: "Blood needs blood tubing with a filter. Fetch it from the truck." };
-      }
-      if (this.atPatient("fluid_warmer") < 1) {
-        return { ok: false, reason: "Blood needs the warmer at 38 C. Fetch it from the truck." };
-      }
-    } else if (!this.take(drip === "micro60" ? "micro_drip_set" : "macro_drip_set")) {
-      return { ok: false, reason: "No drip set at the patient." };
+    if (fluid === "blood") return this.hangBlood(line, units);
+    if (line.ySet !== null) {
+      return { ok: false, reason: `Line ${lineId} has blood tubing: nothing but NS and blood through it. Use another line.` };
     }
-    const what = fluid === "blood" ? "whole blood (500 mL)" : `${fluid.toUpperCase()} 1,000 mL`;
-    return this.start("hang", `Hang ${what} on line ${lineId}`, 30, () => {
+    const bagItem = fluid === "ns" ? "ns_1000ml" : "lr_1000ml";
+    if (!this.take(bagItem)) return { ok: false, reason: `No ${fluid.toUpperCase()} 1 L bag at the patient.` };
+    // Drip sets stay on the line: only the first bag on a line needs one.
+    const setItem = drip === "micro60" ? "micro_drip_set" : "macro_drip_set";
+    const reuse = line.dripSet === setItem;
+    if (!reuse && !this.take(setItem)) return { ok: false, reason: "No drip set at the patient." };
+    const what = `${fluid.toUpperCase()} 1,000 mL`;
+    return this.start("hang", `Hang ${what} on line ${lineId}`, reuse ? 20 : 30, () => {
       const target = this.fluids.lines.find((l) => l.id === lineId);
       if (target === undefined || !target.patent || target.infiltrated) {
         this.addLog("trap", `Line ${lineId} went bad while hanging the bag. Bag wasted.`);
         return;
       }
-      target.bag = {
-        fluid,
-        volumeTotal_mL: fluid === "blood" ? 500 : 1000,
-        volumeLeft_mL: fluid === "blood" ? 500 : 1000,
-        drip
-      };
+      target.dripSet = setItem;
+      target.bag = { fluid, volumeTotal_mL: 1000, volumeLeft_mL: 1000, drip };
       this.refreshLineFlow(target);
       this.addLog(
         "fluid",
-        `${what} hanging on line ${lineId} at ${Math.round(target.flow_mL_per_min)} mL/min` +
+        `${what} hanging on line ${lineId}${reuse ? " (same drip set)" : ""} at ${Math.round(target.flow_mL_per_min)} mL/min` +
           `${target.pressureBag ? " (pressure bag)" : " (gravity)"}.`
+      );
+    });
+  }
+
+  private hangBlood(line: LineState, units: number): ActionResult {
+    const n = units === 2 ? 2 : 1;
+    const set = line.ySet;
+    if (set === null) return { ok: false, reason: `Line ${line.id} needs Y tubing + warmer primed first (Lines: Blood).` };
+    if (this.t_s - set.placedAt_s >= BLOOD_SET_MAX_S) return { ok: false, reason: "Y set is past 4 h: replace the set." };
+    if (set.units + n > BLOOD_SET_MAX_UNITS) {
+      return { ok: false, reason: `Y set has run ${set.units} of ${BLOOD_SET_MAX_UNITS} units: replace the set.` };
+    }
+    if (set.salineLeft_mL < BLOOD_FLUSH_ML_PER_UNIT * n) return { ok: false, reason: "Saline on the Y set is out: replace the set to spike a new bag." };
+    for (let i = 0; i < n; i++) {
+      if (!this.take("whole_blood_unit")) {
+        return { ok: false, reason: n === 2 ? "Need 2 units of whole blood at the patient." : "No whole blood at the patient. Stage the blood cooler." };
+      }
+    }
+    const mL = BLOOD_UNIT_ML * n;
+    const what = n === 2 ? `2 units whole blood (${mL} mL)` : `whole blood (${mL} mL)`;
+    return this.start("hang", `Hang ${what} on line ${line.id}`, 30, () => {
+      const target = this.fluids.lines.find((l) => l.id === line.id);
+      if (target === undefined || !target.patent || target.infiltrated || target.ySet === null) {
+        this.addLog("trap", `Line ${line.id} went bad while hanging blood. Unit${n > 1 ? "s" : ""} wasted.`);
+        return;
+      }
+      target.ySet.units += n;
+      target.ySet.salineLeft_mL = Math.max(0, target.ySet.salineLeft_mL - BLOOD_FLUSH_ML_PER_UNIT * n);
+      target.bag = { fluid: "blood", volumeTotal_mL: mL, volumeLeft_mL: mL, drip: "y_set" };
+      this.refreshLineFlow(target);
+      this.addLog(
+        "fluid",
+        `${what} on the Y set, warmed 38 C, line ${target.id} at ${Math.round(target.flow_mL_per_min)} mL/min` +
+          `${target.pressureBag ? " (pressure bag)" : " (gravity)"}. Set ${target.ySet.units}/${BLOOD_SET_MAX_UNITS} units, ` +
+          `NS ${Math.round(target.ySet.salineLeft_mL)} mL left.`
       );
     });
   }
@@ -1595,6 +1827,7 @@ export class Sim {
     } else {
       this.addLog("fluid", `Line ${lineId} pulled.`);
     }
+    if (line?.warmer === true) this.addLog("fluid", "Warmer comes off with the line: free for another line.");
     this.fluids.lines.splice(index, 1);
     this.ioPressureFlows.delete(lineId);
     return { ok: true };
@@ -1616,6 +1849,11 @@ export class Sim {
     if (!Number.isFinite(amount) || amount <= 0) return { ok: false, reason: "Draw a positive amount." };
     if (pres.math.maxUnits !== null && amount > pres.math.maxUnits * 4) {
       return { ok: false, reason: `That is more than 4 ${pres.math.unitLabel === "mL" ? "vials" : "units"} worth: split the prep.` };
+    }
+    const reach = this.drugReachable(entry.drug.location);
+    if (!reach.ok) {
+      const box = TRUCK_BOXES[reach.box ?? ""]?.label ?? "a truck box";
+      return { ok: false, reason: `${entry.drug.name} is in the ${box} on the truck. Stage it first.` };
     }
     if (!this.take(syringeId)) return { ok: false, reason: `No ${syringeId} at the patient.` };
     const routeUpper = entry.standard.route.toUpperCase();

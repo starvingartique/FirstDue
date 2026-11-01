@@ -5,7 +5,8 @@
     "gameplayRule": "The jump bag is what is at the patient. Cabinet items require someone to go to the truck: 45-60 s round trip (partner or player).",
     "cabinetFetch_s": "45-60",
     "cabinetFetch_engine_s": 50,
-    "oct29Note": "Oct 29 adds airway, breathing, lines/fluids, assessment and monitor items from OCT28_MEDICAL_ANSWERS section 7, plus the hypothermia wrap blanket the Oct 28 build used untracked. Oct 29 quantities are logistical placeholders for Wyatt sign-off, not clinical values. Stash rule unchanged: belt + jump_bag are at the patient, cabinet needs a truck fetch."
+    "oct29Note": "Oct 29 adds airway, breathing, lines/fluids, assessment and monitor items from OCT28_MEDICAL_ANSWERS section 7, plus the hypothermia wrap blanket the Oct 28 build used untracked. Oct 29 quantities are logistical placeholders for Wyatt sign-off, not clinical values. Stash rule unchanged: belt + jump_bag are at the patient, cabinet needs a truck fetch.",
+    "oct31Note": "Oct 31: blood tubing renamed Y tubing (filtered Y blood set, NS only on the second spike). Added NS 250 mL, FAST1 sternal IO, pelvic binder, needle decompression kit, cric kit, LifeFlow. Kit bag and truck loaded to ALS levels (reference: Loyola EMSS ALS inventory 12/2025). Quantities are logistics placeholders for Wyatt sign-off, not clinical values."
   },
   "equipment": [
     {
@@ -13,20 +14,28 @@
       "name": "CAT tourniquet",
       "category": "hemorrhage",
       "location": "jump_bag",
-      "quantity": 7,
-      "quantities": { "belt": 1, "jump_bag": 2, "cabinet": 4 },
+      "quantity": 11,
+      "quantities": {
+        "belt": 1,
+        "jump_bag": 4,
+        "cabinet": 6
+      },
       "consumable": false,
-      "notes": "Belt 1, jump 2, cabinet 4."
+      "notes": "Belt 1, jump 4, cabinet 6."
     },
     {
       "id": "softt_wide_tourniquet",
       "name": "SOF-T Wide tourniquet",
       "category": "hemorrhage",
       "location": "cabinet",
-      "quantity": 2,
-      "quantities": { "belt": 0, "jump_bag": 0, "cabinet": 2 },
+      "quantity": 3,
+      "quantities": {
+        "belt": 0,
+        "jump_bag": 1,
+        "cabinet": 2
+      },
       "consumable": false,
-      "notes": "Cabinet only."
+      "notes": "Belt 0, jump 1, cabinet 2."
     },
     {
       "id": "junctional_tourniquet_samjt",
@@ -34,79 +43,111 @@
       "category": "hemorrhage",
       "location": "cabinet",
       "quantity": 1,
-      "quantities": { "belt": 0, "jump_bag": 0, "cabinet": 1 },
+      "quantities": {
+        "belt": 0,
+        "jump_bag": 0,
+        "cabinet": 1
+      },
       "consumable": false,
-      "notes": "Cabinet only. Many civilian units do not carry one; keep it in the cabinet."
+      "notes": "Belt 0, jump 0, cabinet 1."
     },
     {
       "id": "hemostatic_gauze_zfold",
       "name": "Hemostatic gauze, z-fold (Combat Gauze / QuikClot)",
       "category": "hemorrhage",
       "location": "jump_bag",
-      "quantity": 6,
-      "quantities": { "belt": 0, "jump_bag": 2, "cabinet": 4 },
+      "quantity": 10,
+      "quantities": {
+        "belt": 0,
+        "jump_bag": 4,
+        "cabinet": 6
+      },
       "consumable": true,
-      "notes": "Jump 2, cabinet 4."
+      "notes": "Belt 0, jump 4, cabinet 6."
     },
     {
       "id": "plain_gauze_roll_kerlix",
       "name": "Plain gauze roll (Kerlix)",
       "category": "hemorrhage",
       "location": "jump_bag",
-      "quantity": 14,
-      "quantities": { "belt": 0, "jump_bag": 4, "cabinet": 10 },
+      "quantity": 18,
+      "quantities": {
+        "belt": 0,
+        "jump_bag": 6,
+        "cabinet": 12
+      },
       "consumable": true,
-      "notes": "Jump 4, cabinet 10. Packs at about 75 percent instead of 90."
+      "notes": "Belt 0, jump 6, cabinet 12."
     },
     {
       "id": "pressure_bandage_6in",
       "name": "Pressure bandage 6 in (Israeli / emergency trauma bandage)",
       "category": "hemorrhage",
       "location": "jump_bag",
-      "quantity": 8,
-      "quantities": { "belt": 0, "jump_bag": 2, "cabinet": 6 },
+      "quantity": 12,
+      "quantities": {
+        "belt": 0,
+        "jump_bag": 4,
+        "cabinet": 8
+      },
       "consumable": true,
-      "notes": "Jump 2, cabinet 6."
+      "notes": "Belt 0, jump 4, cabinet 8."
     },
     {
       "id": "pressure_bandage_4in",
       "name": "Pressure bandage 4 in",
       "category": "hemorrhage",
       "location": "jump_bag",
-      "quantity": 6,
-      "quantities": { "belt": 0, "jump_bag": 2, "cabinet": 4 },
+      "quantity": 8,
+      "quantities": {
+        "belt": 0,
+        "jump_bag": 2,
+        "cabinet": 6
+      },
       "consumable": true,
-      "notes": "Jump 2, cabinet 4."
+      "notes": "Belt 0, jump 2, cabinet 6."
     },
     {
       "id": "elastic_wrap_ace",
       "name": "Elastic wrap (ACE)",
       "category": "hemorrhage",
       "location": "jump_bag",
-      "quantity": 8,
-      "quantities": { "belt": 0, "jump_bag": 2, "cabinet": 6 },
+      "quantity": 6,
+      "quantities": {
+        "belt": 0,
+        "jump_bag": 2,
+        "cabinet": 4
+      },
       "consumable": true,
-      "notes": "Jump 2, cabinet 6."
+      "notes": "Belt 0, jump 2, cabinet 4."
     },
     {
       "id": "trauma_dressing_10x30",
       "name": "Trauma dressing 10x30",
       "category": "hemorrhage",
       "location": "jump_bag",
-      "quantity": 6,
-      "quantities": { "belt": 0, "jump_bag": 2, "cabinet": 4 },
+      "quantity": 8,
+      "quantities": {
+        "belt": 0,
+        "jump_bag": 2,
+        "cabinet": 6
+      },
       "consumable": true,
-      "notes": "Jump 2, cabinet 4."
+      "notes": "Belt 0, jump 2, cabinet 6."
     },
     {
       "id": "abd_pad",
       "name": "ABD pad",
       "category": "hemorrhage",
       "location": "jump_bag",
-      "quantity": 16,
-      "quantities": { "belt": 0, "jump_bag": 6, "cabinet": 10 },
+      "quantity": 14,
+      "quantities": {
+        "belt": 0,
+        "jump_bag": 4,
+        "cabinet": 10
+      },
       "consumable": true,
-      "notes": "Jump 6, cabinet 10."
+      "notes": "Belt 0, jump 4, cabinet 10."
     },
     {
       "id": "trauma_shears",
@@ -114,7 +155,11 @@
       "category": "assessment",
       "location": "belt",
       "quantity": 3,
-      "quantities": { "belt": 1, "jump_bag": 1, "cabinet": 1 },
+      "quantities": {
+        "belt": 1,
+        "jump_bag": 1,
+        "cabinet": 1
+      },
       "consumable": false,
       "notes": "Belt 1, jump 1, cabinet 1. Needed to expose the wound."
     },
@@ -124,9 +169,13 @@
       "category": "chest",
       "location": "jump_bag",
       "quantity": 6,
-      "quantities": { "belt": 0, "jump_bag": 2, "cabinet": 4 },
+      "quantities": {
+        "belt": 0,
+        "jump_bag": 2,
+        "cabinet": 4
+      },
       "consumable": true,
-      "notes": "Jump 2, cabinet 4. Parked use until R step depth lands; carried for inventory truth."
+      "notes": "Belt 0, jump 2, cabinet 4."
     },
     {
       "id": "sharpie_tq_time",
@@ -134,7 +183,11 @@
       "category": "hemorrhage",
       "location": "belt",
       "quantity": 2,
-      "quantities": { "belt": 1, "jump_bag": 1, "cabinet": 0 },
+      "quantities": {
+        "belt": 1,
+        "jump_bag": 1,
+        "cabinet": 0
+      },
       "consumable": false,
       "notes": "Belt 1, jump 1. No time written is logged and missing from MIST."
     },
@@ -143,10 +196,14 @@
       "name": "Hypothermia wrap blanket",
       "category": "hypothermia",
       "location": "jump_bag",
-      "quantity": 3,
-      "quantities": { "belt": 0, "jump_bag": 1, "cabinet": 2 },
+      "quantity": 5,
+      "quantities": {
+        "belt": 0,
+        "jump_bag": 1,
+        "cabinet": 4
+      },
       "consumable": false,
-      "notes": "Oct 29 fix-up: the Oct 28 wrap action used an untracked blanket. Now tracked. Jump 1, cabinet 2 (placeholder counts)."
+      "notes": "Belt 0, jump 1, cabinet 4."
     },
     {
       "id": "opa_set",
@@ -154,8 +211,16 @@
       "category": "airway",
       "location": "airway_bag",
       "quantity": 2,
-      "quantities": { "belt": 0, "jump_bag": 1, "cabinet": 1 },
-      "sizes": ["80", "90", "100"],
+      "quantities": {
+        "belt": 0,
+        "jump_bag": 1,
+        "cabinet": 1
+      },
+      "sizes": [
+        "80",
+        "90",
+        "100"
+      ],
       "consumable": false,
       "notes": "Airway bag staged at the patient counts as jump_bag stash. Josh: 100 mm (90 acceptable)."
     },
@@ -165,8 +230,18 @@
       "category": "airway",
       "location": "airway_bag",
       "quantity": 2,
-      "quantities": { "belt": 0, "jump_bag": 1, "cabinet": 1 },
-      "sizes": ["26", "28", "30", "32", "34"],
+      "quantities": {
+        "belt": 0,
+        "jump_bag": 1,
+        "cabinet": 1
+      },
+      "sizes": [
+        "26",
+        "28",
+        "30",
+        "32",
+        "34"
+      ],
       "consumable": false,
       "notes": "Josh: 30-32 Fr."
     },
@@ -175,33 +250,60 @@
       "name": "i-gel set (#3/#4/#5)",
       "category": "airway",
       "location": "airway_bag",
-      "quantity": 2,
-      "quantities": { "belt": 0, "jump_bag": 1, "cabinet": 1 },
-      "sizes": ["3", "4", "5"],
+      "quantity": 4,
+      "quantities": {
+        "belt": 0,
+        "jump_bag": 2,
+        "cabinet": 2
+      },
+      "sizes": [
+        "3",
+        "4",
+        "5"
+      ],
       "consumable": true,
-      "notes": "Josh: #4 (50-90 kg band)."
+      "notes": "Belt 0, jump 2, cabinet 2."
     },
     {
       "id": "kinglt_set",
       "name": "King LT set (#3/#4/#5)",
       "category": "airway",
       "location": "airway_bag",
-      "quantity": 2,
-      "quantities": { "belt": 0, "jump_bag": 1, "cabinet": 1 },
-      "sizes": ["3", "4", "5"],
+      "quantity": 3,
+      "quantities": {
+        "belt": 0,
+        "jump_bag": 1,
+        "cabinet": 2
+      },
+      "sizes": [
+        "3",
+        "4",
+        "5"
+      ],
       "consumable": true,
-      "notes": "Josh: #4 (5-6 ft band)."
+      "notes": "Belt 0, jump 1, cabinet 2."
     },
     {
       "id": "ett_set",
       "name": "ETT set (6.0-8.5 + laryngoscope + bougie)",
       "category": "airway",
       "location": "airway_bag",
-      "quantity": 2,
-      "quantities": { "belt": 0, "jump_bag": 1, "cabinet": 1 },
-      "sizes": ["6.0", "6.5", "7.0", "7.5", "8.0", "8.5"],
+      "quantity": 6,
+      "quantities": {
+        "belt": 0,
+        "jump_bag": 3,
+        "cabinet": 3
+      },
+      "sizes": [
+        "6.0",
+        "6.5",
+        "7.0",
+        "7.5",
+        "8.0",
+        "8.5"
+      ],
       "consumable": true,
-      "notes": "Josh: 7.5-8.0 at 22-23 cm. Waveform EtCO2 is the only reliable confirmation."
+      "notes": "Belt 0, jump 3, cabinet 3."
     },
     {
       "id": "bvm_adult",
@@ -209,8 +311,16 @@
       "category": "breathing",
       "location": "airway_bag",
       "quantity": 2,
-      "quantities": { "belt": 0, "jump_bag": 1, "cabinet": 1 },
-      "sizes": ["small", "medium", "large"],
+      "quantities": {
+        "belt": 0,
+        "jump_bag": 1,
+        "cabinet": 1
+      },
+      "sizes": [
+        "small",
+        "medium",
+        "large"
+      ],
       "consumable": false,
       "notes": "Josh mask: large. Deliver 500-600 mL, one breath every 6 s."
     },
@@ -220,7 +330,11 @@
       "category": "airway",
       "location": "airway_bag",
       "quantity": 1,
-      "quantities": { "belt": 0, "jump_bag": 1, "cabinet": 0 },
+      "quantities": {
+        "belt": 0,
+        "jump_bag": 1,
+        "cabinet": 0
+      },
       "consumable": false,
       "notes": "Rigid Yankauer for the mouth. Max 10-15 s per pass."
     },
@@ -229,10 +343,14 @@
       "name": "Suction catheter 14 Fr (for ETT)",
       "category": "airway",
       "location": "airway_bag",
-      "quantity": 3,
-      "quantities": { "belt": 0, "jump_bag": 1, "cabinet": 2 },
+      "quantity": 10,
+      "quantities": {
+        "belt": 0,
+        "jump_bag": 4,
+        "cabinet": 6
+      },
       "consumable": true,
-      "notes": "14 Fr flexible catheter for the ETT."
+      "notes": "Belt 0, jump 4, cabinet 6."
     },
     {
       "id": "waveform_etco2",
@@ -240,7 +358,11 @@
       "category": "monitor",
       "location": "monitor",
       "quantity": 1,
-      "quantities": { "belt": 0, "jump_bag": 1, "cabinet": 0 },
+      "quantities": {
+        "belt": 0,
+        "jump_bag": 1,
+        "cabinet": 0
+      },
       "consumable": false,
       "notes": "The only reliable ETT confirmation. Shows waveform or no waveform."
     },
@@ -249,30 +371,42 @@
       "name": "Nasal cannula",
       "category": "breathing",
       "location": "jump_bag",
-      "quantity": 6,
-      "quantities": { "belt": 0, "jump_bag": 2, "cabinet": 4 },
+      "quantity": 8,
+      "quantities": {
+        "belt": 0,
+        "jump_bag": 2,
+        "cabinet": 6
+      },
       "consumable": true,
-      "notes": "1-6 L, 24-44 percent (+4 percent per L)."
+      "notes": "Belt 0, jump 2, cabinet 6."
     },
     {
       "id": "simple_mask",
       "name": "Simple O2 mask",
       "category": "breathing",
       "location": "jump_bag",
-      "quantity": 3,
-      "quantities": { "belt": 0, "jump_bag": 1, "cabinet": 2 },
+      "quantity": 5,
+      "quantities": {
+        "belt": 0,
+        "jump_bag": 1,
+        "cabinet": 4
+      },
       "consumable": true,
-      "notes": "6-10 L, 35-60 percent."
+      "notes": "Belt 0, jump 1, cabinet 4."
     },
     {
       "id": "non_rebreather",
       "name": "Non-rebreather mask",
       "category": "breathing",
       "location": "jump_bag",
-      "quantity": 4,
-      "quantities": { "belt": 0, "jump_bag": 2, "cabinet": 2 },
+      "quantity": 8,
+      "quantities": {
+        "belt": 0,
+        "jump_bag": 2,
+        "cabinet": 6
+      },
       "consumable": true,
-      "notes": "10-15 L, 60-90 percent. Reservoir must be pre-inflated or the patient rebreathes (trap)."
+      "notes": "Belt 0, jump 2, cabinet 6."
     },
     {
       "id": "cpap_unit",
@@ -280,7 +414,11 @@
       "category": "breathing",
       "location": "cabinet",
       "quantity": 1,
-      "quantities": { "belt": 0, "jump_bag": 0, "cabinet": 1 },
+      "quantities": {
+        "belt": 0,
+        "jump_bag": 0,
+        "cabinet": 1
+      },
       "consumable": false,
       "notes": "5-10 cmH2O. Cabinet only on Oct 29."
     },
@@ -289,10 +427,14 @@
       "name": "O2 D cylinder (2,000 psi full)",
       "category": "breathing",
       "location": "jump_bag",
-      "quantity": 1,
-      "quantities": { "belt": 0, "jump_bag": 1, "cabinet": 0 },
+      "quantity": 3,
+      "quantities": {
+        "belt": 0,
+        "jump_bag": 1,
+        "cabinet": 2
+      },
       "consumable": false,
-      "notes": "Portable D staged at the patient. Factor 0.16. Full D at 15 L/min is about 19 min. Can run out."
+      "notes": "Belt 0, jump 1, cabinet 2."
     },
     {
       "id": "o2_tank_m",
@@ -300,7 +442,11 @@
       "category": "breathing",
       "location": "cabinet",
       "quantity": 1,
-      "quantities": { "belt": 0, "jump_bag": 0, "cabinet": 1 },
+      "quantities": {
+        "belt": 0,
+        "jump_bag": 0,
+        "cabinet": 1
+      },
       "consumable": false,
       "notes": "Truck M cylinder. Factor 1.56. Fetch to swap when the D runs dry."
     },
@@ -309,50 +455,70 @@
       "name": "IV catheter 14g orange (300 mL/min)",
       "category": "lines",
       "location": "jump_bag",
-      "quantity": 6,
-      "quantities": { "belt": 0, "jump_bag": 2, "cabinet": 4 },
+      "quantity": 10,
+      "quantities": {
+        "belt": 0,
+        "jump_bag": 4,
+        "cabinet": 6
+      },
       "consumable": true,
-      "notes": "Gravity flow 300 mL/min crystalloid."
+      "notes": "Belt 0, jump 4, cabinet 6."
     },
     {
       "id": "iv_cath_16g",
       "name": "IV catheter 16g gray (200 mL/min)",
       "category": "lines",
       "location": "jump_bag",
-      "quantity": 6,
-      "quantities": { "belt": 0, "jump_bag": 2, "cabinet": 4 },
+      "quantity": 10,
+      "quantities": {
+        "belt": 0,
+        "jump_bag": 4,
+        "cabinet": 6
+      },
       "consumable": true,
-      "notes": "Gravity flow 200 mL/min crystalloid."
+      "notes": "Belt 0, jump 4, cabinet 6."
     },
     {
       "id": "iv_cath_18g",
       "name": "IV catheter 18g green (100 mL/min)",
       "category": "lines",
       "location": "jump_bag",
-      "quantity": 6,
-      "quantities": { "belt": 0, "jump_bag": 2, "cabinet": 4 },
+      "quantity": 16,
+      "quantities": {
+        "belt": 0,
+        "jump_bag": 6,
+        "cabinet": 10
+      },
       "consumable": true,
-      "notes": "Gravity flow 100 mL/min crystalloid."
+      "notes": "Belt 0, jump 6, cabinet 10."
     },
     {
       "id": "iv_cath_20g",
       "name": "IV catheter 20g pink (60 mL/min)",
       "category": "lines",
       "location": "jump_bag",
-      "quantity": 6,
-      "quantities": { "belt": 0, "jump_bag": 2, "cabinet": 4 },
+      "quantity": 16,
+      "quantities": {
+        "belt": 0,
+        "jump_bag": 6,
+        "cabinet": 10
+      },
       "consumable": true,
-      "notes": "Gravity flow 60 mL/min crystalloid."
+      "notes": "Belt 0, jump 6, cabinet 10."
     },
     {
       "id": "iv_cath_22g",
       "name": "IV catheter 22g blue (35 mL/min)",
       "category": "lines",
       "location": "jump_bag",
-      "quantity": 6,
-      "quantities": { "belt": 0, "jump_bag": 2, "cabinet": 4 },
+      "quantity": 10,
+      "quantities": {
+        "belt": 0,
+        "jump_bag": 4,
+        "cabinet": 6
+      },
       "consumable": true,
-      "notes": "Gravity flow 35 mL/min crystalloid."
+      "notes": "Belt 0, jump 4, cabinet 6."
     },
     {
       "id": "iv_cath_24g",
@@ -360,9 +526,13 @@
       "category": "lines",
       "location": "jump_bag",
       "quantity": 6,
-      "quantities": { "belt": 0, "jump_bag": 2, "cabinet": 4 },
+      "quantities": {
+        "belt": 0,
+        "jump_bag": 2,
+        "cabinet": 4
+      },
       "consumable": true,
-      "notes": "Gravity flow 20 mL/min crystalloid."
+      "notes": "Belt 0, jump 2, cabinet 4."
     },
     {
       "id": "io_drill_ezio",
@@ -370,7 +540,11 @@
       "category": "lines",
       "location": "jump_bag",
       "quantity": 1,
-      "quantities": { "belt": 0, "jump_bag": 1, "cabinet": 0 },
+      "quantities": {
+        "belt": 0,
+        "jump_bag": 1,
+        "cabinet": 0
+      },
       "consumable": false,
       "notes": "20-40 s, about 95 percent success."
     },
@@ -379,100 +553,126 @@
       "name": "EZ-IO needle 15 mm (3-39 kg)",
       "category": "lines",
       "location": "jump_bag",
-      "quantity": 3,
-      "quantities": { "belt": 0, "jump_bag": 1, "cabinet": 2 },
+      "quantity": 5,
+      "quantities": {
+        "belt": 0,
+        "jump_bag": 2,
+        "cabinet": 3
+      },
       "consumable": true,
-      "notes": "Peds needle. Wrong for Josh."
+      "notes": "Belt 0, jump 2, cabinet 3."
     },
     {
       "id": "io_needle_25mm",
       "name": "EZ-IO needle 25 mm (adult tibial)",
       "category": "lines",
       "location": "jump_bag",
-      "quantity": 3,
-      "quantities": { "belt": 0, "jump_bag": 1, "cabinet": 2 },
+      "quantity": 7,
+      "quantities": {
+        "belt": 0,
+        "jump_bag": 3,
+        "cabinet": 4
+      },
       "consumable": true,
-      "notes": "Josh tibial needle."
+      "notes": "Belt 0, jump 3, cabinet 4."
     },
     {
       "id": "io_needle_45mm",
       "name": "EZ-IO needle 45 mm (humeral or obese)",
       "category": "lines",
       "location": "jump_bag",
-      "quantity": 3,
-      "quantities": { "belt": 0, "jump_bag": 1, "cabinet": 2 },
+      "quantity": 7,
+      "quantities": {
+        "belt": 0,
+        "jump_bag": 3,
+        "cabinet": 4
+      },
       "consumable": true,
-      "notes": "Josh humeral needle."
+      "notes": "Belt 0, jump 3, cabinet 4."
     },
     {
       "id": "macro_drip_set",
       "name": "Macro drip set (10/15/20 gtt/mL)",
       "category": "lines",
       "location": "jump_bag",
-      "quantity": 6,
-      "quantities": { "belt": 0, "jump_bag": 2, "cabinet": 4 },
+      "quantity": 12,
+      "quantities": {
+        "belt": 0,
+        "jump_bag": 4,
+        "cabinet": 8
+      },
       "consumable": true,
-      "notes": "gtt/min = mL/h x drop factor / 60. Player sets the rate at L4+."
+      "notes": "Belt 0, jump 4, cabinet 8."
     },
     {
       "id": "micro_drip_set",
       "name": "Micro drip set (60 gtt/mL)",
       "category": "lines",
       "location": "jump_bag",
-      "quantity": 4,
-      "quantities": { "belt": 0, "jump_bag": 1, "cabinet": 3 },
+      "quantity": 6,
+      "quantities": {
+        "belt": 0,
+        "jump_bag": 2,
+        "cabinet": 4
+      },
       "consumable": true,
-      "notes": "60 gtt/mL."
+      "notes": "Belt 0, jump 2, cabinet 4."
     },
     {
       "id": "pressure_bag_300",
       "name": "Pressure bag (300 mmHg)",
       "category": "lines",
       "location": "jump_bag",
-      "quantity": 2,
-      "quantities": { "belt": 0, "jump_bag": 1, "cabinet": 1 },
+      "quantity": 3,
+      "quantities": {
+        "belt": 0,
+        "jump_bag": 1,
+        "cabinet": 2
+      },
       "consumable": false,
-      "notes": "About 1.5-2x gravity flow."
+      "notes": "Belt 0, jump 1, cabinet 2."
     },
     {
       "id": "fluid_warmer",
       "name": "Fluid warmer (38 C)",
       "category": "lines",
-      "location": "cabinet",
+      "location": "blood_kit",
       "quantity": 1,
-      "quantities": { "belt": 0, "jump_bag": 0, "cabinet": 1 },
+      "quantities": {
+        "belt": 0,
+        "jump_bag": 0,
+        "cabinet": 1
+      },
       "consumable": false,
-      "notes": "Blood products need a warmer at 38 C. Cabinet only."
-    },
-    {
-      "id": "blood_tubing_filter",
-      "name": "Blood tubing with filter",
-      "category": "lines",
-      "location": "cabinet",
-      "quantity": 2,
-      "quantities": { "belt": 0, "jump_bag": 0, "cabinet": 2 },
-      "consumable": true,
-      "notes": "Blood products need blood tubing with a filter. Cabinet only."
+      "notes": "QinFlow-style warmer, reusable device, one line at a time. Lives in the blood kit (cabinet 1)."
     },
     {
       "id": "ns_1000ml",
       "name": "Normal saline 1,000 mL bag",
       "category": "fluids",
       "location": "jump_bag",
-      "quantity": 6,
-      "quantities": { "belt": 0, "jump_bag": 2, "cabinet": 4 },
+      "quantity": 8,
+      "quantities": {
+        "belt": 0,
+        "jump_bag": 2,
+        "cabinet": 6
+      },
       "consumable": true,
-      "notes": "Crystalloid: +1,000 mL intravascular now, about 250 mL retained over 60 min."
+      "notes": "Belt 0, jump 2, cabinet 6."
     },
     {
       "id": "lr_1000ml",
       "name": "Lactated Ringers 1,000 mL bag",
       "category": "fluids",
       "location": "jump_bag",
-      "quantity": 3,
-      "quantities": { "belt": 0, "jump_bag": 1, "cabinet": 2 },
+      "quantity": 5,
+      "quantities": {
+        "belt": 0,
+        "jump_bag": 1,
+        "cabinet": 4
+      },
       "consumable": true,
-      "notes": "Crystalloid: same explicit decay as saline."
+      "notes": "Belt 0, jump 1, cabinet 4."
     },
     {
       "id": "whole_blood_unit",
@@ -480,39 +680,55 @@
       "category": "fluids",
       "location": "blood_cooler",
       "quantity": 2,
-      "quantities": { "belt": 0, "jump_bag": 0, "cabinet": 2 },
+      "quantities": {
+        "belt": 0,
+        "jump_bag": 0,
+        "cabinet": 2
+      },
       "consumable": true,
-      "notes": "Stays about 90 percent intravascular. Needs blood tubing + warmer at 38 C. Cooler on the truck."
+      "notes": "Low titer O whole blood, about 500 mL per unit. Blood cooler 2 (2-6 C, stage the cooler to bring both)."
     },
     {
       "id": "syringe_3ml",
       "name": "Syringe 3 mL",
       "category": "medications",
       "location": "drug_box",
-      "quantity": 4,
-      "quantities": { "belt": 0, "jump_bag": 2, "cabinet": 2 },
+      "quantity": 12,
+      "quantities": {
+        "belt": 0,
+        "jump_bag": 6,
+        "cabinet": 6
+      },
       "consumable": true,
-      "notes": "Drug box staged at the patient. Dose = mL x concentration."
+      "notes": "Belt 0, jump 6, cabinet 6."
     },
     {
       "id": "syringe_10ml",
       "name": "Syringe 10 mL",
       "category": "medications",
       "location": "drug_box",
-      "quantity": 4,
-      "quantities": { "belt": 0, "jump_bag": 2, "cabinet": 2 },
+      "quantity": 12,
+      "quantities": {
+        "belt": 0,
+        "jump_bag": 6,
+        "cabinet": 6
+      },
       "consumable": true,
-      "notes": "Drug box staged at the patient."
+      "notes": "Belt 0, jump 6, cabinet 6."
     },
     {
       "id": "syringe_20ml",
       "name": "Syringe 20 mL",
       "category": "medications",
       "location": "drug_box",
-      "quantity": 4,
-      "quantities": { "belt": 0, "jump_bag": 2, "cabinet": 2 },
+      "quantity": 7,
+      "quantities": {
+        "belt": 0,
+        "jump_bag": 3,
+        "cabinet": 4
+      },
       "consumable": true,
-      "notes": "Drug box staged at the patient."
+      "notes": "Belt 0, jump 3, cabinet 4."
     },
     {
       "id": "stethoscope",
@@ -520,7 +736,11 @@
       "category": "assessment",
       "location": "jump_bag",
       "quantity": 1,
-      "quantities": { "belt": 0, "jump_bag": 1, "cabinet": 0 },
+      "quantities": {
+        "belt": 0,
+        "jump_bag": 1,
+        "cabinet": 0
+      },
       "consumable": false,
       "notes": "Auscultated BP and lung sounds."
     },
@@ -530,7 +750,11 @@
       "category": "assessment",
       "location": "jump_bag",
       "quantity": 1,
-      "quantities": { "belt": 0, "jump_bag": 1, "cabinet": 0 },
+      "quantities": {
+        "belt": 0,
+        "jump_bag": 1,
+        "cabinet": 0
+      },
       "consumable": false,
       "notes": "Correct cuff for Josh. Width about 40 percent of arm circumference."
     },
@@ -540,7 +764,11 @@
       "category": "assessment",
       "location": "jump_bag",
       "quantity": 1,
-      "quantities": { "belt": 0, "jump_bag": 1, "cabinet": 0 },
+      "quantities": {
+        "belt": 0,
+        "jump_bag": 1,
+        "cabinet": 0
+      },
       "consumable": false,
       "notes": "Too big for Josh: reads LOW -5-10."
     },
@@ -550,7 +778,11 @@
       "category": "assessment",
       "location": "jump_bag",
       "quantity": 1,
-      "quantities": { "belt": 0, "jump_bag": 1, "cabinet": 0 },
+      "quantities": {
+        "belt": 0,
+        "jump_bag": 1,
+        "cabinet": 0
+      },
       "consumable": false,
       "notes": "Too small for Josh: reads HIGH +10-30."
     },
@@ -560,7 +792,11 @@
       "category": "assessment",
       "location": "belt",
       "quantity": 1,
-      "quantities": { "belt": 1, "jump_bag": 0, "cabinet": 0 },
+      "quantities": {
+        "belt": 1,
+        "jump_bag": 0,
+        "cabinet": 0
+      },
       "consumable": false,
       "notes": "Pupil check, each eye plus consensual."
     },
@@ -570,7 +806,11 @@
       "category": "assessment",
       "location": "jump_bag",
       "quantity": 1,
-      "quantities": { "belt": 0, "jump_bag": 1, "cabinet": 0 },
+      "quantities": {
+        "belt": 0,
+        "jump_bag": 1,
+        "cabinet": 0
+      },
       "consumable": false,
       "notes": "Fingerstick, +/-15 percent."
     },
@@ -580,7 +820,11 @@
       "category": "assessment",
       "location": "jump_bag",
       "quantity": 1,
-      "quantities": { "belt": 0, "jump_bag": 1, "cabinet": 0 },
+      "quantities": {
+        "belt": 0,
+        "jump_bag": 1,
+        "cabinet": 0
+      },
       "consumable": false,
       "notes": "Temporal reads low in cold or sweaty skin."
     },
@@ -590,9 +834,111 @@
       "category": "monitor",
       "location": "jump_bag",
       "quantity": 1,
-      "quantities": { "belt": 0, "jump_bag": 1, "cabinet": 0 },
+      "quantities": {
+        "belt": 0,
+        "jump_bag": 1,
+        "cabinet": 0
+      },
       "consumable": false,
       "notes": "Staged at the patient. SpO2 pleth, NIBP auto cycle, EtCO2 waveform. Pacing/cardioversion parked."
+    },
+    {
+      "id": "y_tubing_blood",
+      "name": "Y tubing, filtered blood set",
+      "category": "lines",
+      "location": "blood_kit",
+      "quantity": 4,
+      "quantities": {
+        "belt": 0,
+        "jump_bag": 0,
+        "cabinet": 4
+      },
+      "consumable": true,
+      "notes": "Belt 0, jump 0, cabinet 4."
+    },
+    {
+      "id": "ns_250ml",
+      "name": "Normal saline 250 mL",
+      "category": "fluids",
+      "location": "blood_kit",
+      "quantity": 4,
+      "consumable": true,
+      "quantities": {
+        "belt": 0,
+        "jump_bag": 0,
+        "cabinet": 4
+      },
+      "notes": "Saline spike for the Y blood set: primes and flushes. Blood kit 4."
+    },
+    {
+      "id": "io_fast1",
+      "name": "FAST1 sternal IO",
+      "category": "lines",
+      "location": "jump_bag",
+      "quantity": 3,
+      "consumable": true,
+      "quantities": {
+        "belt": 0,
+        "jump_bag": 1,
+        "cabinet": 2
+      },
+      "notes": "Sternal IO, device sets its own depth. One attempt per patient. Jump 1, cabinet 2."
+    },
+    {
+      "id": "pelvic_binder",
+      "name": "Pelvic binder (SAM)",
+      "category": "hemorrhage",
+      "location": "cabinet",
+      "quantity": 2,
+      "consumable": true,
+      "quantities": {
+        "belt": 0,
+        "jump_bag": 0,
+        "cabinet": 2
+      },
+      "notes": "No action yet (pelvis procedures parked). Cabinet 2."
+    },
+    {
+      "id": "needle_decompression_kit",
+      "name": "Needle decompression kit (3.25 in)",
+      "category": "airway",
+      "location": "jump_bag",
+      "quantity": 4,
+      "consumable": true,
+      "quantities": {
+        "belt": 0,
+        "jump_bag": 2,
+        "cabinet": 2
+      },
+      "notes": "No action yet (chest procedures parked). Jump 2, cabinet 2."
+    },
+    {
+      "id": "cric_kit",
+      "name": "Surgical cric kit",
+      "category": "airway",
+      "location": "cabinet",
+      "quantity": 1,
+      "consumable": true,
+      "quantities": {
+        "belt": 0,
+        "jump_bag": 0,
+        "cabinet": 1
+      },
+      "notes": "No action yet. Cabinet 1."
+    },
+    {
+      "id": "lifeflow_infuser",
+      "name": "LifeFlow rapid infuser",
+      "category": "lines",
+      "location": "blood_kit",
+      "quantity": 1,
+      "consumable": false,
+      "quantities": {
+        "belt": 0,
+        "jump_bag": 0,
+        "cabinet": 1
+      },
+      "notes": "No action yet. Blood kit 1."
     }
   ]
 }

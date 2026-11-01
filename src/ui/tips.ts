@@ -36,6 +36,8 @@ export const TIPS: Record<string, string> = {
   "lines:start io (30s, 95 percent)": "Awake patients feel IO infusion. Numb it first if you can.",
   "lines:fluids (explicit volumes)": "Bleeding patients lose blood, not salt water. Blood replaces what was lost; large crystalloid volumes thin it out.",
 
+  "lines:blood (y tubing + warmer)": "Blood runs through filtered Y tubing: blood on one spike, normal saline on the other to prime and flush. Nothing but NS and blood goes through it. Warm it on the way in.",
+  "circulation:truck: stage boxes at the patient": "On a long scene, bring the boxes you will need to the patient early: narc box, blood cooler, blood kit. One trip, then it is all at hand.",
   "monitor:live monitor": "A monitor reading is only as good as the probe. Cold, shocky fingers give poor SpO2 readings.",
   "monitor:manual vitals": "Count breaths without telling the patient. People breathe differently when they know they are watched.",
 

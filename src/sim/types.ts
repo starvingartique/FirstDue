@@ -221,6 +221,16 @@ export interface LineState {
   bag: FluidBag | null;
   infused_mL: number;
   ioLidoGiven: boolean;
+  /**
+   * Filtered Y blood tubing on this line: blood on one spike, normal saline
+   * on the other for priming and flushing. Reused across units up to the
+   * cap (BLOOD_SET_MAX_UNITS / BLOOD_SET_MAX_S), then it needs a new set.
+   */
+  ySet: { placedAt_s: number; units: number; salineLeft_mL: number } | null;
+  /** Fluid warmer inline on this line (one warmer, one line at a time). */
+  warmer: boolean;
+  /** Crystalloid drip set on this line. Reused for every bag on the line. */
+  dripSet: string | null;
 }
 
 export interface FluidsState {
