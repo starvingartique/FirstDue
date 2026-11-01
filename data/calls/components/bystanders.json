@@ -1,18 +1,106 @@
 {
   "_meta": {
-    "version": "0.0.1",
-    "status": "SKELETON - Dispatch Engine v1 lands Oct 31",
-    "sourceNote": "WEIGHT_EST - weights estimated"
+    "version": "0.1.0",
+    "status": "Dispatch Engine v1. Seeded estimates, not NEMSIS data.",
+    "sourceNote": "WEIGHT_EST: every weight below is a seeded estimate.",
+    "samplerRule": "The sampler draws 0 to 1 archetype: 25% no bystander on arrival, else one archetype weighted by weight within minLevel <= level. helpsWith 'holding_pressure' stages bystander pressure at instantiation when a femoral bleed is present."
   },
   "archetypes": [
     {
-      "id": "placeholder_panicked_spouse",
-      "label": "TODO - first real entry: panicked spouse",
-      "behavior": "TODO - panics, hovers, answers in fragments",
+      "id": "helpful_driver_holding_pressure",
+      "label": "Witnessing driver holding pressure",
+      "behavior": "Stopped to help, holds a shirt on the wound, answers short and stays out of the way once you take over.",
+      "helpsWith": ["holding_pressure", "called_911", "saw_what_happened"],
+      "obstructsWith": [],
+      "sampleLines": ["I put my shirt on it - it just keeps coming.", "Tell me where you want me."],
+      "weight": 0.15,
+      "weightTag": "WEIGHT_EST",
+      "minLevel": 1,
+      "sourceNote": "WEIGHT_EST: seeded estimate. Mirrors the Bike down opener."
+    },
+    {
+      "id": "helpful_offduty_nurse",
+      "label": "Helpful off-duty nurse",
+      "behavior": "Calm, gives a crisp handoff (onset, meds, allergies), offers hands but never takes over your call.",
+      "helpsWith": ["knows_history", "called_911", "can_hold_pressure"],
+      "obstructsWith": [],
+      "sampleLines": ["Onset was about ten minutes ago. He takes metoprolol - that is all I know.", "Want me to hold that while you work?"],
+      "weight": 0.1,
+      "weightTag": "WEIGHT_EST",
+      "minLevel": 1,
+      "sourceNote": "WEIGHT_EST: seeded estimate."
+    },
+    {
+      "id": "panicked_spouse",
+      "label": "Panicked spouse",
+      "behavior": "Hovers, cries, answers in fragments, needs one clear job or keeps crowding your workspace.",
+      "helpsWith": ["knows_history"],
+      "obstructsWith": ["hovers", "answers_in_fragments", "needs_a_job"],
+      "sampleLines": ["Please - please just do something!", "He was fine - he was just - I do not know what happened!"],
+      "weight": 0.2,
+      "weightTag": "WEIGHT_EST",
+      "minLevel": 1,
+      "sourceNote": "WEIGHT_EST: seeded estimate."
+    },
+    {
+      "id": "caller_gone_quiet_house",
+      "label": "Caller gone, quiet house",
+      "behavior": "Nobody on scene. The 911 caller hung up and left the door open. You work alone with the patient.",
       "helpsWith": [],
-      "obstructsWith": ["TODO"],
-      "sampleLines": ["TODO - sample line"],
-      "weight": "WEIGHT_EST"
+      "obstructsWith": ["no_history_source", "no_extra_hands"],
+      "sampleLines": [],
+      "weight": 0.09,
+      "weightTag": "WEIGHT_EST",
+      "minLevel": 1,
+      "sourceNote": "WEIGHT_EST: seeded estimate. Tests solo assessment and history-taking from the patient alone."
+    },
+    {
+      "id": "lying_roommate",
+      "label": "Lying roommate",
+      "behavior": "Called 911 but hides the drugs. Story changes when you ask twice. The scene clues contradict him.",
+      "helpsWith": ["called_911"],
+      "obstructsWith": ["lies_about_drugs", "story_changes", "hides_evidence"],
+      "sampleLines": ["He just - fell asleep, man. I do not know about any pills.", "Those are not his - I mean - somebody left those here."],
+      "weight": 0.14,
+      "weightTag": "WEIGHT_EST",
+      "minLevel": 2,
+      "sourceNote": "WEIGHT_EST: seeded estimate. Built for overdose calls."
+    },
+    {
+      "id": "hostile_crowd",
+      "label": "Hostile crowd",
+      "behavior": "Films everything, shouts advice, closes in. One loud voice leads; the rest follow. PD is coming but not here.",
+      "helpsWith": [],
+      "obstructsWith": ["crowds_the_scene", "films", "shouts_advice", "slows_everything"],
+      "sampleLines": ["Yo, you are hurting him! I am recording this!", "Back up? We live here - hurry up!"],
+      "weight": 0.12,
+      "weightTag": "WEIGHT_EST",
+      "minLevel": 2,
+      "sourceNote": "WEIGHT_EST: seeded estimate."
+    },
+    {
+      "id": "language_barrier_family",
+      "label": "Family with a language barrier",
+      "behavior": "Caring, frantic, almost no English. Points, mimes, shows a pill bottle and a phone with a translate app that barely works.",
+      "helpsWith": ["knows_history_through_gestures", "shows_meds_bottle"],
+      "obstructsWith": ["cannot_answer_OPQRST", "translate_app_is_slow"],
+      "sampleLines": ["[rapid speech in another language, pointing at the pill bottle]", "[holds up phone: TRANSLATE - pain... chest... morning?]"],
+      "weight": 0.12,
+      "weightTag": "WEIGHT_EST",
+      "minLevel": 2,
+      "sourceNote": "WEIGHT_EST: seeded estimate."
+    },
+    {
+      "id": "drunk_friend_talking_over",
+      "label": "Drunk friend talking over everyone",
+      "behavior": "Means well, slurs, interrupts the patient and you, contradicts himself about times and amounts.",
+      "helpsWith": ["called_911"],
+      "obstructsWith": ["interrupts", "contradicts_himself", "unreliable_times"],
+      "sampleLines": ["We had like - two beers - okay maybe more, but he is fine, he is - oh no.", "Let me tell you what happened - no wait, ask me, I saw the whole thing."],
+      "weight": 0.08,
+      "weightTag": "WEIGHT_EST",
+      "minLevel": 2,
+      "sourceNote": "WEIGHT_EST: seeded estimate."
     }
   ]
 }

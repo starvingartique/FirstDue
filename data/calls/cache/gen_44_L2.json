@@ -1,0 +1,106 @@
+{
+  "id": "gen_44_L2",
+  "seed": 44,
+  "patient": {
+    "name": "Maya Ellis",
+    "nameLocked": false,
+    "age": 22,
+    "sex": "F",
+    "weight_kg": 84,
+    "weightNote": "V1: weight is narrative-only; the engine runs 80 kg adult physiology for every patient.",
+    "complaint": "overdose"
+  },
+  "dispatch": {
+    "nature": "Overdose",
+    "address": "47 Birch Lane, Apt B",
+    "cadText": "Caller says wife is passed out on the bathroom floor and barely breathing. Says she maybe had a seizure or maybe just fell asleep. Not sure if she was drinking. Door was locked and he had to push it open a few minutes ago.",
+    "updates": [
+      "Caller is crying and hard to understand, staying with her in bathroom"
+    ]
+  },
+  "scene": {
+    "location": "bathroom",
+    "timeOfDay": "afternoon",
+    "weather": "indoor",
+    "mechanism": "overdose_causes",
+    "mechanismSubtype": "opioid_rx_tablets",
+    "hazards": [
+      "confined space",
+      "locked door"
+    ],
+    "description": "Small home bathroom in afternoon light. Young woman on floor by toilet. Pill bottles on the counter, one with another name on label. Tight space with little room to work."
+  },
+  "backstory": "She is limp and barely responsive and drifts in and out. She mumbles a few slurred words when shaken loudly then goes quiet again. Her breathing looks slow and shallow and she does not push you away.",
+  "injuries": [],
+  "conditions": [],
+  "conditionsNote": "Dispatch Engine v1: generatorReady conditions only; see skeleton.",
+  "marchFocus": [
+    "R",
+    "C",
+    "H"
+  ],
+  "bystander": {
+    "archetypeId": "panicked_spouse",
+    "label": "Panicked spouse",
+    "notes": "Hovers, cries, answers in fragments, needs one clear job or keeps crowding your workspace."
+  },
+  "levels": [
+    2
+  ],
+  "skeleton": {
+    "version": "dispatch-v1",
+    "seed": 44,
+    "level": 2,
+    "complaintId": "overdose",
+    "mechanismId": "overdose_causes",
+    "subtypeId": "opioid_rx_tablets",
+    "conditionIds": [],
+    "patient": {
+      "age": 22,
+      "sex": "F",
+      "weight_kg": 84
+    },
+    "comorbidityIds": [],
+    "homeMeds": [],
+    "environmentId": "bathroom_home",
+    "timeOfDay": "afternoon",
+    "weather": "indoor",
+    "bystanderId": "panicked_spouse",
+    "complication": null
+  },
+  "persona": "She is limp and barely responsive and drifts in and out. She mumbles a few slurred words when shaken loudly then goes quiet again. Her breathing looks slow and shallow and she does not push you away.",
+  "historyCard": {
+    "SAMPLE": {
+      "signs_symptoms": "Very sleepy, hard to wake, slow shallow breathing, nausea earlier per spouse",
+      "allergies": "No known allergies per spouse",
+      "medications": "No home meds on file, no daily pills she admits to",
+      "past_history": "No known medical problems reported, prior low mood per spouse",
+      "last_meal": "Ate lunch earlier, time unclear, spouse unsure",
+      "events": "Found in locked bathroom after being quiet a while, empty pill bottles nearby"
+    },
+    "OPQRST": {
+      "onset": "Found a short while ago after she went to bathroom and did not come out",
+      "provokes": "Loud voice and sternal rub briefly wake her, quiet lets her fade again",
+      "quality": "Drowsy mumbling, heavy limbs, sick to stomach feeling",
+      "radiates": "No pain complaint, just feels heavy and foggy when roused",
+      "severity_words": "Worst drowsiness she has ever felt, cannot stay awake",
+      "time": "Symptoms ongoing since found, getting sleepier per spouse"
+    },
+    "secrets": [
+      {
+        "fact": "Pills were prescription pain tablets belonging to a relative, not prescribed to her",
+        "revealWhen": "Asked whose name is on the bottle or where pills came from?"
+      },
+      {
+        "fact": "Took extra tablets after argument because she wanted to sleep and stop stress",
+        "revealWhen": "Asked why she took them or what happened today?"
+      }
+    ]
+  },
+  "bystanderLines": [
+    "Please please wake up - baby please - do something!",
+    "I - I knocked and knocked - the door was locked - I pushed - I..."
+  ],
+  "expectedPathway": "Ensure scene safety and open space to work, assign spouse one clear job away from patient. Assess responsiveness and airway with breathing support as needed. Recognize opioid toxidrome from story and pill bottles, support ventilation with oxygen per protocol. Give naloxone per protocol and watch for waking or re-sedation. Monitor airway closely, place in recovery position if remains sleepy, transport for ongoing care and mental health follow up.",
+  "complication": null
+}

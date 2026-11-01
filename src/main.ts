@@ -23,6 +23,10 @@ import { getTermMode, setTermMode, type TermMode } from "./ui/terms";
 import { RunFlow, evaluateHandoff, type HandoffCheck } from "./ui/flow";
 import type { Sim } from "./sim/engine";
 import { newBikeDownSim } from "./sim/scenario";
+import { newGeneratedSim } from "./dispatch/instantiate";
+import { pickBundled } from "./dispatch/cache";
+import type { FleshedCall } from "./dispatch/types";
+import type { FixedCall } from "./data/types";
 import { loadAll, loadBikeDown, loadDifficulty } from "./data/loaders";
 
 function showBootError(message: string): void {
@@ -240,11 +244,22 @@ function main(): void {
     const picked = levels.find((l) => l.level === level);
     flow.record.level = level;
     flow.record.levelLabel = `L${level} ${picked?.role ?? ""}`.trim();
-    flow.showDispatch(call, () => {
-      const s = newBikeDownSim();
-      s.setLevel(level);
-      s.addLog("info", `Level chosen: ${flow.record.levelLabel}.`);
-      sim = s;
+    const hooks = {
+      onAccept: (accepted: FixedCall) => {
+        let s: Sim;
+        try {
+          s =
+            accepted.id === "bike_down"
+              ? newBikeDownSim()
+              : newGeneratedSim(accepted as FleshedCall);
+        } catch {
+          flow.showDispatch(call, level, hooks, "That generated call was malformed. Bike down is loaded instead - accept it or generate again.");
+          return;
+        }
+        hud.showCall(accepted);
+        s.setLevel(level);
+        s.addLog("info", `Level chosen: ${flow.record.levelLabel}.`);
+        sim = s;
       debug = new DebugOverlay(s);
       menu = new MedicalMenu(s);
       menu.setRunInfo({ level: flow.record.levelLabel, destination: "not chosen", outcome: "run in progress" });
@@ -281,7 +296,40 @@ function main(): void {
         flow.hideOverlay();
         hud.showPackage(true);
       });
-    });
+    },
+      onGenerate: async (seedText: string) => {
+        const trimmed = seedText.trim();
+        const wantSeed = /^\d{1,6}$/.test(trimmed) ? Number(trimmed) : null;
+        try {
+          const response = await fetch("/api/generate-call", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify(wantSeed === null ? { level } : { seed: wantSeed, level })
+          });
+          const data = (await response.json()) as {
+            call?: FixedCall;
+            fallbackNote?: unknown;
+            fallback?: unknown;
+            error?: unknown;
+          };
+          if (!response.ok || data.call === undefined) throw new Error(String(data.error ?? "bad response"));
+          return {
+            call: data.call,
+            note: typeof data.fallbackNote === "string" ? data.fallbackNote : null
+          };
+        } catch {
+          // Server unreachable or generation exhausted: bundled cached call,
+          // never a stuck Dispatch screen.
+          const fallbackSeed = wantSeed ?? Math.floor(Date.now() % 1000000);
+          const bundled = pickBundled(fallbackSeed, level);
+          return {
+            call: bundled,
+            note: `Server unreachable; served bundled cached call ${bundled.id}.`
+          };
+        }
+      }
+    };
+    flow.showDispatch(call, level, hooks);
   });
 }
 

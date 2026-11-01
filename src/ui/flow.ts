@@ -74,7 +74,7 @@ export function evaluateHandoff(sim: Sim): { win: boolean; checks: HandoffCheck[
 export function hintFor(sim: Sim): string | null {
   if (sim.arrested) return null;
   const rate = sim.bleedRate_mL_per_min();
-  if (!sim.exposed) return "Partner: check for bleeding - expose that thigh first.";
+  if (!sim.exposed && sim.femoralBleed) return "Partner: check for bleeding - expose that thigh first.";
   if (sim.beltTrap) return "Partner: that belt on the thigh looks wrong - take a second look.";
   const nothingOn =
     !sim.tq.applied && sim.packing.stage === "none" && !sim.pressure.active && !sim.dressing.applied;
@@ -284,34 +284,107 @@ export class RunFlow {
 
   // - dispatch -
 
-  showDispatch(call: FixedCall, onAccept: () => void): void {
-    this.phase = "dispatch";
-    const card = h("div", "flow-card");
-    const head = h("div", "flow-dispatch-head");
-    head.appendChild(h("span", "flow-tone", "(tone)"));
-    head.appendChild(h("span", "flow-title", "DISPATCH"));
-    head.appendChild(h("span", "flow-tone", "(tone)"));
-    card.appendChild(head);
+  private cadList(call: FixedCall): HTMLElement {
     const dl = h("dl", "flow-cad");
+    const when = call.scene.timeOfDay;
+    const sceneHead = `${when.charAt(0).toUpperCase()}${when.slice(1)} ${call.scene.location}`;
     const rows: [string, string][] = [
       ["Nature", call.dispatch.nature],
       ["Patient", `${call.patient.age}-year-old ${call.patient.sex === "M" ? "male" : "female"}`],
       ["CAD", call.dispatch.cadText ?? ""],
       ["Update", (call.dispatch.updates ?? []).join(" ")],
-      ["Scene", `Night roadside - ${call.scene.description ?? ""}`.trim()]
+      ["Scene", `${sceneHead} - ${call.scene.description ?? ""}`.trim()]
     ];
     for (const [k, v] of rows) {
       if (v === "") continue;
       dl.appendChild(h("dt", "flow-dt", k));
       dl.appendChild(h("dd", "flow-dd", v));
     }
-    card.appendChild(dl);
-    const btn = h("button", "flow-btn flow-btn-big", "Accept call and arrive on scene");
-    btn.type = "button";
-    btn.addEventListener("click", onAccept);
-    card.appendChild(btn);
-    card.appendChild(h("div", "flow-note", "Accepting starts the clock and the event log."));
-    this.show(card);
+    return dl;
+  }
+
+  private dispatchHead(note: string): HTMLElement {
+    const head = h("div", "flow-dispatch-head");
+    head.appendChild(h("span", "flow-tone", "(tone)"));
+    head.appendChild(h("span", "flow-title", note));
+    head.appendChild(h("span", "flow-tone", "(tone)"));
+    return head;
+  }
+
+  /**
+   * Dispatch screen. The fixed Bike down card stays first and unchanged as
+   * the default demo call; the Generate panel beside it offers a fresh
+   * Dispatch Engine v1 call. Every path resolves to an Accept or a Back -
+   * never a blank screen and never a stuck Dispatch screen.
+   */
+  showDispatch(
+    fixed: FixedCall,
+    level: 1 | 2,
+    hooks: {
+      onAccept: (call: FixedCall) => void;
+      onGenerate: (seedText: string) => Promise<{ call: FixedCall; note: string | null }>;
+    },
+    note?: string
+  ): void {
+    this.phase = "dispatch";
+
+    const renderFixed = (status: string): void => {
+      const card = h("div", "flow-card");
+      card.appendChild(this.dispatchHead("DISPATCH"));
+      card.appendChild(this.cadList(fixed));
+      const btn = h("button", "flow-btn flow-btn-big", "Accept call and arrive on scene");
+      btn.type = "button";
+      btn.addEventListener("click", () => hooks.onAccept(fixed));
+      card.appendChild(btn);
+      card.appendChild(h("div", "flow-note", "Accepting starts the clock and the event log."));
+      card.appendChild(h("div", "flow-h", `Or generate a new call (Dispatch Engine v1, L${level})`));
+      const row = h("div", "flow-btn-row");
+      const seed = document.createElement("input");
+      seed.className = "flow-seed";
+      seed.placeholder = "seed (blank for random)";
+      seed.inputMode = "numeric";
+      seed.setAttribute("aria-label", "Generation seed, blank for random");
+      const gen = h("button", "flow-btn", "Generate New Call");
+      gen.type = "button";
+      row.append(seed, gen);
+      card.appendChild(row);
+      const statusDiv = h("div", "flow-note", status);
+      card.appendChild(statusDiv);
+      gen.addEventListener("click", () => {
+        gen.disabled = true;
+        statusDiv.textContent = "Generating...";
+        void hooks
+          .onGenerate(seed.value)
+          .then(({ call, note: genNote }) => renderGenerated(call, genNote))
+          .catch((error: unknown) => {
+            gen.disabled = false;
+            statusDiv.textContent =
+              error instanceof Error ? `Generation failed: ${error.message}` : "Generation failed.";
+          });
+      });
+      this.show(card);
+    };
+
+    const renderGenerated = (call: FixedCall, genNote: string | null): void => {
+      const card = h("div", "flow-card");
+      card.appendChild(this.dispatchHead("DISPATCH - GENERATED"));
+      card.appendChild(this.cadList(call));
+      if (genNote !== null && genNote !== "") {
+        card.appendChild(h("div", "flow-note", genNote));
+      }
+      const btn = h("button", "flow-btn flow-btn-big", "Accept generated call and arrive on scene");
+      btn.type = "button";
+      btn.addEventListener("click", () => hooks.onAccept(call));
+      card.appendChild(btn);
+      const back = h("button", "flow-btn flow-btn-ghost", "Back to Bike down");
+      back.type = "button";
+      back.addEventListener("click", () => renderFixed("Bike down is the default demo call."));
+      card.appendChild(back);
+      card.appendChild(h("div", "flow-note", "Accepting starts the clock and the event log."));
+      this.show(card);
+    };
+
+    renderFixed(note ?? "Bike down is the default demo call.");
   }
 
   // - size-up -

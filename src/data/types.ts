@@ -263,6 +263,8 @@ export interface Complaint {
   id: string;
   label: string;
   weight: number | string;
+  /** V1: always WEIGHT_EST until NEMSIS weights land. */
+  weightTag?: string;
   sourceNote?: string;
   minLevel?: number;
 }
@@ -275,6 +277,7 @@ export interface ComplaintsFile {
 export interface MechanismSubtype {
   id: string;
   w?: number;
+  weightTag?: string;
   patient?: string;
   injuries?: unknown[][];
   regionWeights?: unknown[][];
@@ -283,32 +286,53 @@ export interface MechanismSubtype {
   pediatricPattern?: string;
   sceneSafety?: string;
   teachingPoint?: string;
+  /** V1 medical-cause subtypes: scene clues and engine-honesty note. */
+  sceneClues?: string[];
+  medicNote?: string;
 }
 
 export interface Mechanism {
   id: string;
   ntdbShare?: number;
   caseFatality?: number;
+  weightTag?: string;
+  sourceNote?: string;
   subtypes: MechanismSubtype[];
+}
+
+/** V1: complaint to mechanism/subtype draw with a tagged weight. */
+export interface ComplaintMechanism {
+  complaintId: string;
+  mechanismId: string;
+  subtypeId: string;
+  weight: number;
+  weightTag?: string;
+  sourceNote?: string;
 }
 
 export interface MechanismsFile {
   _meta: MetaBlock;
   mechanisms: Mechanism[];
+  complaintMechanisms?: ComplaintMechanism[];
   universalModifiers?: Record<string, string>;
 }
 
 export interface ConditionsMapEntry {
   conditionId: string;
   probability: number | string;
+  probabilityTag?: string;
   onsetDelay_s?: number | string;
   coOccursWith?: string[];
   excludes?: string[];
   notes?: string;
+  sourceNote?: string;
 }
 
 export interface ConditionsMapping {
   mechanismId: string;
+  subtypeId?: string;
+  complaintId?: string;
+  sourceNote?: string;
   conditions: ConditionsMapEntry[];
 }
 
@@ -320,8 +344,12 @@ export interface ConditionsMapFile {
 export interface PatientDistribution {
   complaintId: string;
   ageRange: [number, number] | string;
+  ageTag?: string;
   sexSplit?: Record<string, unknown>;
+  sexTag?: string;
   weight_kg?: Record<string, unknown>;
+  weightTag?: string;
+  sourceNote?: string;
   notes?: string;
 }
 
@@ -335,8 +363,13 @@ export interface ComorbidityEntry {
   label: string;
   homeMeds?: string[];
   physiologyModifiers?: Record<string, unknown>;
+  /** V1: "modeled" or "history_only_v1". */
+  engineEffect?: string;
   examMasks?: string[];
   weight?: number | string;
+  weightTag?: string;
+  minLevel?: number;
+  sourceNote?: string;
   notes?: string;
 }
 
@@ -348,10 +381,15 @@ export interface ComorbiditiesFile {
 export interface EnvironmentEntry {
   id: string;
   label: string;
+  location?: string;
+  complaintIds?: string[];
   timesOfDay?: string[];
   weather?: string[];
   hazards?: string[];
   weight?: number | string;
+  weightTag?: string;
+  minLevel?: number;
+  sourceNote?: string;
   notes?: string;
 }
 
@@ -368,6 +406,9 @@ export interface BystanderArchetype {
   obstructsWith?: string[];
   sampleLines?: string[];
   weight?: number | string;
+  weightTag?: string;
+  minLevel?: number;
+  sourceNote?: string;
 }
 
 export interface BystandersFile {
@@ -379,9 +420,16 @@ export interface Complication {
   id: string;
   label: string;
   trigger: string;
+  onset_s?: [number, number];
   engineEffect?: string;
+  /** V1: only true entries can be drawn. */
+  v1Ready?: boolean;
+  v1Note?: string;
+  requiresCondition?: string | null;
   weight?: number | string;
+  weightTag?: string;
   minLevel?: number;
+  sourceNote?: string;
 }
 
 export interface ComplicationsFile {

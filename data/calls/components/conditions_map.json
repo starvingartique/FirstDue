@@ -1,18 +1,210 @@
 {
   "_meta": {
-    "version": "0.0.1",
-    "status": "SKELETON - Dispatch Engine v1 lands Oct 31",
-    "sourceNote": "WEIGHT_EST - probabilities estimated until NEMSIS or NTDB data confirms them"
+    "version": "0.1.0",
+    "status": "Dispatch Engine v1. Only generatorReady conditions appear here.",
+    "sourceNote": "WEIGHT_EST: every probability below is a seeded estimate, never NEMSIS or NTDB data.",
+    "rules": [
+      "Every conditionId in this file must be generatorReady true in the repo medical data (oct28_conditions.json in v1). The validator rejects anything else.",
+      "coOccursWith: when this condition is drawn, also draw the listed conditions (if not already drawn).",
+      "excludes: when this condition is drawn, drop the listed conditions. V1 data has no exclusions; the sampler implements the rule and the headless test covers it with synthetic data.",
+      "onsetDelay_s: 0 in v1 (present at arrival). Delayed-onset conditions such as tension pneumothorax need engine support and land with the Nov 2 conditions.",
+      "Medical mappings are honest placeholders: the fleshed narrative carries the toxidrome or cardiac or allergy story while the engine instantiates only modeled trauma physiology. Each mapping says so in its note."
+    ]
   },
   "mappings": [
     {
-      "mechanismId": "placeholder_mechanism",
+      "mechanismId": "fall",
+      "subtypeId": "ground_level_fall_elderly",
+      "sourceNote": "WEIGHT_EST: seeded estimates. Hip fracture, subdural and TBI are not engine-modeled in v1, so this mapping covers only the modeled subset.",
       "conditions": [
-        {
-          "conditionId": "TODO - first real mapping",
-          "probability": "WEIGHT_EST",
-          "notes": "Placeholder. Oct 31 sampler reads this file."
-        }
+        { "conditionId": "crash_stress_offset", "probability": 0.7, "probabilityTag": "WEIGHT_EST", "onsetDelay_s": 0, "coOccursWith": [], "excludes": [], "sourceNote": "WEIGHT_EST: pain and fear response after a fall.", "notes": "Pain and fear bump. The medical-cause check (syncope, hypoglycemia, stroke) is history-card work in v1." },
+        { "conditionId": "road_rash", "probability": 0.25, "probabilityTag": "WEIGHT_EST", "onsetDelay_s": 0, "coOccursWith": [], "excludes": [], "sourceNote": "WEIGHT_EST: scrape on the way down.", "notes": "Capillary ooze, self-clots." },
+        { "conditionId": "hypothermia_trauma", "probability": 0.2, "probabilityTag": "WEIGHT_EST", "onsetDelay_s": 0, "coOccursWith": [], "excludes": [], "sourceNote": "WEIGHT_EST: long lie on a cold floor or ground.", "notes": "Flat probability in v1; environment-aware onset needs the Nov 2 conditions." }
+      ]
+    },
+    {
+      "mechanismId": "fall",
+      "subtypeId": "fall_from_ladder_or_roof",
+      "sourceNote": "WEIGHT_EST: seeded estimates. Fractures and spine injury are not engine-modeled in v1.",
+      "conditions": [
+        { "conditionId": "crash_stress_offset", "probability": 0.85, "probabilityTag": "WEIGHT_EST", "onsetDelay_s": 0, "coOccursWith": [], "excludes": [], "sourceNote": "WEIGHT_EST: pain and fear response after a fall from height.", "notes": "" },
+        { "conditionId": "road_rash", "probability": 0.3, "probabilityTag": "WEIGHT_EST", "onsetDelay_s": 0, "coOccursWith": [], "excludes": [], "sourceNote": "WEIGHT_EST: scrape on impact.", "notes": "" },
+        { "conditionId": "hypothermia_trauma", "probability": 0.25, "probabilityTag": "WEIGHT_EST", "onsetDelay_s": 0, "coOccursWith": [], "excludes": [], "sourceNote": "WEIGHT_EST: exposed at the scene.", "notes": "" },
+        { "conditionId": "femoral_arterial_bleed", "probability": 0.03, "probabilityTag": "WEIGHT_EST", "onsetDelay_s": 0, "coOccursWith": ["crash_stress_offset"], "excludes": [], "sourceNote": "WEIGHT_EST: rare leg impalement or open injury edge case.", "notes": "Rare. Uses the modeled thigh-bleed physiology whatever the sharp object was." }
+      ]
+    },
+    {
+      "mechanismId": "fall",
+      "subtypeId": "fall_from_height_gt_20ft",
+      "sourceNote": "WEIGHT_EST: seeded estimates. Severe polytrauma is beyond v1; this mapping covers the leg-bleed subset only.",
+      "conditions": [
+        { "conditionId": "crash_stress_offset", "probability": 0.95, "probabilityTag": "WEIGHT_EST", "onsetDelay_s": 0, "coOccursWith": [], "excludes": [], "sourceNote": "WEIGHT_EST: severe pain and fear response.", "notes": "" },
+        { "conditionId": "femoral_arterial_bleed", "probability": 0.1, "probabilityTag": "WEIGHT_EST", "onsetDelay_s": 0, "coOccursWith": ["crash_stress_offset"], "excludes": [], "sourceNote": "WEIGHT_EST: leg-bleed subset of high falls.", "notes": "TBI, pelvic and spine injuries are narrative-only in v1." },
+        { "conditionId": "road_rash", "probability": 0.4, "probabilityTag": "WEIGHT_EST", "onsetDelay_s": 0, "coOccursWith": [], "excludes": [], "sourceNote": "WEIGHT_EST: slide on impact.", "notes": "" },
+        { "conditionId": "hypothermia_trauma", "probability": 0.3, "probabilityTag": "WEIGHT_EST", "onsetDelay_s": 0, "coOccursWith": [], "excludes": [], "sourceNote": "WEIGHT_EST: exposed at the scene.", "notes": "" }
+      ]
+    },
+    {
+      "mechanismId": "motor_vehicle_traffic",
+      "subtypeId": "motorcycle_crash",
+      "sourceNote": "WEIGHT_EST: seeded estimates. Femoral probability matches the mechanisms.json motorcycle entry (0.08).",
+      "conditions": [
+        { "conditionId": "crash_stress_offset", "probability": 0.9, "probabilityTag": "WEIGHT_EST", "onsetDelay_s": 0, "coOccursWith": [], "excludes": [], "sourceNote": "WEIGHT_EST: crash pain and fear.", "notes": "" },
+        { "conditionId": "road_rash", "probability": 0.6, "probabilityTag": "WEIGHT_EST", "onsetDelay_s": 0, "coOccursWith": [], "excludes": [], "sourceNote": "WEIGHT_EST: matches the mechanisms.json motorcycle road_rash value.", "notes": "" },
+        { "conditionId": "hypothermia_trauma", "probability": 0.35, "probabilityTag": "WEIGHT_EST", "onsetDelay_s": 0, "coOccursWith": [], "excludes": [], "sourceNote": "WEIGHT_EST: night roadside exposure.", "notes": "" },
+        { "conditionId": "femoral_arterial_bleed", "probability": 0.08, "probabilityTag": "WEIGHT_EST", "onsetDelay_s": 0, "coOccursWith": ["crash_stress_offset"], "excludes": [], "sourceNote": "WEIGHT_EST: matches the mechanisms.json motorcycle femoral value.", "notes": "Same modeled bleed as Bike down; the fleshed story differs." }
+      ]
+    },
+    {
+      "mechanismId": "motor_vehicle_traffic",
+      "subtypeId": "mvc_frontal",
+      "sourceNote": "WEIGHT_EST: seeded estimates. Chest, cardiac and abdominal injuries are not engine-modeled in v1.",
+      "conditions": [
+        { "conditionId": "crash_stress_offset", "probability": 0.9, "probabilityTag": "WEIGHT_EST", "onsetDelay_s": 0, "coOccursWith": [], "excludes": [], "sourceNote": "WEIGHT_EST: crash pain and fear.", "notes": "" },
+        { "conditionId": "road_rash", "probability": 0.15, "probabilityTag": "WEIGHT_EST", "onsetDelay_s": 0, "coOccursWith": [], "excludes": [], "sourceNote": "WEIGHT_EST: glass and seatbelt scrape.", "notes": "" },
+        { "conditionId": "hypothermia_trauma", "probability": 0.3, "probabilityTag": "WEIGHT_EST", "onsetDelay_s": 0, "coOccursWith": [], "excludes": [], "sourceNote": "WEIGHT_EST: roadside exposure.", "notes": "" },
+        { "conditionId": "femoral_arterial_bleed", "probability": 0.04, "probabilityTag": "WEIGHT_EST", "onsetDelay_s": 0, "coOccursWith": ["crash_stress_offset"], "excludes": [], "sourceNote": "WEIGHT_EST: leg-bleed subset of frontal crashes.", "notes": "" }
+      ]
+    },
+    {
+      "mechanismId": "motor_vehicle_traffic",
+      "subtypeId": "mvc_lateral_tbone",
+      "sourceNote": "WEIGHT_EST: seeded estimates. Pelvic, diaphragm and solid-organ injuries are not engine-modeled in v1.",
+      "conditions": [
+        { "conditionId": "crash_stress_offset", "probability": 0.9, "probabilityTag": "WEIGHT_EST", "onsetDelay_s": 0, "coOccursWith": [], "excludes": [], "sourceNote": "WEIGHT_EST: crash pain and fear.", "notes": "" },
+        { "conditionId": "road_rash", "probability": 0.1, "probabilityTag": "WEIGHT_EST", "onsetDelay_s": 0, "coOccursWith": [], "excludes": [], "sourceNote": "WEIGHT_EST: glass scrape.", "notes": "" },
+        { "conditionId": "hypothermia_trauma", "probability": 0.3, "probabilityTag": "WEIGHT_EST", "onsetDelay_s": 0, "coOccursWith": [], "excludes": [], "sourceNote": "WEIGHT_EST: roadside exposure.", "notes": "" }
+      ]
+    },
+    {
+      "mechanismId": "motor_vehicle_traffic",
+      "subtypeId": "pedestrian_struck",
+      "sourceNote": "WEIGHT_EST: seeded estimates. Fractures, TBI and solid-organ injuries are not engine-modeled in v1.",
+      "conditions": [
+        { "conditionId": "crash_stress_offset", "probability": 0.95, "probabilityTag": "WEIGHT_EST", "onsetDelay_s": 0, "coOccursWith": [], "excludes": [], "sourceNote": "WEIGHT_EST: severe pain and fear.", "notes": "" },
+        { "conditionId": "femoral_arterial_bleed", "probability": 0.08, "probabilityTag": "WEIGHT_EST", "onsetDelay_s": 0, "coOccursWith": ["crash_stress_offset"], "excludes": [], "sourceNote": "WEIGHT_EST: leg-bleed subset of pedestrian strikes.", "notes": "" },
+        { "conditionId": "road_rash", "probability": 0.5, "probabilityTag": "WEIGHT_EST", "onsetDelay_s": 0, "coOccursWith": [], "excludes": [], "sourceNote": "WEIGHT_EST: thrown to the pavement.", "notes": "" },
+        { "conditionId": "hypothermia_trauma", "probability": 0.3, "probabilityTag": "WEIGHT_EST", "onsetDelay_s": 0, "coOccursWith": [], "excludes": [], "sourceNote": "WEIGHT_EST: roadside exposure.", "notes": "" }
+      ]
+    },
+    {
+      "mechanismId": "transport_other_and_pedal_cyclist",
+      "subtypeId": "bicycle_crash",
+      "sourceNote": "WEIGHT_EST: seeded estimates. Handlebar abdominal injuries and TBI are not engine-modeled in v1.",
+      "conditions": [
+        { "conditionId": "crash_stress_offset", "probability": 0.85, "probabilityTag": "WEIGHT_EST", "onsetDelay_s": 0, "coOccursWith": [], "excludes": [], "sourceNote": "WEIGHT_EST: crash pain and fear.", "notes": "" },
+        { "conditionId": "road_rash", "probability": 0.6, "probabilityTag": "WEIGHT_EST", "onsetDelay_s": 0, "coOccursWith": [], "excludes": [], "sourceNote": "WEIGHT_EST: matches the mechanisms.json bicycle road_rash value.", "notes": "" },
+        { "conditionId": "hypothermia_trauma", "probability": 0.25, "probabilityTag": "WEIGHT_EST", "onsetDelay_s": 0, "coOccursWith": [], "excludes": [], "sourceNote": "WEIGHT_EST: roadside exposure.", "notes": "" },
+        { "conditionId": "femoral_arterial_bleed", "probability": 0.03, "probabilityTag": "WEIGHT_EST", "onsetDelay_s": 0, "coOccursWith": ["crash_stress_offset"], "excludes": [], "sourceNote": "WEIGHT_EST: rare leg impalement edge case.", "notes": "" }
+      ]
+    },
+    {
+      "mechanismId": "struck_by_against",
+      "subtypeId": "assault_blunt",
+      "sourceNote": "WEIGHT_EST: seeded estimates. Facial fractures, TBI and solid-organ injuries are not engine-modeled in v1.",
+      "conditions": [
+        { "conditionId": "crash_stress_offset", "probability": 0.9, "probabilityTag": "WEIGHT_EST", "onsetDelay_s": 0, "coOccursWith": [], "excludes": [], "sourceNote": "WEIGHT_EST: pain and fear after assault.", "notes": "Scene safety (assailant may be present) is carried in the fleshed CAD text." },
+        { "conditionId": "road_rash", "probability": 0.2, "probabilityTag": "WEIGHT_EST", "onsetDelay_s": 0, "coOccursWith": [], "excludes": [], "sourceNote": "WEIGHT_EST: knocked to the ground.", "notes": "" },
+        { "conditionId": "hypothermia_trauma", "probability": 0.15, "probabilityTag": "WEIGHT_EST", "onsetDelay_s": 0, "coOccursWith": [], "excludes": [], "sourceNote": "WEIGHT_EST: down outdoors.", "notes": "" }
+      ]
+    },
+    {
+      "mechanismId": "struck_by_against",
+      "subtypeId": "sports_impact",
+      "sourceNote": "WEIGHT_EST: seeded estimates. Concussion and spine injuries are not engine-modeled in v1.",
+      "conditions": [
+        { "conditionId": "crash_stress_offset", "probability": 0.7, "probabilityTag": "WEIGHT_EST", "onsetDelay_s": 0, "coOccursWith": [], "excludes": [], "sourceNote": "WEIGHT_EST: pain and fear after impact.", "notes": "" },
+        { "conditionId": "road_rash", "probability": 0.3, "probabilityTag": "WEIGHT_EST", "onsetDelay_s": 0, "coOccursWith": [], "excludes": [], "sourceNote": "WEIGHT_EST: turf or court burn.", "notes": "" }
+      ]
+    },
+    {
+      "mechanismId": "cut_pierce",
+      "subtypeId": "stabbing",
+      "sourceNote": "WEIGHT_EST: seeded estimates. V1 models the leg-stab subset; chest, abdomen and neck stab pathophysiology is narrative-only until Nov 2.",
+      "conditions": [
+        { "conditionId": "crash_stress_offset", "probability": 0.9, "probabilityTag": "WEIGHT_EST", "onsetDelay_s": 0, "coOccursWith": [], "excludes": [], "sourceNote": "WEIGHT_EST: pain and fear after stabbing.", "notes": "Scene safety (PD staging) is carried in the fleshed CAD text." },
+        { "conditionId": "femoral_arterial_bleed", "probability": 0.25, "probabilityTag": "WEIGHT_EST", "onsetDelay_s": 0, "coOccursWith": ["crash_stress_offset"], "excludes": [], "sourceNote": "WEIGHT_EST: leg-stab subset of stabbings.", "notes": "When drawn, the fleshed story is a leg stab. When absent, it is a torso stab carried in narrative only." }
+      ]
+    },
+    {
+      "mechanismId": "firearm",
+      "subtypeId": "gsw_single_or_multiple",
+      "sourceNote": "WEIGHT_EST: seeded estimates. V1 models the extremity subset; chest, abdomen, head and neck GSW pathophysiology is narrative-only until Nov 2.",
+      "conditions": [
+        { "conditionId": "crash_stress_offset", "probability": 0.95, "probabilityTag": "WEIGHT_EST", "onsetDelay_s": 0, "coOccursWith": [], "excludes": [], "sourceNote": "WEIGHT_EST: pain and fear after shooting.", "notes": "Scene safety (PD must clear) is carried in the fleshed CAD text." },
+        { "conditionId": "femoral_arterial_bleed", "probability": 0.2, "probabilityTag": "WEIGHT_EST", "onsetDelay_s": 0, "coOccursWith": ["crash_stress_offset"], "excludes": [], "sourceNote": "WEIGHT_EST: extremity subset of shootings.", "notes": "When drawn, the fleshed story is a leg GSW. When absent, it is a torso GSW carried in narrative only." }
+      ]
+    },
+    {
+      "mechanismId": "overdose_causes",
+      "subtypeId": "opioid_rx_tablets",
+      "sourceNote": "WEIGHT_EST: v1 placeholder mapping. No engine conditions; the toxidrome is narrative-only.",
+      "conditions": []
+    },
+    {
+      "mechanismId": "overdose_causes",
+      "subtypeId": "heroin_injection",
+      "sourceNote": "WEIGHT_EST: v1 placeholder mapping. No engine conditions; the toxidrome is narrative-only.",
+      "conditions": []
+    },
+    {
+      "mechanismId": "overdose_causes",
+      "subtypeId": "stimulant_use",
+      "sourceNote": "WEIGHT_EST: v1 placeholder mapping. No engine conditions; the toxidrome is narrative-only.",
+      "conditions": []
+    },
+    {
+      "mechanismId": "overdose_causes",
+      "subtypeId": "polysubstance_unknown",
+      "sourceNote": "WEIGHT_EST: v1 placeholder mapping. No engine conditions; the toxidrome is narrative-only.",
+      "conditions": []
+    },
+    {
+      "mechanismId": "chest_pain_causes",
+      "subtypeId": "exertional_cardiac",
+      "sourceNote": "WEIGHT_EST: v1 placeholder mapping. Stress response only; coronary pathophysiology is Nov 2 scope.",
+      "conditions": [
+        { "conditionId": "crash_stress_offset", "probability": 0.85, "probabilityTag": "WEIGHT_EST", "onsetDelay_s": 0, "coOccursWith": [], "excludes": [], "sourceNote": "WEIGHT_EST: sympathetic bump from pain and fear.", "notes": "V1 placeholder: the modeled HR, RR and SBP bump stands in for the sympathetic response. No coronary model exists yet." }
+      ]
+    },
+    {
+      "mechanismId": "chest_pain_causes",
+      "subtypeId": "rest_onset_cardiac",
+      "sourceNote": "WEIGHT_EST: v1 placeholder mapping. Stress response only; coronary pathophysiology is Nov 2 scope.",
+      "conditions": [
+        { "conditionId": "crash_stress_offset", "probability": 0.85, "probabilityTag": "WEIGHT_EST", "onsetDelay_s": 0, "coOccursWith": [], "excludes": [], "sourceNote": "WEIGHT_EST: sympathetic bump from pain and fear.", "notes": "V1 placeholder, same as exertional." }
+      ]
+    },
+    {
+      "mechanismId": "chest_pain_causes",
+      "subtypeId": "noncardiac_chest_pain",
+      "sourceNote": "WEIGHT_EST: v1 placeholder mapping. Stress response only.",
+      "conditions": [
+        { "conditionId": "crash_stress_offset", "probability": 0.5, "probabilityTag": "WEIGHT_EST", "onsetDelay_s": 0, "coOccursWith": [], "excludes": [], "sourceNote": "WEIGHT_EST: milder sympathetic bump.", "notes": "Lower probability: noncardiac chest pain often presents calmer." }
+      ]
+    },
+    {
+      "mechanismId": "allergy_causes",
+      "subtypeId": "food_exposure",
+      "sourceNote": "WEIGHT_EST: v1 placeholder mapping. Stress response only; anaphylaxis pathophysiology is Nov 2 scope.",
+      "conditions": [
+        { "conditionId": "crash_stress_offset", "probability": 0.8, "probabilityTag": "WEIGHT_EST", "onsetDelay_s": 0, "coOccursWith": [], "excludes": [], "sourceNote": "WEIGHT_EST: sympathetic bump from fear and distress.", "notes": "V1 placeholder. Airway edema, vasodilation and shock are not modeled yet." }
+      ]
+    },
+    {
+      "mechanismId": "allergy_causes",
+      "subtypeId": "insect_sting",
+      "sourceNote": "WEIGHT_EST: v1 placeholder mapping. Stress response only; anaphylaxis pathophysiology is Nov 2 scope.",
+      "conditions": [
+        { "conditionId": "crash_stress_offset", "probability": 0.8, "probabilityTag": "WEIGHT_EST", "onsetDelay_s": 0, "coOccursWith": [], "excludes": [], "sourceNote": "WEIGHT_EST: sympathetic bump from fear and distress.", "notes": "V1 placeholder. The epi pen on scene is a history-card item, not an engine input, in v1." }
+      ]
+    },
+    {
+      "mechanismId": "allergy_causes",
+      "subtypeId": "unknown_exposure",
+      "sourceNote": "WEIGHT_EST: v1 placeholder mapping. Stress response only; anaphylaxis pathophysiology is Nov 2 scope.",
+      "conditions": [
+        { "conditionId": "crash_stress_offset", "probability": 0.8, "probabilityTag": "WEIGHT_EST", "onsetDelay_s": 0, "coOccursWith": [], "excludes": [], "sourceNote": "WEIGHT_EST: sympathetic bump from fear and distress.", "notes": "V1 placeholder." }
       ]
     }
   ]
