@@ -1,18 +1,114 @@
 {
   "_meta": {
-    "version": "0.0.1",
-    "status": "SKELETON - Dispatch Engine v1 lands Oct 31",
-    "sourceNote": "WEIGHT_EST - weights estimated"
+    "version": "0.1.0",
+    "status": "Dispatch Engine v1. Seeded estimates, not NEMSIS data.",
+    "sourceNote": "WEIGHT_EST: every weight below is a seeded estimate. V1 renders one 3D scene type; environments change the CAD text, hazards, lighting flags and story, never the geometry.",
+    "samplerRule": "The sampler draws the environment from complaintIds-compatible entries only, then timeOfDay and weather uniform from the entry lists. Indoor entries use weather 'indoor'."
   },
   "environments": [
     {
-      "id": "placeholder_roadside_night",
-      "label": "TODO - first real entry: roadside at night (matches Bike down)",
+      "id": "roadside_night",
+      "label": "Roadside at night",
+      "location": "roadside",
+      "complaintIds": ["fall", "mvc", "assault", "stabbing", "gunshot", "chest_pain", "overdose"],
       "timesOfDay": ["night"],
-      "weather": ["clear"],
-      "hazards": ["traffic"],
-      "weight": "WEIGHT_EST",
-      "notes": "Placeholder. Oct 31 sampler reads this file."
+      "weather": ["clear", "cloudy", "rain"],
+      "hazards": ["live traffic lane", "darkness"],
+      "weight": 0.2,
+      "weightTag": "WEIGHT_EST",
+      "sourceNote": "WEIGHT_EST: seeded estimate. Matches the Bike down setting.",
+      "notes": "darkScene true, roadside true at instantiation. Rain is narrative-only in v1 (wet clothing follows the hypothermia condition)."
+    },
+    {
+      "id": "sidewalk_downtown",
+      "label": "Downtown sidewalk",
+      "location": "sidewalk",
+      "complaintIds": ["fall", "mvc", "assault", "stabbing", "gunshot", "chest_pain", "overdose", "allergic_reaction"],
+      "timesOfDay": ["morning", "afternoon", "evening", "night"],
+      "weather": ["clear", "cloudy", "rain"],
+      "hazards": ["traffic nearby", "crowd"],
+      "weight": 0.14,
+      "weightTag": "WEIGHT_EST",
+      "sourceNote": "WEIGHT_EST: seeded estimate.",
+      "notes": "The anywhere-downtown fallback: every complaint can happen here."
+    },
+    {
+      "id": "bathroom_home",
+      "label": "Home bathroom",
+      "location": "bathroom",
+      "complaintIds": ["fall", "assault", "chest_pain", "overdose", "allergic_reaction"],
+      "timesOfDay": ["morning", "afternoon", "evening", "night"],
+      "weather": ["indoor"],
+      "hazards": ["confined space", "locked door"],
+      "weight": 0.12,
+      "weightTag": "WEIGHT_EST",
+      "sourceNote": "WEIGHT_EST: seeded estimate. Classic overdose setting.",
+      "notes": "Tight working space is carried in the scene description; no geometry change in v1."
+    },
+    {
+      "id": "bedroom_home",
+      "label": "Home bedroom",
+      "location": "bedroom",
+      "complaintIds": ["fall", "assault", "chest_pain", "overdose", "allergic_reaction"],
+      "timesOfDay": ["morning", "afternoon", "evening", "night"],
+      "weather": ["indoor"],
+      "hazards": ["stairs to climb", "pets underfoot"],
+      "weight": 0.12,
+      "weightTag": "WEIGHT_EST",
+      "sourceNote": "WEIGHT_EST: seeded estimate.",
+      "notes": ""
+    },
+    {
+      "id": "restaurant",
+      "label": "Restaurant dining room",
+      "location": "restaurant",
+      "complaintIds": ["fall", "assault", "chest_pain", "overdose", "allergic_reaction"],
+      "timesOfDay": ["morning", "afternoon", "evening"],
+      "weather": ["indoor"],
+      "hazards": ["crowd of diners", "tight aisles"],
+      "weight": 0.1,
+      "weightTag": "WEIGHT_EST",
+      "sourceNote": "WEIGHT_EST: seeded estimate. Classic chest pain and food-allergy setting.",
+      "notes": ""
+    },
+    {
+      "id": "park_picnic",
+      "label": "Park picnic area",
+      "location": "park",
+      "complaintIds": ["fall", "assault", "chest_pain", "overdose", "allergic_reaction", "mvc"],
+      "timesOfDay": ["morning", "afternoon", "evening"],
+      "weather": ["clear", "cloudy"],
+      "hazards": ["uneven ground", "distance from the truck"],
+      "weight": 0.1,
+      "weightTag": "WEIGHT_EST",
+      "sourceNote": "WEIGHT_EST: seeded estimate. Classic sting and food-allergy setting.",
+      "notes": "mvc here is a bicycle crash on the park path, never a car."
+    },
+    {
+      "id": "gym",
+      "label": "Gym floor",
+      "location": "gym",
+      "complaintIds": ["fall", "assault", "chest_pain", "allergic_reaction"],
+      "timesOfDay": ["morning", "afternoon", "evening"],
+      "weather": ["indoor"],
+      "hazards": ["heavy equipment", "crowd"],
+      "weight": 0.08,
+      "weightTag": "WEIGHT_EST",
+      "sourceNote": "WEIGHT_EST: seeded estimate. Exertional chest pain and sports impact live here.",
+      "notes": ""
+    },
+    {
+      "id": "construction_site",
+      "label": "Construction site",
+      "location": "construction",
+      "complaintIds": ["fall", "mvc", "assault", "chest_pain"],
+      "timesOfDay": ["morning", "afternoon"],
+      "weather": ["clear", "cloudy", "rain"],
+      "hazards": ["heavy equipment", "uneven ground", "noise"],
+      "weight": 0.08,
+      "weightTag": "WEIGHT_EST",
+      "sourceNote": "WEIGHT_EST: seeded estimate. Ladder, roof and height falls live here.",
+      "notes": "mvc here is equipment or ATV, staged by the site crew."
     }
   ]
 }

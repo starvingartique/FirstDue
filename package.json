@@ -16,7 +16,10 @@
     "server:test": "tsx scripts/server-test.ts",
     "validate-data": "tsx scripts/validate-data.ts",
     "sim:test": "tsx scripts/sim-test.ts",
-    "sim:test29": "tsx scripts/oct29-test.ts"
+    "sim:test29": "tsx scripts/oct29-test.ts",
+    "sim:test30": "tsx scripts/oct30-test.ts",
+    "sim:test31": "tsx scripts/oct31-test.ts",
+    "sim:persona": "tsx scripts/persona-test.ts"
   },
   "dependencies": {
     "@hono/node-server": "^1.13.0",

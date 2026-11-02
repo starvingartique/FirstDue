@@ -1,9 +1,34 @@
-TODO - Call generator prompt lands Oct 31 with Dispatch Engine v1.
+Think briefly (under 150 tokens of thought), then output only the JSON object.
 
-Intent: flesh out a seeded call skeleton into dispatcher script, CAD text, scene
-description, patient persona, hidden history card, bystander lines and expected
-care pathway. Strict JSON output. Use only IDs that exist in the data.
-Never invent medicine and never emit clinical numbers.
+You write one 911 call for a paramedic training sim. Input: a call skeleton (fixed IDs) plus context. Output: strict JSON only, no fences, no commentary, matching the schema below exactly.
+
+Rules:
+- Echo the skeleton exactly: patient age, sex and weight, home meds, conditions, complaint, mechanism, environment, time of day, weather, bystander. Never change an ID or a number from the skeleton.
+- dispatch.cadText is what the 911 caller would report: partial, possibly wrong, never a clean clinical summary. Include one wrong or uncertain detail.
+- persona: two or three sentences, how the patient talks and acts.
+- historyCard: SAMPLE and OPQRST answers consistent with the skeleton, plus secrets. Each secret has revealWhen: the question that surfaces it. Facts surface only when the right questions are asked.
+- If homeMeds is non-empty, SAMPLE.medications names every one of them.
+- Story every drawn condition in the CAD text, persona or history: leg or thigh bleeding for femoral_arterial_bleed; pain or fear for crash_stress_offset; scrape or gravel for road_rash; cold, shivering or wet for hypothermia_trauma. If femoral_arterial_bleed was NOT drawn, never write arterial, spurting, tourniquet or femoral.
+- bystander lines in the archetype voice. If bystanderId is null, label is "No bystander on arrival" and lines is [].
+- expectedPathway: the correct care sequence for the FTO debrief. Never shown to the player, so write it plainly.
+- NO CLINICAL NUMBERS anywhere: no vitals (no heart rate, blood pressure, breathing rate, SpO2, EtCO2, GCS, glucose, temperature numbers), no doses, no pain /10 scores, no percents. Severity in words only ("worst pain of his life", "mild ache"). Age (28-year-old), addresses and plain durations ("3 minutes ago") are allowed.
+- Never use em-dashes or en-dashes. Use single hyphens - like this - if you need a pause.
+- Keep every field short: CAD under 600 chars, persona under 800, each history answer under 400, each bystander line under 300, pathway under 800.
+
+Schema:
+{
+  "dispatch": {"nature": "...", "address": "...", "cadText": "...", "updates": ["..."]},
+  "scene": {"description": "..."},
+  "patient": {"name": "..."},
+  "persona": "...",
+  "historyCard": {
+    "SAMPLE": {"signs_symptoms": "...", "allergies": "...", "medications": "...", "past_history": "...", "last_meal": "...", "events": "..."},
+    "OPQRST": {"onset": "...", "provokes": "...", "quality": "...", "radiates": "...", "severity_words": "...", "time": "..."},
+    "secrets": [{"fact": "...", "revealWhen": "..."}]
+  },
+  "bystander": {"label": "...", "lines": ["...", "..."]},
+  "expectedPathway": "..."
+}
 
 Call skeleton:
 {{STATE}}

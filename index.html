@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>First Due - Oct 29 Kit Depth + Patient Voice</title>
+    <title>First Due - Oct 30 Bike down end-to-end</title>
   </head>
   <body>
     <div id="app">
@@ -17,7 +17,11 @@
           <button type="button" data-spot="kit" class="spot-btn">2 Kit bags</button>
           <button type="button" data-spot="bystander" class="spot-btn">3 Bystander</button>
         </nav>
+        <button type="button" id="wording-btn" class="spot-btn" title="Medical or everyday words">Wording: Medical</button>
+        <button type="button" id="package-btn" class="spot-btn" title="Package for transport (G)" hidden>Package</button>
       </header>
+      <div id="partner-hint" hidden></div>
+      <div id="flow-overlay" hidden></div>
       <aside id="region-panel" aria-live="polite">
         <div id="region-title">No region selected</div>
         <div id="region-sub">Click a body region, or pick Examine / Circulation below.</div>
@@ -33,7 +37,7 @@
         <p id="debug-note">True state, ticking every sim-second. Hidden from the player; F1 only.</p>
       </aside>
       <footer id="hud-bottom">
-        <span>Drag to look - Click body to select - F1 debug - 1/2/3 camera - V talk</span>
+        <span>Drag to look - Click body to select - 1/2/3 camera - V talk - G package - F1 debug</span>
       </footer>
       <div id="boot-error" hidden></div>
     </div>

@@ -1,17 +1,66 @@
 {
   "_meta": {
-    "version": "0.0.1",
-    "status": "SKELETON - Dispatch Engine v1 lands Oct 31",
-    "sourceNote": "WEIGHT_EST - prevalence estimated until NEMSIS data confirms it"
+    "version": "0.1.0",
+    "status": "Dispatch Engine v1. Only already-modeled engine effects are claimed.",
+    "sourceNote": "WEIGHT_EST: every prevalence weight below is a seeded estimate, never NEMSIS data.",
+    "rules": [
+      "physiologyModifiers may only name effects the engine already models. Anything else is history-card-only in v1 and says so.",
+      "engineEffect is 'modeled' only when the Sim reads it at instantiation. All other entries are carried in the history card and the expected care pathway.",
+      "Sampler: L1 draws 0 to 1 comorbidity from minLevel 1 entries; L2 draws 0 to 2 from all entries."
+    ]
   },
   "entries": [
     {
-      "id": "placeholder_beta_blocker",
-      "label": "TODO - first real entry: beta-blocker use (blunts tachycardia)",
-      "homeMeds": ["TODO_CLINICAL"],
-      "physiologyModifiers": { "note": "TODO_CLINICAL - how this modifies the compensation curve" },
-      "weight": "WEIGHT_EST",
-      "notes": "Placeholder. Oct 31 sampler reads this file."
+      "id": "beta_blocker_use",
+      "label": "Beta-blocker use (blunts tachycardia)",
+      "homeMeds": ["metoprolol"],
+      "physiologyModifiers": { "betaBlocked": true },
+      "engineEffect": "modeled",
+      "examMasks": ["tachycardia: shock looks normal on the monitor until late"],
+      "weight": 0.15,
+      "weightTag": "WEIGHT_EST",
+      "minLevel": 1,
+      "sourceNote": "WEIGHT_EST: seeded prevalence. Engine effect (HR-rise suppression) already modeled in deriveVitals.",
+      "notes": "Metoprolol is in drugs.json. The one v1 comorbidity with a live engine effect."
+    },
+    {
+      "id": "anticoagulant_use",
+      "label": "Anticoagulant use (bleeds more, clots less)",
+      "homeMeds": ["warfarin", "apixaban"],
+      "physiologyModifiers": {},
+      "engineEffect": "history_only_v1",
+      "examMasks": [],
+      "weight": 0.12,
+      "weightTag": "WEIGHT_EST",
+      "minLevel": 2,
+      "sourceNote": "WEIGHT_EST: seeded prevalence. No bleed-rate scaling exists in the engine, so nothing is claimed.",
+      "notes": "V1: history-card and destination-planning item only. Bleed scaling and delayed-subdural risk need the Nov 2 engine."
+    },
+    {
+      "id": "insulin_dependent_diabetes",
+      "label": "Insulin-dependent diabetes",
+      "homeMeds": ["insulin glargine"],
+      "physiologyModifiers": {},
+      "engineEffect": "history_only_v1",
+      "examMasks": [],
+      "weight": 0.1,
+      "weightTag": "WEIGHT_EST",
+      "minLevel": 2,
+      "sourceNote": "WEIGHT_EST: seeded prevalence. No glucose drive exists in the engine, so nothing is claimed.",
+      "notes": "V1: history-card item only (SAMPLE meds, medic-alert tag). Glucometer reads baseline glucose in v1."
+    },
+    {
+      "id": "pde5_inhibitor_use",
+      "label": "PDE5 inhibitor use (nitro trap)",
+      "homeMeds": ["sildenafil"],
+      "physiologyModifiers": {},
+      "engineEffect": "history_only_v1",
+      "examMasks": [],
+      "weight": 0.06,
+      "weightTag": "WEIGHT_EST",
+      "minLevel": 2,
+      "sourceNote": "WEIGHT_EST: seeded prevalence. No nitro interaction check exists in the engine, so nothing is claimed.",
+      "notes": "V1: history-card secret plus expected-pathway trap note (nitro after PDE5 inhibitor). Live interaction check is Nov 2 scope."
     }
   ]
 }

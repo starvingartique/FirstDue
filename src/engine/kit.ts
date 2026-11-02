@@ -1,8 +1,8 @@
 // Staged jump bag and kit items for the night roadside scene. Procedural
 // low-poly shapes in the same style as the rest of the world: boxes,
 // cylinders, spheres, torus arcs and tube lines with flat standard materials.
-// Scene-level dressing only. This group never joins the patient group, so
-// region picking is untouched and no kit item is clickable.
+// This group never joins the patient group, so region picking is untouched.
+// Each staged item carries a kitItem tag for click picking and label anchors.
 // Item choice mirrors the equipment.json jump_bag stash: CAT tourniquet,
 // gauze rolls and z-fold packing, pressure dressing, non-rebreather with a
 // D cylinder, NS bag and drip line, and the folded hypothermia blanket.
@@ -11,6 +11,51 @@
 // (max x about 0.32), the wound and the blood pool.
 
 import * as THREE from "three";
+
+/** Staged items with labels. The jump bag shell itself is untagged. */
+export type KitItemId =
+  | "cat"
+  | "kerlix"
+  | "zfold"
+  | "dressing"
+  | "gloves"
+  | "nrb"
+  | "o2"
+  | "ns"
+  | "blanket"
+  | "airway"
+  | "drugs";
+
+export function isKitItemId(value: unknown): value is KitItemId {
+  return (
+    value === "cat" ||
+    value === "kerlix" ||
+    value === "zfold" ||
+    value === "dressing" ||
+    value === "gloves" ||
+    value === "nrb" ||
+    value === "o2" ||
+    value === "ns" ||
+    value === "blanket" ||
+    value === "airway" ||
+    value === "drugs"
+  );
+}
+
+/** World-space anchor per item for the HTML label overlay. Above the item. */
+export const KIT_ANCHORS: Record<KitItemId, [number, number, number]> = {
+  cat: [0.85, 0.1, 0.75],
+  kerlix: [0.85, 0.11, 0.98],
+  zfold: [1.03, 0.09, 0.64],
+  dressing: [0.82, 0.11, 1.52],
+  gloves: [0.73, 0.07, 0.63],
+  nrb: [1.62, 0.15, 0.63],
+  o2: [1.62, 0.47, 1.12],
+  ns: [0.68, 0.11, 1.1],
+  blanket: [1.3, 0.13, 0.42],
+  airway: [1.18, 0.27, 1.45],
+  drugs: [0.8, 0.15, 1.35]
+};
 
 const BAG_RED = 0x7a1515;
 const BAG_DARK = 0x5f1010;
@@ -35,6 +80,10 @@ export function buildKit(): THREE.Group {
   const kit = new THREE.Group();
   kit.name = "kit";
 
+  // Item tag stamped on every mesh placed while it is set. Null for the
+  // tarp and the jump bag shell, which are not labeled or clickable.
+  let current: KitItemId | null = null;
+
   function put(
     geo: THREE.BufferGeometry,
     material: THREE.Material,
@@ -47,6 +96,7 @@ export function buildKit(): THREE.Group {
     mesh.position.set(x, y, z);
     mesh.castShadow = castShadow;
     mesh.receiveShadow = true;
+    if (current !== null) mesh.userData["kitItem"] = current;
     kit.add(mesh);
     return mesh;
   }
@@ -133,6 +183,7 @@ export function buildKit(): THREE.Group {
   box(0.006, 0.035, 0.28, tapeMat, bx + 0.278, 0.245, bz, false);
 
   // - airway pouch: small closed bag behind the jump bag -
+  current = "airway";
   box(0.42, 0.2, 0.26, darkMat, 1.18, 0.1, 1.45);
   box(0.43, 0.02, 0.27, webMat, 1.18, 0.19, 1.45); // lid seam
   const pouchHandle = put(new THREE.TorusGeometry(0.11, 0.012, 8, 18, Math.PI), webMat, 1.18, 0.2, 1.45);
@@ -140,6 +191,7 @@ export function buildKit(): THREE.Group {
   box(0.42, 0.03, 0.006, tapeMat, 1.18, 0.13, 1.318, false);
 
   // - drug box with a red cross on the lid -
+  current = "drugs";
   const drugMat = mat(0xd8d8d8, 0.6);
   box(0.3, 0.1, 0.2, drugMat, 0.8, 0.05, 1.35);
   box(0.09, 0.006, 0.03, mat(CROSS_RED, 0.6), 0.8, 0.103, 1.35, false);
@@ -147,6 +199,7 @@ export function buildKit(): THREE.Group {
   box(0.04, 0.03, 0.01, mat(STEEL, 0.5), 0.8, 0.06, 1.246);
 
   // - CAT tourniquet: strap loop, orange windlass, white time band -
+  current = "cat";
   const catLoop = put(new THREE.TorusGeometry(0.055, 0.013, 8, 24), webMat, 0.85, DECK + 0.014, 0.75);
   catLoop.rotation.x = -Math.PI / 2;
   catLoop.scale.set(1, 0.62, 1);
@@ -155,24 +208,29 @@ export function buildKit(): THREE.Group {
   box(0.05, 0.008, 0.028, mat(0xf0f0f0, 0.6), 0.85, DECK + 0.016, 0.712);
 
   // - Kerlix roll and hemostatic z-fold packet -
+  current = "kerlix";
   const kerlix = cyl(0.035, 0.035, 0.1, mat(CREAM, 0.9), 0.85, DECK + 0.035, 0.98);
   kerlix.rotation.z = Math.PI / 2;
+  current = "zfold";
   const packet = box(0.16, 0.025, 0.11, mat(PACKET_TAN, 0.9), 0.98, DECK + 0.013, 0.64);
   packet.rotation.y = 0.3;
   const packetStripe = box(0.16, 0.027, 0.03, mat(CROSS_RED, 0.8), 0.98, DECK + 0.013, 0.64);
   packetStripe.rotation.y = 0.3;
 
   // - pressure dressing: elastic roll, flat pad, pressure bar -
+  current = "dressing";
   const wrapRoll = cyl(0.045, 0.045, 0.09, mat(CREAM, 0.9), 0.9, DECK + 0.045, 1.52);
   wrapRoll.rotation.z = Math.PI / 2;
   box(0.14, 0.02, 0.1, mat(CREAM, 0.9), 0.74, DECK + 0.01, 1.52);
   box(0.03, 0.024, 0.104, mat(0x6a6f75, 0.7), 0.74, DECK + 0.012, 1.52);
 
   // - glove pair: palms, fingers, thumbs and cuffs, purple nitrile -
+  current = "gloves";
   const gloveMat = mat(GLOVE, 0.55);
   for (const side of [-1, 1] as const) {
     const gx = 0.775 + side * 0.04;
     const glove = new THREE.Group();
+    glove.userData["kitItem"] = "gloves";
     glove.position.set(gx, 0, 0.63);
     glove.rotation.y = side * 0.15;
     kit.add(glove);
@@ -194,6 +252,7 @@ export function buildKit(): THREE.Group {
   }
 
   // - O2 D cylinder with valve, regulator and gauge -
+  current = "o2";
   const o2Mat = mat(O2_GREEN, 0.5);
   cyl(0.05, 0.05, 0.3, o2Mat, 1.62, DECK + 0.15, 1.12);
   cyl(0.018, 0.05, 0.05, o2Mat, 1.62, DECK + 0.325, 1.12);
@@ -202,6 +261,7 @@ export function buildKit(): THREE.Group {
   cyl(0.016, 0.016, 0.008, mat(0xf0f0f0, 0.5), 1.585, DECK + 0.387, 1.12, 12);
 
   // - non-rebreather: clear cup, strap, green reservoir bag, O2 line -
+  current = "nrb";
   const clearMat = new THREE.MeshStandardMaterial({
     color: 0xe8f0f2,
     transparent: true,
@@ -251,6 +311,7 @@ export function buildKit(): THREE.Group {
 
   // - NS bag flat on the tarp: bag, label, port, drip chamber, coiled line.
   //   The line ends well short of the patient: staged, not connected. -
+  current = "ns";
   const ivMat = new THREE.MeshStandardMaterial({
     color: 0xdce8ec,
     transparent: true,
@@ -275,6 +336,7 @@ export function buildKit(): THREE.Group {
   );
 
   // - hypothermia blanket, folded stack with a gold edge showing -
+  current = "blanket";
   const foilMat = new THREE.MeshStandardMaterial({
     color: 0xdde2e8,
     roughness: 0.45,

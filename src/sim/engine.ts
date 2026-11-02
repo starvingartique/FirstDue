@@ -83,6 +83,14 @@ export interface SimConfig {
   fetch_s: number;
   darkScene: boolean;
   roadside: boolean;
+  /**
+   * V1 generated-call presence knobs. Omitted means present, so Bike down and
+   * every existing test build the identical sim without touching their config.
+   */
+  femoralBleed?: boolean;
+  roadRash?: boolean;
+  /** V1 data-driven mid-call events: [{ at_s, id }]. Empty for Bike down. */
+  scheduled?: Array<{ at_s: number; id: string }>;
 }
 
 export interface ActionResult {
@@ -96,6 +104,14 @@ export interface TqOptions {
   halfTurns: number;
   writeTime: boolean;
 }
+
+/**
+ * L1 slow-deterioration dial from the brief difficulty table. The brief gives
+ * no number, so this stays a named TUNE flag and an open clinical question:
+ * L1 accrues blood loss at half the engine rate, L2 stays 1.0 exactly
+ * (Oct 28 curve untouched).
+ */
+export const L1_DETERIORATION_SCALE = 0.5;
 
 export interface SecondTqOptions {
   placement: "proximal" | "distal" | "over_wound" | "overlapping";
@@ -199,6 +215,11 @@ export class Sim {
   exposed = false;
   beltTrap: boolean;
 
+  /** V1 presence knobs from config (default present, see SimConfig). */
+  readonly femoralBleed: boolean;
+  readonly roadRash: boolean;
+  private scheduled: Array<{ at_s: number; id: string; fired: boolean }>;
+
   tq: TqState = freshTq();
   packing: PackingState = freshPacking();
   pressure: PressureState = freshPressure();
@@ -214,6 +235,12 @@ export class Sim {
   monitor: MonitorState = { spo2Attached: false, etco2Attached: false, spo2History: [], movedDuringNibp: false };
   /** Cert level for vitals display: L1 auto, L2 manual. Bike down runs L2. */
   level: 1 | 2 = 2;
+  /** Blood-loss accrual multiplier. L1 slow, L2 exactly 1.0. See setLevel. */
+  deteriorationScale = 1;
+  /** Display name for talk and menu. Bike down default; generated calls set their own. */
+  patientName = "Josh";
+  /** Generated-call persona and history for the patient voice. Null means the Josh locked block. */
+  persona: string | null = null;
   lastTalkAt_s = -1000;
   talkCount = 0;
   private stressEasedLogged = false;
@@ -247,7 +274,12 @@ export class Sim {
     this.wrapped = config.wrapped;
     this.beltTrap = config.beltTrap;
     this.pressure.bystanderShirt = config.bystanderShirt;
-    this.roadRashClotAt_s = Math.round(this.rng.range(300, 600));
+    this.femoralBleed = config.femoralBleed ?? true;
+    this.roadRash = config.roadRash ?? true;
+    this.scheduled = (config.scheduled ?? []).map((event) => ({ ...event, fired: false }));
+    // The clot roll stays first in the rng stream whenever road rash is
+    // present, so Bike down replays exactly.
+    this.roadRashClotAt_s = this.roadRash ? Math.round(this.rng.range(300, 600)) : -1;
     this.vitals = this.derive();
     this.addLog("info", `Call start. Seed ${config.seed}. Blood loss at contact ${Math.round(config.startLoss_mL)} mL.`);
     if (config.bystanderShirt) {
@@ -336,10 +368,15 @@ export class Sim {
 
     this.tickOct29();
 
+    // V1 generated-call complications fire here. Bike down schedules none.
+    this.fireScheduled();
+
     // Bleed accrues at the controlled rate. MAP from last tick keeps the
     // pressure scaling causal: the bleed slows as he crashes.
     const ratePerMin = this.bleedRate_mL_per_min();
-    this.loss_mL += ratePerMin / 60;
+    // L1 difficulty dial only: L2 multiplies by exactly 1.0, so the Oct 28
+    // bleed curve underneath is unchanged.
+    this.loss_mL += (ratePerMin / 60) * this.deteriorationScale;
 
     // Hypothermia slide: -0.5 C per 10 min exposed and wet (TUNE).
     const slide = this.wetClothing && !this.wrapped ? 1 : this.wetClothing || !this.wrapped ? 0.5 : 0;
@@ -414,6 +451,46 @@ export class Sim {
     });
   }
 
+  /**
+   * V1 data-driven mid-call events. Onset comes from the skeleton; effects
+   * only touch existing state (shared vomit path, loosened flags). Unknown
+   * ids log and are ignored, never crash.
+   */
+  private fireScheduled(): void {
+    for (const event of this.scheduled) {
+      if (event.fired || this.t_s < event.at_s) continue;
+      event.fired = true;
+      if (event.id === "vomiting") {
+        this.vomit("mid-call complication");
+      } else if (event.id === "re_bleed") {
+        this.slipControls();
+      } else {
+        this.addLog("info", `Unknown scheduled event "${event.id}" ignored.`);
+      }
+    }
+  }
+
+  private slipControls(): void {
+    let slipped = false;
+    if (this.tq.applied && this.tq.occluded && !this.tq.loosened) {
+      this.tq.loosened = true;
+      slipped = true;
+    }
+    if (this.packing.stage === "set" && !this.packing.loosened) {
+      this.packing.loosened = true;
+      slipped = true;
+    }
+    if (this.dressing.applied && !this.dressing.loosened) {
+      this.dressing.loosened = true;
+      slipped = true;
+    }
+    if (slipped) {
+      this.addLog("trap", "Re-bleed: hemorrhage control slipped. Reassess and re-secure it.");
+    } else {
+      this.addLog("info", "Re-bleed scare: oozing, but no active control to slip.");
+    }
+  }
+
   addLog(kind: LogEvent["kind"], text: string): void {
     this.log.push({ t_s: this.t_s, kind, text });
   }
@@ -431,7 +508,7 @@ export class Sim {
   /** Current femoral bleed rate in mL/min, controlled by interventions. */
   bleedRate_mL_per_min(): number {
     if (this.arrested) return 0;
-    const base = FEMORAL_BASE_ML_PER_MIN * (this.lastMap / BASELINE_MAP);
+    const base = this.femoralBleed ? FEMORAL_BASE_ML_PER_MIN * (this.lastMap / BASELINE_MAP) : 0;
     let mult = 1;
     let residual = 1;
 
@@ -497,8 +574,13 @@ export class Sim {
     }
 
     // Road rash ooze until it self-clots (capillary, not pressure-scaled).
-    const ooze = this.t_s < this.roadRashClotAt_s ? 2 : 0;
+    const ooze = this.roadRash && this.t_s < this.roadRashClotAt_s ? 2 : 0;
     return Math.max(0, base * mult * residual + ooze);
+  }
+
+  /** True when an exposable wound exists. Gates the L1 bleed hint on generated calls. */
+  get woundPresent(): boolean {
+    return this.femoralBleed || this.roadRash;
   }
 
   /** True when the thigh is congested: belt trap, venous TQ, or tight dressing. */
@@ -540,7 +622,11 @@ export class Sim {
     if (this.atPatient("trauma_shears") < 1) return { ok: false, reason: "Need trauma shears at the patient." };
     return this.start("expose", "Expose the thigh (shears)", 10, () => {
       this.exposed = true;
-      this.addLog("action", "Thigh exposed: partial femoral laceration, spurting. Belt cinched mid-thigh, leg purple and swollen.");
+      if (this.femoralBleed) {
+        this.addLog("action", "Thigh exposed: partial femoral laceration, spurting. Belt cinched mid-thigh, leg purple and swollen.");
+      } else {
+        this.addLog("action", "Exposed: no major wound found.");
+      }
     });
   }
 
@@ -1104,7 +1190,11 @@ export class Sim {
 
   setLevel(level: 1 | 2): void {
     this.level = level;
-    this.addLog("info", `Cert level ${level}: ${level === 1 ? "vitals auto-display." : "manual vitals."}`);
+    this.deteriorationScale = level === 1 ? L1_DETERIORATION_SCALE : 1;
+    this.addLog(
+      "info",
+      `Cert level ${level}: ${level === 1 ? "vitals auto-display, slow deterioration." : "manual vitals, real deterioration."}`
+    );
   }
 
   recordTalk(): void {

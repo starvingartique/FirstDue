@@ -1,0 +1,103 @@
+{
+  "id": "gen_22_L2",
+  "seed": 22,
+  "patient": {
+    "name": "Robert Hale",
+    "nameLocked": false,
+    "age": 53,
+    "sex": "M",
+    "weight_kg": 105,
+    "weightNote": "V1: weight is narrative-only; the engine runs 80 kg adult physiology for every patient.",
+    "complaint": "chest_pain"
+  },
+  "dispatch": {
+    "nature": "Chest pain",
+    "address": "1420 Harbor View Restaurant",
+    "cadText": "53-year-old man with chest pain in dining room, clutching chest and sweaty. Caller says he was dancing maybe, or just walked up stairs fast, not sure. Says he looks pale and scared, thinks he might have choked.",
+    "updates": [
+      "Crowd gathering, tight aisles for stretcher"
+    ]
+  },
+  "scene": {
+    "location": "restaurant",
+    "timeOfDay": "evening",
+    "weather": "indoor",
+    "mechanism": "chest_pain_causes",
+    "mechanismSubtype": "exertional_cardiac",
+    "hazards": [
+      "crowd of diners",
+      "tight aisles"
+    ],
+    "description": "Evening indoor restaurant dining room with crowd of diners and tight aisles. Man seated clutching chest, pale and sweaty."
+  },
+  "backstory": "Fearful and restless, clutching his chest and breathing hard. Speaks in short bursts between pains, keeps asking if he is going to be okay and looks to staff for reassurance.",
+  "injuries": [],
+  "conditions": [
+    "crash_stress_offset"
+  ],
+  "conditionsNote": "Dispatch Engine v1: generatorReady conditions only; see skeleton.",
+  "marchFocus": [
+    "R",
+    "C",
+    "H",
+    "P"
+  ],
+  "levels": [
+    2
+  ],
+  "skeleton": {
+    "version": "dispatch-v1",
+    "seed": 22,
+    "level": 2,
+    "complaintId": "chest_pain",
+    "mechanismId": "chest_pain_causes",
+    "subtypeId": "exertional_cardiac",
+    "conditionIds": [
+      "crash_stress_offset"
+    ],
+    "patient": {
+      "age": 53,
+      "sex": "M",
+      "weight_kg": 105
+    },
+    "comorbidityIds": [],
+    "homeMeds": [],
+    "environmentId": "restaurant",
+    "timeOfDay": "evening",
+    "weather": "indoor",
+    "bystanderId": null,
+    "complication": null
+  },
+  "persona": "Fearful and restless, clutching his chest and breathing hard. Speaks in short bursts between pains, keeps asking if he is going to be okay and looks to staff for reassurance.",
+  "historyCard": {
+    "SAMPLE": {
+      "signs_symptoms": "Heavy pressure in center of chest with sweating and nausea, says he feels very afraid.",
+      "allergies": "No known allergies that he can recall.",
+      "medications": "Takes no daily medications.",
+      "past_history": "Says generally healthy, no heart problems told to him before.",
+      "last_meal": "Ate pasta and bread in the restaurant this evening before pain started.",
+      "events": "Pain started while hurrying up the restaurant stairs to meet family, then sat down clutching chest."
+    },
+    "OPQRST": {
+      "onset": "Started suddenly with exertion on the stairs a short while ago.",
+      "provokes": "Worse with movement and effort, eases a little when sitting still.",
+      "quality": "Heavy pressure and tightness like something sitting on chest.",
+      "radiates": "Pressure stays central with ache into left shoulder and jaw.",
+      "severity_words": "Worst pressure he has ever felt, frightening.",
+      "time": "Has been constant since it started and has not gone away."
+    },
+    "secrets": [
+      {
+        "fact": "Had similar brief chest tightness with exertion last week that went away with rest.",
+        "revealWhen": "Ask about prior similar episodes or exertional symptoms"
+      },
+      {
+        "fact": "Very stressed about work and family argument before dinner.",
+        "revealWhen": "Ask about stress or what happened today"
+      }
+    ]
+  },
+  "bystanderLines": [],
+  "expectedPathway": "Scene control in crowded dining room, primary assessment and cardiac workup. Keep patient still, calm fear, avoid exertion. Obtain history including exertional onset and prior episodes. Monitor closely, prepare for rapid transport to cardiac care and early alert.",
+  "complication": null
+}

@@ -8,6 +8,8 @@ export interface InputHandlers {
   onSpotKey: (index: number) => void;
   onDebugKey: () => void;
   onTalkKey: () => void;
+  /** G key: package for transport. Never fires while the player types. */
+  onPackageKey?: () => void;
 }
 
 const TAP_SLOP_PX = 6;
@@ -53,12 +55,23 @@ export function bindInput(canvas: HTMLCanvasElement, handlers: InputHandlers): v
       handlers.onDebugKey();
       return;
     }
+    // Hotkeys never fire while the player types (drug amounts, talk line,
+    // radio report): typing "1" or "g" must not switch the camera or open
+    // the package screen.
+    if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement || event.target instanceof HTMLSelectElement) return;
+    if (event.ctrlKey || event.metaKey || event.altKey) return;
     if (event.key === "1" || event.key === "2" || event.key === "3") {
       handlers.onSpotKey(Number(event.key) - 1);
+      return;
     }
     // V opens the Talk tab. Typing in an input field must not retrigger it.
-    if ((event.key === "v" || event.key === "V") && !(event.target instanceof HTMLInputElement)) {
+    if (event.key === "v" || event.key === "V") {
       handlers.onTalkKey();
+      return;
+    }
+    if (event.key === "g" || event.key === "G") {
+      event.preventDefault();
+      handlers.onPackageKey?.();
     }
   });
 

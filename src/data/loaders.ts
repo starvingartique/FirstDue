@@ -263,65 +263,253 @@ export function loadMarchPaws(): MarchPawsFile {
   });
 }
 
+/** V1 estimate tag. Every estimated weight must carry exactly this. */
+const WEIGHT_EST = "WEIGHT_EST";
+
+function needWeightEst(file: string, where: string, entry: Rec): void {
+  if (entry["weightTag"] !== WEIGHT_EST && entry["probabilityTag"] !== WEIGHT_EST) {
+    throw new DataError(file, `"${where}" must tag its estimated weight "${WEIGHT_EST}"`);
+  }
+}
+
+function needSourceNote(file: string, where: string, entry: Rec): void {
+  const note = entry["sourceNote"];
+  if (typeof note !== "string" || note.length === 0) {
+    throw new DataError(file, `"${where}" must carry a non-empty sourceNote`);
+  }
+}
+
+function needPositiveNumber(file: string, where: string, value: unknown): number {
+  if (typeof value !== "number" || !(value > 0)) {
+    throw new DataError(file, `"${where}" weight must be a number above 0`);
+  }
+  return value;
+}
+
 export function loadComplaints(): ComplaintsFile {
   return as<ComplaintsFile>("complaints.json", complaintsJson, (root) => {
     checkMeta("complaints.json", root);
-    const list = checkEntries("complaints.json", "complaints", root, ["id", "label", "weight"]);
+    const list = checkEntries("complaints.json", "complaints", root, [
+      "id",
+      "label",
+      "weight",
+      "weightTag",
+      "sourceNote",
+      "minLevel"
+    ]);
     checkUniqueIds("complaints.json", "complaints", list);
+    list.forEach((entry, i) => {
+      needWeightEst("complaints.json", `complaints[${i}]`, entry);
+      needSourceNote("complaints.json", `complaints[${i}]`, entry);
+      needPositiveNumber("complaints.json", `complaints[${i}]`, entry["weight"]);
+    });
   });
 }
 
 export function loadMechanisms(): MechanismsFile {
   return as<MechanismsFile>("mechanisms.json", mechanismsJson, (root) => {
     checkMeta("mechanisms.json", root);
-    const list = checkEntries("mechanisms.json", "mechanisms", root, ["id", "subtypes"]);
+    const list = checkEntries("mechanisms.json", "mechanisms", root, ["id", "subtypes", "sourceNote"]);
     checkUniqueIds("mechanisms.json", "mechanisms", list);
+    // V1 sampler linkage: every complaint draws its mechanism from here.
+    const links = checkEntries("mechanisms.json", "complaintMechanisms", root, [
+      "complaintId",
+      "mechanismId",
+      "subtypeId",
+      "weight"
+    ]);
+    links.forEach((entry, i) => {
+      needWeightEst("mechanisms.json", `complaintMechanisms[${i}]`, entry);
+      needSourceNote("mechanisms.json", `complaintMechanisms[${i}]`, entry);
+      needPositiveNumber("mechanisms.json", `complaintMechanisms[${i}]`, entry["weight"]);
+    });
   });
 }
 
 export function loadConditionsMap(): ConditionsMapFile {
   return as<ConditionsMapFile>("conditions_map.json", conditionsMapJson, (root) => {
     checkMeta("conditions_map.json", root);
-    checkEntries("conditions_map.json", "mappings", root, ["mechanismId", "conditions"]);
+    const list = checkEntries("conditions_map.json", "mappings", root, [
+      "mechanismId",
+      "subtypeId",
+      "sourceNote",
+      "conditions"
+    ]);
+    list.forEach((mapping, i) => {
+      needSourceNote("conditions_map.json", `mappings[${i}]`, mapping);
+      const entries = mapping["conditions"];
+      if (!Array.isArray(entries)) {
+        throw new DataError("conditions_map.json", `"mappings[${i}].conditions" must be an array`);
+      }
+      entries.forEach((raw, j) => {
+        if (!isObject(raw)) {
+          throw new DataError("conditions_map.json", `"mappings[${i}].conditions[${j}]" must be an object`);
+        }
+        const where = `mappings[${i}].conditions[${j}]`;
+        for (const key of ["conditionId", "probability", "probabilityTag", "sourceNote"]) {
+          if (raw[key] === undefined) throw new DataError("conditions_map.json", `"${where}" is missing "${key}"`);
+        }
+        const p = raw["probability"];
+        if (typeof p !== "number" || p < 0 || p > 1) {
+          throw new DataError("conditions_map.json", `"${where}.probability" must be a number 0-1`);
+        }
+        needWeightEst("conditions_map.json", where, raw);
+        needSourceNote("conditions_map.json", where, raw);
+      });
+    });
   });
 }
 
 export function loadPatients(): PatientsFile {
   return as<PatientsFile>("patients.json", patientsJson, (root) => {
     checkMeta("patients.json", root);
-    checkEntries("patients.json", "distributions", root, ["complaintId", "ageRange", "sexSplit"]);
+    const list = checkEntries("patients.json", "distributions", root, [
+      "complaintId",
+      "ageRange",
+      "sexSplit",
+      "weight_kg",
+      "sourceNote"
+    ]);
+    list.forEach((entry, i) => {
+      const where = `distributions[${i}]`;
+      needSourceNote("patients.json", where, entry);
+      for (const tag of ["ageTag", "sexTag", "weightTag"]) {
+        if (entry[tag] !== WEIGHT_EST) {
+          throw new DataError("patients.json", `"${where}.${tag}" must be "${WEIGHT_EST}"`);
+        }
+      }
+      const range = entry["ageRange"];
+      if (!Array.isArray(range) || typeof range[0] !== "number" || typeof range[1] !== "number") {
+        throw new DataError("patients.json", `"${where}.ageRange" must be [min, max]`);
+      }
+      const split = entry["sexSplit"];
+      if (!isObject(split) || typeof split["M"] !== "number" || typeof split["F"] !== "number") {
+        throw new DataError("patients.json", `"${where}.sexSplit" must hold numeric M and F shares`);
+      }
+      const total = (split["M"] as number) + (split["F"] as number);
+      if (Math.abs(total - 1) > 0.001) {
+        throw new DataError("patients.json", `"${where}.sexSplit" shares must sum to 1`);
+      }
+      const weight = entry["weight_kg"];
+      if (!isObject(weight) || typeof weight["min"] !== "number" || typeof weight["max"] !== "number") {
+        throw new DataError("patients.json", `"${where}.weight_kg" must hold numeric min and max`);
+      }
+    });
   });
 }
 
 export function loadComorbidities(): ComorbiditiesFile {
   return as<ComorbiditiesFile>("comorbidities.json", comorbiditiesJson, (root) => {
     checkMeta("comorbidities.json", root);
-    const list = checkEntries("comorbidities.json", "entries", root, ["id", "label"]);
+    const list = checkEntries("comorbidities.json", "entries", root, [
+      "id",
+      "label",
+      "homeMeds",
+      "physiologyModifiers",
+      "engineEffect",
+      "weight",
+      "weightTag",
+      "minLevel",
+      "sourceNote"
+    ]);
     checkUniqueIds("comorbidities.json", "entries", list);
+    list.forEach((entry, i) => {
+      const where = `entries[${i}]`;
+      needWeightEst("comorbidities.json", where, entry);
+      needSourceNote("comorbidities.json", where, entry);
+      const w = entry["weight"];
+      if (typeof w !== "number" || w < 0 || w > 1) {
+        throw new DataError("comorbidities.json", `"${where}.weight" must be a number 0-1`);
+      }
+      if (entry["engineEffect"] !== "modeled" && entry["engineEffect"] !== "history_only_v1") {
+        throw new DataError("comorbidities.json", `"${where}.engineEffect" must be modeled or history_only_v1`);
+      }
+    });
   });
 }
 
 export function loadEnvironments(): EnvironmentsFile {
   return as<EnvironmentsFile>("environments.json", environmentsJson, (root) => {
     checkMeta("environments.json", root);
-    const list = checkEntries("environments.json", "environments", root, ["id", "label"]);
+    const list = checkEntries("environments.json", "environments", root, [
+      "id",
+      "label",
+      "location",
+      "complaintIds",
+      "timesOfDay",
+      "weather",
+      "hazards",
+      "weight",
+      "weightTag",
+      "sourceNote"
+    ]);
     checkUniqueIds("environments.json", "environments", list);
+    list.forEach((entry, i) => {
+      const where = `environments[${i}]`;
+      needWeightEst("environments.json", where, entry);
+      needSourceNote("environments.json", where, entry);
+      needPositiveNumber("environments.json", where, entry["weight"]);
+      for (const key of ["complaintIds", "timesOfDay", "weather", "hazards"]) {
+        const v = entry[key];
+        if (!Array.isArray(v) || v.length === 0) {
+          throw new DataError("environments.json", `"${where}.${key}" must be a non-empty array`);
+        }
+      }
+    });
   });
 }
 
 export function loadBystanders(): BystandersFile {
   return as<BystandersFile>("bystanders.json", bystandersJson, (root) => {
     checkMeta("bystanders.json", root);
-    const list = checkEntries("bystanders.json", "archetypes", root, ["id", "label", "behavior"]);
+    const list = checkEntries("bystanders.json", "archetypes", root, [
+      "id",
+      "label",
+      "behavior",
+      "weight",
+      "weightTag",
+      "minLevel",
+      "sourceNote"
+    ]);
     checkUniqueIds("bystanders.json", "archetypes", list);
+    list.forEach((entry, i) => {
+      const where = `archetypes[${i}]`;
+      needWeightEst("bystanders.json", where, entry);
+      needSourceNote("bystanders.json", where, entry);
+      needPositiveNumber("bystanders.json", where, entry["weight"]);
+    });
   });
 }
 
 export function loadComplications(): ComplicationsFile {
   return as<ComplicationsFile>("complications.json", complicationsJson, (root) => {
     checkMeta("complications.json", root);
-    const list = checkEntries("complications.json", "complications", root, ["id", "label", "trigger"]);
+    const list = checkEntries("complications.json", "complications", root, [
+      "id",
+      "label",
+      "trigger",
+      "onset_s",
+      "engineEffect",
+      "v1Ready",
+      "weight",
+      "weightTag",
+      "minLevel",
+      "sourceNote"
+    ]);
     checkUniqueIds("complications.json", "complications", list);
+    list.forEach((entry, i) => {
+      const where = `complications[${i}]`;
+      needWeightEst("complications.json", where, entry);
+      needSourceNote("complications.json", where, entry);
+      needPositiveNumber("complications.json", where, entry["weight"]);
+      const window = entry["onset_s"];
+      if (!Array.isArray(window) || typeof window[0] !== "number" || typeof window[1] !== "number") {
+        throw new DataError("complications.json", `"${where}.onset_s" must be [min_s, max_s]`);
+      }
+      if (typeof entry["v1Ready"] !== "boolean") {
+        throw new DataError("complications.json", `"${where}.v1Ready" must be a boolean`);
+      }
+    });
   });
 }
 

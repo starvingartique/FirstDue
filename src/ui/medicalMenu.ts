@@ -13,8 +13,9 @@ import type { CuffFit } from "../sim/exams";
 import { drugCatalog, formatDose, presentationMath } from "../sim/drugs";
 import { bvmRatePerMin, gttPerMin, tankMinutesLeft } from "../sim/airway";
 import { TalkClient } from "./talk";
+import { word } from "./wording";
 
-type Tab = "examine" | "airway" | "breathing" | "circulation" | "meds" | "lines" | "monitor" | "talk";
+export type Tab = "examine" | "airway" | "breathing" | "circulation" | "meds" | "lines" | "monitor" | "talk";
 
 const TAB_LABELS: Record<Tab, string> = {
   examine: "Examine",
@@ -39,6 +40,17 @@ function fmtClock(t_s: number): string {
   return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
+/** First hemorrhage-control marker in the event log, own marker list. */
+function firstHandsText(s: Sim): string {
+  const marks = [/TQ time written/i, /Wound packed/i, /Direct pressure/i, /pressure dressing/i, /Take over from/i, /packing pressure/i];
+  for (const e of s.log) {
+    if (e.t_s > 0 && marks.some((re) => re.test(e.text))) {
+      return `T+${fmtClock(e.t_s)}`;
+    }
+  }
+  return "none yet";
+}
+
 interface SelectSpec {
   id: string;
   label: string;
@@ -58,6 +70,12 @@ export class MedicalMenu {
   private readonly talkClient: TalkClient;
   private drugId = "fentanyl";
   private drugPres = 0;
+  // Oct 30 run context for the report rows. Set by the phase flow.
+  private runLevel = "not chosen";
+  private runDestination = "not chosen";
+  private runOutcome = "run in progress";
+  // Kit side pass: section jumped to from a kit preview, static highlight.
+  private kitFocus: string | null = null;
 
   constructor(private readonly sim: Sim) {
     this.talkClient = new TalkClient(sim);
@@ -81,11 +99,94 @@ export class MedicalMenu {
     this.render(true);
   }
 
-  /** V key: open Talk and focus the line to Josh. */
+  /** Kit side pass: open a tab. Instant, no animation. */
+  setTab(tab: Tab): void {
+    this.tab = tab;
+    this.render(true);
+  }
+
+  /**
+   * Kit side pass: open a tab and jump to one of its existing sections.
+   * Instant scroll, static highlight, no animation. Never runs a procedure.
+   */
+  openKitAction(tab: Tab, section: string | null): void {
+    this.kitFocus = section === null ? null : `${tab}|${section}`;
+    this.setTab(tab);
+    if (section === null) return;
+    const head = [...this.body.querySelectorAll<HTMLHeadingElement>(".menu-h")].find(
+      (h) => h.dataset["kitSection"] === section
+    );
+    head?.scrollIntoView({ block: "start" });
+  }
+
+  /** V key: open Talk and focus the patient line. */
   openTalk(): void {
     this.tab = "talk";
     this.render(true);
     document.getElementById("talk-input")?.focus();
+  }
+
+  /** Oct 30 run context for the report rows. Updated by the phase flow. */
+  setRunInfo(info: { level: string; destination: string; outcome: string }): void {
+    this.runLevel = info.level;
+    this.runDestination = info.destination;
+    this.runOutcome = info.outcome;
+  }
+
+  /** Wording mode changed: rebuild everything from engine strings. */
+  reword(): void {
+    this.render(true);
+  }
+
+  /** The run report as a standalone element for the end screen. */
+  reportElement(): HTMLElement {
+    const report = this.buildReport();
+    word(report);
+    return report;
+  }
+
+  /**
+   * Clean-rebuild run report, own implementation. Live engine state plus a
+   * scan of the event log: no extra bookkeeping, no history tracking.
+   */
+  private buildReport(): HTMLElement {
+    const s = this.sim;
+    const rate = s.bleedRate_mL_per_min();
+    const wrap = document.createElement("div");
+    const table = document.createElement("dl");
+    table.className = "flow-cad";
+    const rows: [string, string][] = [
+      ["Clock", `T+${fmtClock(s.t_s)}`],
+      ["Level", this.runLevel],
+      ["Destination", this.runDestination],
+      ["Outcome", this.runOutcome],
+      ["Blood lost", `${Math.round(s.loss_mL)} mL`],
+      ["Bleed rate now", `${Math.round(rate)} mL/min${rate < 30 ? " (controlled)" : " (NOT controlled)"}`],
+      ["Shock class", s.arrested ? "arrested" : s.vitals.atlsClass],
+      ["First hands on the bleed", firstHandsText(s)]
+    ];
+    for (const [k, v] of rows) {
+      const dt = document.createElement("dt");
+      dt.className = "flow-dt";
+      dt.textContent = k;
+      const dd = document.createElement("dd");
+      dd.className = "flow-dd";
+      dd.textContent = v;
+      table.append(dt, dd);
+    }
+    wrap.appendChild(table);
+    const traps = s.log.filter((e) => e.kind === "trap" && e.t_s > 0);
+    const head = document.createElement("div");
+    head.className = "flow-h";
+    head.textContent = traps.length === 0 ? "Traps sprung: none" : `Traps sprung: ${traps.length}`;
+    wrap.appendChild(head);
+    for (const e of traps.slice(0, 6)) {
+      const line = document.createElement("div");
+      line.className = "flow-note";
+      line.textContent = `T+${fmtClock(e.t_s)} - ${e.text}`;
+      wrap.appendChild(line);
+    }
+    return wrap;
   }
 
   /** Called every sim tick: cheap status refresh, full re-render on change. */
@@ -148,12 +249,14 @@ export class MedicalMenu {
     if (s.airway.soiled) bits.push("AIRWAY: SUCTION");
     if (s.o2.tankPsi <= 200 && s.o2.device !== "none") bits.push("O2: TANK EMPTY");
     this.status.textContent = bits.join(" - ");
+    word(this.status);
     const tail = s.log.slice(-3);
     this.logBox.innerHTML = "";
     for (const e of tail) {
       const div = document.createElement("div");
       div.textContent = `T+${fmtClock(e.t_s)} [${e.kind}] ${e.text}`;
       this.logBox.appendChild(div);
+      word(div);
     }
   }
 
@@ -163,7 +266,10 @@ export class MedicalMenu {
     const h = document.createElement("h3");
     h.className = "menu-h";
     h.textContent = title;
+    h.dataset["kitSection"] = title;
+    if (this.kitFocus === `${this.tab}|${title}`) h.classList.add("kit-focus");
     this.body.appendChild(h);
+    word(h);
     return h;
   }
 
@@ -172,6 +278,7 @@ export class MedicalMenu {
     p.className = "menu-note";
     p.textContent = text;
     this.body.appendChild(p);
+    word(p);
   }
 
   private findingList(items: string[]): void {
@@ -183,6 +290,7 @@ export class MedicalMenu {
       ul.appendChild(li);
     }
     this.body.appendChild(ul);
+    word(ul);
   }
 
   private selects(specs: SelectSpec[]): Map<string, HTMLSelectElement> {
@@ -209,6 +317,7 @@ export class MedicalMenu {
       }
       wrap.append(caption, select);
       this.body.appendChild(wrap);
+      word(wrap);
       map.set(spec.id, select);
     }
     return map;
@@ -228,6 +337,7 @@ export class MedicalMenu {
     input.className = "menu-num";
     wrap.append(caption, input);
     this.body.appendChild(wrap);
+    word(wrap);
     return input;
   }
 
@@ -244,6 +354,7 @@ export class MedicalMenu {
       this.render(true);
     });
     this.body.appendChild(button);
+    word(button);
   }
 
   // - Examine -
@@ -325,7 +436,7 @@ export class MedicalMenu {
     }
     this.action("Remove wet clothing (45s)", () => s.removeWetClothing());
     this.action(`Wrap for hypothermia (30s, blankets: ${s.atPatient("hypothermia_wrap_blanket")})`, () => s.applyWrap());
-    this.note("Talk to Josh on the Talk tab (V). Airway sizing, O2, lines and drugs live in their tabs.");
+    this.note(`Talk to ${s.patientName} on the Talk tab (V). Airway sizing, O2, lines and drugs live in their tabs.`);
   }
 
   // - Airway -
@@ -344,7 +455,7 @@ export class MedicalMenu {
         `${aw.soiled ? " SOILED: suction." : ""}${aw.aspirated ? " ASPIRATED." : ""}` +
         `${aw.epistaxis ? " Epistaxis." : ""}${aw.dislodged ? " Tube dislodged earlier." : ""}`
     );
-    this.note("No midface or basilar skull trauma on Josh: NPA not contraindicated.");
+    this.note(`No midface or basilar skull trauma on ${s.patientName}: NPA not contraindicated.`);
 
     this.section("OPA / NPA");
     const basicSel = this.selects([
@@ -808,7 +919,7 @@ export class MedicalMenu {
     );
 
     this.section("Start IO (30s, 95 percent)");
-    this.note("Josh: 25 mm tibial, 45 mm humeral. No fracture, burn, prior IO or prosthesis at either site.");
+    this.note(`${s.patientName}: 25 mm tibial, 45 mm humeral. No fracture, burn, prior IO or prosthesis at either site.`);
     const ioSel = this.selects([
       {
         id: "site", label: "Site", options: [
@@ -996,8 +1107,8 @@ export class MedicalMenu {
 
   private renderTalk(): void {
     const client = this.talkClient;
-    this.section("Talk to Josh (V)");
-    this.note("Short questions get short answers. Speech follows his state: pain, tourniquet, breathing, confusion.");
+    this.section(`Talk to ${this.sim.patientName} (V)`);
+    this.note("Short questions get short answers. Speech follows patient state: pain, tourniquet, breathing, confusion.");
     const box = document.createElement("div");
     box.className = "talk-log";
     if (client.turns.length === 0) {
@@ -1009,13 +1120,13 @@ export class MedicalMenu {
     for (const turn of client.turns.slice(-10)) {
       const div = document.createElement("div");
       div.className = turn.from === "player" ? "talk-player" : "talk-josh";
-      div.textContent = `${turn.from === "player" ? "You" : "Josh"}: ${turn.text}`;
+      div.textContent = `${turn.from === "player" ? "You" : this.sim.patientName}: ${turn.text}`;
       box.appendChild(div);
     }
     if (client.sending) {
       const typing = document.createElement("div");
       typing.className = "talk-josh talk-typing";
-      typing.textContent = "Josh: ...";
+      typing.textContent = `${this.sim.patientName}: ...`;
       box.appendChild(typing);
     }
     this.body.appendChild(box);

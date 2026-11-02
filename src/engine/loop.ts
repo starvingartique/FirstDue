@@ -17,6 +17,10 @@ export interface LoopRefs {
   onResize: () => void;
   /** Fires once per sim-second for HUD, menu and overlay refresh. */
   onTick: () => void;
+  /** When true the sim clock holds (transport skip, end card). Rendering never stops. */
+  paused?: () => boolean;
+  /** Per-frame UI hook (kit label projection). Runs even while paused. */
+  onFrame?: () => void;
 }
 
 export function startLoop(refs: LoopRefs): void {
@@ -38,7 +42,11 @@ export function startLoop(refs: LoopRefs): void {
     const t = clock.getElapsedTime();
 
     // Fixed 1 sim-second tick, decoupled from frame rate.
-    simDebt_s += dt;
+    if (refs.paused?.() === true) {
+      simDebt_s = 0;
+    } else {
+      simDebt_s += dt;
+    }
     while (simDebt_s >= 1) {
       simDebt_s -= 1;
       refs.sim.tick();
@@ -60,6 +68,7 @@ export function startLoop(refs: LoopRefs): void {
       const pulse = rate > 30 && hr > 10 ? 1 + 0.12 * Math.max(0, Math.sin((t * hr) / 60 * Math.PI * 2)) : 1;
       refs.patient.wound.scale.set(pulse, 1, pulse);
     }
+    refs.onFrame?.();
     refs.renderer.render(refs.scene, refs.camera);
   });
 }

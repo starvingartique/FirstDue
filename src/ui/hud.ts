@@ -5,10 +5,13 @@
 import { REGION_IDS, REGION_LABELS, type RegionId } from "../patient/regions";
 import type { SpotId } from "../engine/camera";
 import type { FixedCall } from "../data/types";
+import { getWording, type WordingMode } from "./wording";
 
 export interface HudHandlers {
   onSelectRegion: (region: RegionId) => void;
   onSelectSpot: (spot: SpotId) => void;
+  onPackage: () => void;
+  onWording: (mode: WordingMode) => void;
 }
 
 function el<T extends HTMLElement>(id: string): T {
@@ -25,8 +28,15 @@ export class Hud {
   private chips = el("region-chips");
   private spotButtons = [...document.querySelectorAll<HTMLButtonElement>(".spot-btn")];
   private chipButtons = new Map<RegionId, HTMLButtonElement>();
+  private packageButton = el<HTMLButtonElement>("package-btn");
+  private wordingButton = el<HTMLButtonElement>("wording-btn");
+  private wording: WordingMode = getWording();
 
   constructor(handlers: HudHandlers) {
+    this.packageButton.addEventListener("click", () => handlers.onPackage());
+    this.wordingButton.addEventListener("click", () => {
+      handlers.onWording(this.wording === "medical" ? "plain" : "medical");
+    });
     for (const region of REGION_IDS) {
       const button = document.createElement("button");
       button.type = "button";
@@ -68,6 +78,15 @@ export class Hud {
     for (const [id, button] of this.chipButtons) {
       button.classList.toggle("active", id === region);
     }
+  }
+
+  showPackage(visible: boolean): void {
+    this.packageButton.hidden = !visible;
+  }
+
+  showWording(mode: WordingMode): void {
+    this.wording = mode;
+    this.wordingButton.textContent = mode === "medical" ? "Wording: Medical" : "Wording: Plain";
   }
 
   showSpot(spot: SpotId): void {

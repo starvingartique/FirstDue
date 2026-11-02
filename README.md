@@ -14,6 +14,88 @@ and the talking patient (Josh) through the server proxy. F1 stays debug-only.
 No Dispatch Engine, no FTO debrief, no destination/radio report, no
 infection/sepsis, no second patient, no art pass, no driving.
 
+## Oct 30 Bike down end-to-end (clean rebuild, Nov 2)
+
+Wiring only, no clinical value changed. Full run: level select (L1/L2) ->
+dispatch (fixed Bike down CAD text) -> size-up checklist -> care (the Oct
+28 + Oct 29 loop) -> package + destination (trauma / STEMI / stroke /
+nearest ED, logged not graded) -> 300 s transport skip with the engine
+ticking -> text radio report to the AI charge nurse (MIST follow-ups, same
+model and settings as the talking patient) -> handoff. Win = alive + bleed
+under 30 mL/min + airway patent at handoff; lose = arrest anywhere on your
+watch. The end screen shows transport criteria plus a run report with
+Level / Destination / Outcome rows. G or the Package button ends scene care.
+
+- L1: vitals auto-display, partner hints, deterioration x0.5 (named dial
+  L1_DETERIORATION_SCALE, open TUNE flag). L2: manual vitals, no hints,
+  x1.0 exactly.
+- New files: src/ui/flow.ts, src/flow.css, src/ui/wording.ts,
+  server/routes/radio.ts, server/prompts/radio.txt, scripts/oct30-test.ts
+  (`npm.cmd run sim:test30`).
+- Wording toggle (Wording button in the top bar): Medical shows strings as
+  authored; Plain swaps known clinical words for everyday ones through
+  Shina's own small table in src/ui/wording.ts. Remembered between
+  sessions. Reimplemented in the clean rebuild; no tooltips.
+- No Dispatch Engine (Oct 31), no FTO debrief (Nov 1), no second patient,
+  no driving, no ambulance interior, no art pass.
+
+Open clinical questions (TUNE, not settled here), in blocker order:
+
+1. Handoff airway bar (patency 0.8+, no esophageal tube) - invented Oct 30.
+2. Transport skip 300 s - scenario param, decides who survives transport.
+3. L1 deterioration x0.5 - the brief gives slow/real with no number.
+4. Destination correctness for a femoral bleed - not graded, needs a rule.
+
+## Oct 30 bag labels and hands (clean rebuild, Nov 2)
+
+Labels are small HTML pills anchored to the staged kit items, visible only
+in the kit spot. Clicking an item or its label opens that item's existing
+menu tab and shows a static preview card (label, visual-only description,
+jump-to-section button). No motion: the card appears and dismisses
+instantly. First-person gloved hands appear while a procedure runs,
+holding a clone of that procedure's kit item. Labels follow the Medical /
+Plain wording toggle through src/ui/wording.ts.
+
+- New files: src/ui/kitLabels.ts, src/engine/hands.ts. Kit items carry a
+  kitItem tag plus world-space label anchors; picking walks up from the
+  hit mesh so tagged children resolve.
+- Hands angle fix included: palms face the item, fingers forward and down,
+  thumbs on the inner edge, wrists trailing back toward the viewer.
+- Menu navigation reimplemented for the links: setTab plus openKitAction
+  with an instant jump and a static section highlight.
+
+## Oct 31 Dispatch Engine v1 (clean rebuild, Nov 2)
+
+Seeded call generator beside the fixed Bike down card. Dispatch shows Bike
+down first with a Generate New Call panel (seed blank for random, or type
+one). Component database, seeded sampler, Muse fleshing with a strict
+schema, validator with retry then cached fallback, engine instantiation,
+and a cache with 3 generated calls. A malformed accept falls back to Bike
+down; an unreachable server falls back to a bundled cached call. Dispatch
+never strands the player.
+
+- New files: src/dispatch/sampler.ts, validate.ts, instantiate.ts,
+  types.ts, cache.ts, server/routes/generate-call.ts,
+  scripts/oct31-test.ts (`npm.cmd run sim:test31`).
+- L1 stays simple (L1 complaint pool, no mid-call complication). Demo
+  seeds: 44 overdose in a bathroom, 22 chest pain at a restaurant,
+  143 allergy at a picnic.
+- Presence knobs default present, so Bike down replays exactly; mid-call
+  complications (vomiting, re-bleed) fire from the skeleton on generated
+  calls only.
+- Patient voice fix (Nov 1 bug): a generated patient uses its own
+  generated persona and history, never Josh, never a leg bleed unless the
+  generated condition includes one. Covered by scripts/persona-test.ts
+  (`npm.cmd run sim:persona`).
+
+GeneratorReady audit, Nov 2 (target 5, floor 3): 4 ready, all in
+oct28_conditions.json and fully modeled by the engine -
+femoral_arterial_bleed (bleed curve plus TQ, packing, pressure, dressing),
+hypothermia_trauma (temp slide plus wrap), crash_stress_offset (stress
+vitals offset), road_rash (ooze plus clot). The 11 conditions.json entries
+are unreviewed stubs and stay generatorReady false. No flag flipped. Floor
+met, target not met.
+
 ## Prereqs
 
 - Node.js 20 or newer (`node --version` to check)
@@ -34,6 +116,7 @@ npm.cmd run validate-data
 # 3. Headless engine acceptance tests (fixed seeds, no browser)
 npm.cmd run sim:test
 npm.cmd run sim:test29
+npm.cmd run sim:test30
 
 # 4. Put the Meta key in the server env (gitignored, never committed)
 cp server/.env.example server/.env
@@ -170,9 +253,9 @@ cefazolin, ertapenem, moxifloxacin, ceftriaxone, piperacillin_tazobactam,
 metronidazole, cefepime, clindamycin, cefadroxil, cephalexin,
 amoxicillin_clavulanate, levetiracetam.
 
-## Parked for Oct 30 (not built today)
+## Parked for Oct 31 and Nov 1
 
-- Bike down end-to-end flow: dispatch, destination choice, radio report.
+- Oct 31: Dispatch Engine generator. Nov 1: AI FTO debrief.
 - Dispatch Engine, FTO debrief, infection/sepsis.
 - Drug infusions (push only today), same-line incompatibilities, max-dose
   tracking, scope-violation flags.
