@@ -169,12 +169,13 @@ export function loadEquipment(): EquipmentFile {
       "quantity"
     ]);
     checkUniqueIds("equipment.json", "equipment", list);
-    // Oct 28 kit: every hemorrhage item carries per-stash quantities.
+    // CAT: exactly 1 on the belt. Jump and cabinet counts live in the data
+    // table and are not pinned here.
     const cat = list.find((entry) => entry["id"] === "cat_tourniquet");
     if (cat === undefined) throw new DataError("equipment.json", 'missing "cat_tourniquet"');
     const q = cat["quantities"];
-    if (!isObject(q) || q["belt"] !== 1 || q["jump_bag"] !== 2 || q["cabinet"] !== 4) {
-      throw new DataError("equipment.json", '"cat_tourniquet" quantities must be belt 1, jump 2, cabinet 4');
+    if (!isObject(q) || q["belt"] !== 1) {
+      throw new DataError("equipment.json", '"cat_tourniquet" quantities must carry belt 1');
     }
   });
 }

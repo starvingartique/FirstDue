@@ -184,17 +184,102 @@ function generatedReply(sim: Sim, message: string): string {
   return "Okay - okay. Just - stay with me, alright?";
 }
 
+/**
+ * Unprompted line prompt, sent as the patient-route message. Short enough
+ * for the 300-char route cap. The route rules already force short replies
+ * with no vitals numbers and no unasked history; this adds the speak-up
+ * framing and repeats the no-unasked-history rule.
+ */
+export const UNPROMPTED_PROMPT =
+  "(The player has been quiet. You speak up on your own: one or two short sentences about how you feel right now. " +
+  "Do not say your name or history unless this conversation already covered it.)";
+
+/**
+ * Unprompted speech gate: the same rule as the talking patient. Arrested,
+ * tubed, or GCS 8 and under means silence. The engine has no intoxication
+ * flag, so the talking patient has no intox rule either; pain, hypoxia,
+ * and shock degrade the words through the snapshot instead of silencing.
+ */
+export function canSpeakUnprompted(sim: Sim): boolean {
+  if (sim.arrested || sim.vitals.rhythm === "pea") return false;
+  if (sim.airway.ett !== null) return false;
+  if (sim.vitals.gcs_total <= 8) return false;
+  return true;
+}
+
+/**
+ * Offline unprompted line. Name-free and complaint-neutral, so the same
+ * lines fit Josh and every generated patient: no Josh, no leg bleed, no
+ * history, no vitals numbers. State branches mirror the snapshot wording.
+ */
+export function cannedUnprompted(sim: Sim): string {
+  if (sim.arrested) return "(There is no response.)";
+  if (sim.airway.ett !== null) return "(No words past the tube. A hand squeezes back.)";
+  const v = sim.vitals;
+  if (v.gcs_total <= 8) return "(Only a low moan. There are no words left.)";
+  if (v.rr_per_min >= 30 || v.spo2_pct < 90) return "I - can not - get air. Help me breathe.";
+  if (v.pain_0_to_10 >= 7) return "Please - do something. It hurts so bad.";
+  if (v.atlsClass === "III" || v.atlsClass === "IV" || v.gcs_total <= 13) {
+    return "Sorry - I - what is happening? Stay with me.";
+  }
+  return "Hey - are you still there? Talk to me.";
+}
+
 export class TalkClient {
   readonly turns: TalkTurn[] = [];
   sending = false;
+  /** Sim clock of the last player or patient line. Drives unprompted cadence. */
+  lastSpokeAt_s = 0;
+  /** Fires on every new turn so the dock can reset its idle fade. */
+  onTurn: (() => void) | null = null;
 
   constructor(private readonly sim: Sim) {}
+
+  /** True when enough sim time passed since the last line, and idle. */
+  unpromptedDue(now_s: number, gap_s: number): boolean {
+    return !this.sending && now_s - this.lastSpokeAt_s >= gap_s;
+  }
+
+  /**
+   * One unprompted patient line through the existing patient route: same
+   * model and settings, same snapshot and persona wiring as a reply. False
+   * when gated or busy. Offline falls back to a canned line, quietly: no
+   * unreachable note, so a dead server does not spam the log every gap.
+   */
+  async speakUp(): Promise<boolean> {
+    if (this.sending || !canSpeakUnprompted(this.sim)) return false;
+    this.sending = true;
+    try {
+      const response = await fetch("/api/patient", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          message: UNPROMPTED_PROMPT,
+          state: patientSnapshot(this.sim),
+          history: this.turns.slice(-8),
+          ...(this.sim.persona === null ? {} : { persona: this.sim.persona })
+        })
+      });
+      if (!response.ok) throw new Error(`patient route ${response.status}`);
+      const data = (await response.json()) as { text?: unknown };
+      const text = typeof data.text === "string" && data.text !== "" ? data.text : cannedUnprompted(this.sim);
+      this.pushPatient(text);
+      return true;
+    } catch {
+      this.pushPatient(cannedUnprompted(this.sim));
+      return true;
+    } finally {
+      this.sending = false;
+    }
+  }
 
   async send(message: string): Promise<void> {
     const clean = message.trim().slice(0, 300);
     if (clean === "" || this.sending) return;
     this.sending = true;
     this.turns.push({ from: "player", text: clean });
+    this.lastSpokeAt_s = this.sim.t_s;
+    this.onTurn?.();
     this.sim.recordTalk();
     this.sim.addLog("talk", `You: "${clean}"`);
     try {
@@ -225,6 +310,8 @@ export class TalkClient {
     // Belt and suspenders: the server strips em-dashes, the client too.
     const safe = text.replaceAll("\u2014", "-").replaceAll("\u2013", "-");
     this.turns.push({ from: "patient", text: safe });
+    this.lastSpokeAt_s = this.sim.t_s;
+    this.onTurn?.();
     this.sim.addLog("talk", `${this.sim.patientName}: "${safe}"`);
   }
 }

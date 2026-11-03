@@ -78,6 +78,21 @@ body {
   color: var(--accent);
 }
 
+#vitals-pill {
+  font-size: 14px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 2px 10px;
+  white-space: nowrap;
+}
+
+#vitals-pill[hidden] {
+  display: none;
+}
+
 #spot-nav {
   display: flex;
   gap: 8px;
@@ -106,13 +121,22 @@ body {
   font-weight: 600;
 }
 
-#region-panel {
+#left-col {
   position: absolute;
   left: 14px;
+  top: 64px;
   bottom: 44px;
   width: 330px;
   max-width: calc(100vw - 28px);
-  max-height: calc(100vh - 160px);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 5;
+}
+
+#region-panel {
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
   background: var(--panel);
   border: 1px solid var(--line);
@@ -270,6 +294,97 @@ body {
   margin: 2px 0;
 }
 
+/* Paper doll body view: small front-view outline, amber selection. */
+.doll-wrap {
+  margin: 6px 0 2px;
+}
+
+.doll-svg {
+  display: block;
+  width: 132px;
+  height: auto;
+  margin: 0 auto;
+}
+
+.doll-region {
+  fill: rgba(255, 255, 255, 0.07);
+  stroke: var(--dim);
+  stroke-width: 1;
+  cursor: pointer;
+}
+
+.doll-region:hover {
+  fill: rgba(255, 255, 255, 0.16);
+}
+
+.doll-region.selected {
+  fill: var(--accent);
+  stroke: var(--accent);
+}
+
+.doll-region:focus {
+  outline: 1px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.doll-tq {
+  fill: none;
+  stroke: #ff5a3c;
+  stroke-width: 2.5;
+  pointer-events: none;
+}
+
+.doll-packing {
+  fill: #f2f5f9;
+  stroke: none;
+  pointer-events: none;
+}
+
+.doll-dressing {
+  fill: none;
+  stroke: #f2f5f9;
+  stroke-width: 2;
+  pointer-events: none;
+}
+
+.doll-iv {
+  fill: #4da3ff;
+  stroke: none;
+  pointer-events: none;
+}
+
+.doll-io {
+  fill: #58d68d;
+  stroke: none;
+  pointer-events: none;
+}
+
+.doll-yset {
+  fill: none;
+  stroke: #f2f5f9;
+  stroke-width: 1.5;
+  stroke-dasharray: 3 2;
+  pointer-events: none;
+}
+
+.doll-warmer {
+  fill: none;
+  stroke: #ff8c2e;
+  stroke-width: 2;
+  pointer-events: none;
+}
+
+.doll-name {
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+  margin-top: 4px;
+}
+
+.doll-back {
+  margin-top: 6px;
+}
+
 .menu-btn {
   display: block;
   width: 100%;
@@ -318,13 +433,40 @@ body {
   padding-top: 8px;
 }
 
-#menu-log {
-  font-size: 11px;
-  color: var(--dim);
-  margin-top: 6px;
+#scene-log {
+  position: absolute;
+  right: 14px;
+  bottom: 44px;
+  width: 340px;
+  max-width: calc(100vw - 28px);
+  max-height: 32vh;
+  overflow: hidden;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 12px;
+  z-index: 5;
 }
 
-#menu-log div {
+#scene-log[hidden] {
+  display: none;
+}
+
+.scene-log-head {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 6px;
+}
+
+#scene-log-rows {
+  font-size: 11px;
+  color: var(--dim);
+}
+
+#scene-log-rows div {
   margin: 2px 0;
 }
 
@@ -405,6 +547,213 @@ body {
   padding: 7px 14px;
   border-radius: 6px;
   cursor: pointer;
+}
+
+#chat-dock {
+  flex: 0 0 auto;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  transition: opacity 0.6s;
+}
+
+#chat-dock[hidden] {
+  display: none;
+}
+
+/* Idle fade: low-opacity prompt, still visible and clickable. */
+#chat-dock.chat-faded {
+  opacity: 0.28;
+}
+
+.chat-head {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  margin-bottom: 2px;
+}
+
+#chat-dock .talk-log {
+  max-height: 120px;
+}
+
+.chat-status {
+  font-size: 12px;
+  color: var(--dim);
+  margin-top: 4px;
+}
+
+.talk-mic {
+  appearance: none;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 7px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.talk-mic:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+#march-strip {
+  position: absolute;
+  top: 56px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 6;
+  display: flex;
+  gap: 6px;
+  padding: 6px 10px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+#march-strip[hidden] {
+  display: none;
+}
+
+.march-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 52px;
+  padding: 3px 6px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.04);
+  cursor: default;
+}
+
+.march-letter {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--dim);
+}
+
+.march-label {
+  font-size: 10px;
+  color: var(--dim);
+}
+
+.march-step.done {
+  background: rgba(232, 163, 61, 0.2);
+  border-color: var(--accent);
+}
+
+.march-step.done .march-letter,
+.march-step.done .march-label {
+  color: var(--accent);
+}
+
+.march-step.next {
+  border-color: #fff;
+  animation: march-pulse 1.6s ease-in-out infinite;
+}
+
+.march-step.next .march-letter {
+  color: #fff;
+}
+
+@keyframes march-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.35);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(255, 255, 255, 0);
+  }
+}
+
+#speed-bar {
+  position: absolute;
+  bottom: 44px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 6;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  padding: 6px 10px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+#speed-bar[hidden] {
+  display: none;
+}
+
+.speed-paused {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #ffb3b3;
+  border: 1px solid #b33737;
+  border-radius: 6px;
+  padding: 5px 10px;
+  margin-right: 4px;
+}
+
+.speed-paused[hidden] {
+  display: none;
+}
+
+#tips-bubble {
+  position: absolute;
+  top: 56px;
+  right: 14px;
+  width: 260px;
+  z-index: 7;
+  background: rgba(20, 32, 18, 0.92);
+  border: 1px solid #5da24a;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: #d8ecd0;
+  cursor: pointer;
+}
+
+#tips-bubble[hidden] {
+  display: none;
+}
+
+#tips-bubble::after {
+  content: "";
+  position: absolute;
+  top: -8px;
+  right: 26px;
+  border-left: 7px solid transparent;
+  border-right: 7px solid transparent;
+  border-bottom: 8px solid #5da24a;
+}
+
+@media (max-width: 900px) {
+  #speed-bar {
+    bottom: 150px;
+  }
+
+  #scene-log {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .march-step.next {
+    animation: none;
+  }
+
+  #chat-dock {
+    transition: none;
+  }
 }
 
 #hud-bottom {

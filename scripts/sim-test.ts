@@ -144,7 +144,8 @@ function finishPending(sim: Sim): void {
 // 7. Cabinet fetch costs 45-60 s, jump bag items are immediate.
 {
   const sim = newBikeDownSim();
-  check("jump CAT immediate", sim.atPatient("cat_tourniquet") === 3, `have=${sim.atPatient("cat_tourniquet")}`);
+  check("jump CAT immediate", sim.atPatient("cat_tourniquet") === 5, `have=${sim.atPatient("cat_tourniquet")}`);
+  check("CAT belt still 1", sim.stashes.get("cat_tourniquet")?.belt === 1, `belt=${sim.stashes.get("cat_tourniquet")?.belt}`);
   check("SAM JT not at patient", sim.atPatient("junctional_tourniquet_samjt") === 0, "cabinet only");
   const fetch = sim.fetchFromTruck("junctional_tourniquet_samjt", "partner");
   const job = sim.fetches[0];

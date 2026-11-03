@@ -29,7 +29,7 @@ import {
   IV_GRAVITY_FLOW,
   retainedFluids_mL
 } from "./lines";
-import { drugCatalog, effectFactor, formatDose } from "./drugs";
+import { drugBoxFor, drugCatalog, effectFactor, formatDose } from "./drugs";
 import {
   bpAuscultatedRead,
   bpPalpatedRead,
@@ -127,6 +127,25 @@ export interface PressureOptions {
   quality: "firm" | "light" | "off_source";
   holder: Holder;
 }
+
+/** Truck boxes the partner can stage at the patient (one trip per box run). */
+export const TRUCK_BOXES: { id: string; label: string }[] = [
+  { id: "box_narc", label: "Narc box" },
+  { id: "box_blood_cooler", label: "Blood cooler" },
+  { id: "box_blood_kit", label: "Blood kit" },
+  { id: "box_rsi", label: "RSI kit" },
+  { id: "box_cc", label: "Critical care box" },
+  { id: "box_ob", label: "OB kit" },
+  { id: "box_cbrn", label: "CBRN kit" }
+];
+
+/** Blood kit contents moved from the truck when the box stages. */
+const BLOOD_KIT_MOVES: [string, number][] = [
+  ["y_tubing_blood", 2],
+  ["ns_250ml", 2],
+  ["fluid_warmer", 1],
+  ["pressure_bag_300", 1]
+];
 
 const TOOL_ITEMS = new Set([
   "trauma_shears",
@@ -233,6 +252,8 @@ export class Sim {
   drugs: DrugsState = { active: [], flags: [] };
   observed: ObservedVitals = {};
   monitor: MonitorState = { spo2Attached: false, etco2Attached: false, spo2History: [], movedDuringNibp: false };
+  /** Defib pads stuck on the chest. Monitor display only: no shock is modeled, no physiological effect. */
+  defibPadsOn = false;
   /** Cert level for vitals display: L1 auto, L2 manual. Bike down runs L2. */
   level: 1 | 2 = 2;
   /** Blood-loss accrual multiplier. L1 slow, L2 exactly 1.0. See setLevel. */
@@ -241,17 +262,25 @@ export class Sim {
   patientName = "Josh";
   /** Generated-call persona and history for the patient voice. Null means the Josh locked block. */
   persona: string | null = null;
+  /** Blood sweep result text once a sweep completes. Null until then. Display only. */
+  sweepReport: string | null = null;
   lastTalkAt_s = -1000;
   talkCount = 0;
   private stressEasedLogged = false;
   /** Rolled IO pressure-bag flows by line id (seeded at placement, logged). */
   private ioPressureFlows = new Map<number, number>();
+  /** Sternal IO gets one attempt per patient, hit or miss. */
+  sternalAttempted = false;
 
   pending: PendingAction | null = null;
   private pendingDone: (() => void) | null = null;
   fetches: FetchJob[] = [];
   /** Background packing hold when the partner holds (player stays free). */
   private partnerHold_s = 0;
+  /** Truck boxes staged at the patient this run (box ids). */
+  stagedBoxes = new Set<string>();
+  /** Partner box trips in flight. New boxes join a running trip. */
+  boxTrips: { boxes: string[]; remaining_s: number; total_s: number }[] = [];
 
   stashes = new Map<string, { belt: number; jump: number; cabinet: number; fetched: number }>();
   log: LogEvent[] = [];
@@ -306,26 +335,42 @@ export class Sim {
     return this.stashes.get(itemId)?.cabinet ?? 0;
   }
 
-  /** Take one unit from belt, jump bag, or fetched stock. Tools only need presence. */
-  private take(itemId: string): boolean {
+  /**
+   * Take one unit from belt, jump bag, or fetched stock, reporting which
+   * pile it came from so a failed action can refund it. Tools only need
+   * presence and report "tool" (nothing consumed).
+   */
+  private takeTraced(itemId: string): "belt" | "jump" | "fetched" | "tool" | null {
     const s = this.stashes.get(itemId);
-    if (!s) return false;
+    if (!s) return null;
     if (TOOL_ITEMS.has(itemId)) {
-      return s.belt + s.jump + s.fetched > 0;
+      return s.belt + s.jump + s.fetched > 0 ? "tool" : null;
     }
     if (s.belt > 0) {
       s.belt -= 1;
-      return true;
+      return "belt";
     }
     if (s.jump > 0) {
       s.jump -= 1;
-      return true;
+      return "jump";
     }
     if (s.fetched > 0) {
       s.fetched -= 1;
-      return true;
+      return "fetched";
     }
-    return false;
+    return null;
+  }
+
+  /**
+   * Refund a traced take: the unit goes back to the pile it came from.
+   * Every action that grabs kit and then fails (busy, wrong item, missing
+   * second item) refunds instead of using the item up. Tools are a no-op.
+   */
+  private refund(itemId: string, src: "belt" | "jump" | "fetched" | "tool" | null): void {
+    if (src === null || src === "tool") return;
+    const s = this.stashes.get(itemId);
+    if (!s) return;
+    s[src] += 1;
   }
 
   get busy(): boolean {
@@ -424,6 +469,15 @@ export class Sim {
           this.addLog("fetch", `${job.itemId} fetched from the truck (${job.total_s}s round trip).`);
         }
         this.fetches.splice(i, 1);
+      }
+    }
+    // Box trips ride along the same background clock.
+    for (let i = this.boxTrips.length - 1; i >= 0; i--) {
+      const trip = this.boxTrips[i];
+      trip.remaining_s -= 1;
+      if (trip.remaining_s <= 0) {
+        this.finishBoxTrip(trip);
+        this.boxTrips.splice(i, 1);
       }
     }
     if (this.pending === null) return;
@@ -603,6 +657,24 @@ export class Sim {
     return { ok: true };
   }
 
+  /**
+   * Start an action that already grabbed kit: if the start fails (busy or
+   * arrest), every grabbed unit is refunded to its pile instead of used up.
+   */
+  private startRefunding(
+    id: string,
+    label: string,
+    seconds: number,
+    done: () => void,
+    grabbed: [string, "belt" | "jump" | "fetched" | "tool" | null][]
+  ): ActionResult {
+    const res = this.start(id, label, seconds, done);
+    if (!res.ok) {
+      for (const [itemId, src] of grabbed) this.refund(itemId, src);
+    }
+    return res;
+  }
+
   /** First hands-on M step: the bystander lets go and it spurts. */
   private spurtCheck(): void {
     if (this.pressure.bystanderShirt) {
@@ -615,6 +687,36 @@ export class Sim {
     if (!this.pressure.bystanderShirt) return { ok: false, reason: "Nobody to take over from." };
     this.spurtCheck();
     return { ok: true };
+  }
+
+  /**
+   * Blood sweep: a fast whole-patient look for immediate wounds, bleeding
+   * and tenderness. Reports engine state only, changes nothing clinical.
+   * A full region-by-region exam is still needed for the rest.
+   */
+  bloodSweep(): ActionResult {
+    return this.start("sweep", "Blood sweep (12s)", 12, () => {
+      const rate = this.bleedRate_mL_per_min();
+      const bleeding =
+        rate >= 30
+          ? "Active bleeding you can see."
+          : rate > 0
+            ? "Slight oozing, no active bleed."
+            : "No active bleeding.";
+      const wounds: string[] = [];
+      if (this.femoralBleed) wounds.push("open wound, left thigh (femoral bleed)");
+      if (this.roadRash) wounds.push("road rash, oozing");
+      const woundText = wounds.length > 0 ? `Wounds: ${wounds.join("; ")}.` : "No wounds found.";
+      const tender =
+        this.vitals.pain_0_to_10 > 0
+          ? `Tenderness: patient reports pain ${this.vitals.pain_0_to_10}/10 when touched.`
+          : "Tenderness: none volunteered.";
+      const text =
+        `Blood sweep: ${bleeding} ${woundText} ${tender} ` +
+        "A full region-by-region exam is still needed for findings this sweep does not show.";
+      this.sweepReport = text;
+      this.addLog("exam", text);
+    });
   }
 
   exposeWound(): ActionResult {
@@ -641,11 +743,12 @@ export class Sim {
   applyTQ(o: TqOptions): ActionResult {
     if (this.tq.applied) return { ok: false, reason: "A tourniquet is already on." };
     if (o.halfTurns < 0 || o.halfTurns > 6) return { ok: false, reason: "Half-turns must be 0-6." };
-    if (!this.take("cat_tourniquet")) {
+    const grabbed = this.takeTraced("cat_tourniquet");
+    if (grabbed === null) {
       return { ok: false, reason: "No CAT at the patient. Check the belt or jump bag, or fetch from the truck." };
     }
     this.spurtCheck();
-    return this.start("apply_tq", "Apply CAT high and tight", 30, () => {
+    return this.startRefunding("apply_tq", "Apply CAT high and tight", 30, () => {
       if (!o.strapTight) {
         this.tq.failedSlack = true;
         this.tq.applied = false;
@@ -679,19 +782,20 @@ export class Sim {
       }
       if (!o.writeTime) this.addLog("trap", "No TQ time written: logged, missing from MIST.");
       else this.addLog("action", `TQ time written: T+${this.t_s}s.`);
-    });
+    }, [["cat_tourniquet", grabbed]]);
   }
 
   applySecondTQ(o: SecondTqOptions): ActionResult {
     if (!this.tq.applied) return { ok: false, reason: "No first tourniquet to back up." };
     if (this.tq.secondApplied) return { ok: false, reason: "Second tourniquet already on." };
-    if (!this.take("cat_tourniquet")) {
+    const grabbed = this.takeTraced("cat_tourniquet");
+    if (grabbed === null) {
       return { ok: false, reason: "No CAT at the patient. Check the belt or jump bag, or fetch from the truck." };
     }
     this.spurtCheck();
     const gap = o.loosenedFirst;
     if (gap) this.addLog("trap", "First TQ loosened to place the second: full bleed resumes during the gap.");
-    return this.start("apply_tq2", "Apply second CAT proximal", 30, () => {
+    return this.startRefunding("apply_tq2", "Apply second CAT proximal", 30, () => {
       this.tq.secondApplied = true;
       this.tq.secondPlacement = o.placement;
       if (o.placement === "proximal") {
@@ -702,7 +806,7 @@ export class Sim {
       } else {
         this.addLog("trap", "Second TQ below the first or over the wound: no effect.");
       }
-    });
+    }, [["cat_tourniquet", grabbed]]);
   }
 
   packWound(o: PackOptions): ActionResult {
@@ -711,9 +815,10 @@ export class Sim {
     }
     if (!this.exposed) return { ok: false, reason: "Expose the wound first (shears)." };
     const gauzeId = o.gauze === "hemostatic" ? "hemostatic_gauze_zfold" : "plain_gauze_roll_kerlix";
-    if (!this.take(gauzeId)) return { ok: false, reason: `No ${o.gauze} gauze at the patient.` };
+    const grabbed = this.takeTraced(gauzeId);
+    if (grabbed === null) return { ok: false, reason: `No ${o.gauze} gauze at the patient.` };
     this.spurtCheck();
-    return this.start("pack", `Pack the wound (${o.gauze} gauze)`, 60, () => {
+    return this.startRefunding("pack", `Pack the wound (${o.gauze} gauze)`, 60, () => {
       this.packing.stage = "packed_pending_hold";
       this.packing.packed = true;
       this.packing.technique = o.technique;
@@ -726,7 +831,7 @@ export class Sim {
       } else {
         this.addLog("action", "Wound packed onto the bleeding source. Now 3 min of continuous firm pressure.");
       }
-    });
+    }, [[gauzeId, grabbed]]);
   }
 
   holdPacking(holder: Holder): ActionResult {
@@ -842,11 +947,12 @@ export class Sim {
   applyDressing(tightness: "correct" | "loose" | "tight"): ActionResult {
     if (this.dressing.applied) return { ok: false, reason: "A dressing is already on." };
     if (!this.exposed) return { ok: false, reason: "Expose the wound first (shears)." };
-    if (!this.take("pressure_bandage_6in")) {
+    const grabbed = this.takeTraced("pressure_bandage_6in");
+    if (grabbed === null) {
       return { ok: false, reason: "No 6 in pressure bandage at the patient." };
     }
     this.spurtCheck();
-    return this.start("dressing", "Apply pressure dressing", 65, () => {
+    return this.startRefunding("dressing", "Apply pressure dressing", 65, () => {
       this.dressing.applied = true;
       this.dressing.tightness = tightness;
       this.dressing.overPacking = this.packing.stage === "set";
@@ -861,7 +967,7 @@ export class Sim {
       } else {
         this.addLog("bleed", "Dressing over an unpacked arterial wound: only about 40 percent. Escalate to TQ or pack.");
       }
-    });
+    }, [["pressure_bandage_6in", grabbed]]);
   }
 
   removeDressing(): ActionResult {
@@ -955,6 +1061,61 @@ export class Sim {
     return { ok: true };
   }
 
+  /**
+   * Stage a truck box at the patient: one partner trip (fetch_s, 50 s)
+   * brings the whole box. A box joins a trip already in progress instead
+   * of starting its own. Staging consumes nothing up front, so a refused
+   * stage has nothing to refund. The Blood kit arrives with Y sets, NS
+   * 250, the warmer, and the pressure bag; the other boxes stage as
+   * themselves (Narc/RSI/CC boxes unlock their drugs).
+   */
+  stageBox(boxId: string): ActionResult {
+    const box = TRUCK_BOXES.find((b) => b.id === boxId);
+    if (box === undefined) return { ok: false, reason: `Unknown box ${boxId}.` };
+    if (this.stagedBoxes.has(boxId)) return { ok: false, reason: `${box.label} is already staged at the patient.` };
+    if (this.boxTrips.some((t) => t.boxes.includes(boxId))) {
+      return { ok: false, reason: `${box.label} is already on the way.` };
+    }
+    const running = this.boxTrips.find((t) => t.remaining_s > 0);
+    if (running !== undefined) {
+      running.boxes.push(boxId);
+      this.addLog("fetch", `${box.label} joins the partner trip in progress.`);
+      return { ok: true };
+    }
+    const seconds = this.config.fetch_s;
+    this.boxTrips.push({ boxes: [boxId], remaining_s: seconds, total_s: seconds });
+    this.addLog("fetch", `Partner to the truck for the ${box.label} (${seconds}s round trip).`);
+    return { ok: true };
+  }
+
+  /** Move up to n units of an item from the cabinet to the patient. */
+  private moveToPatient(itemId: string, n: number): number {
+    const s = this.stashes.get(itemId);
+    if (!s) return 0;
+    let moved = 0;
+    while (moved < n && s.cabinet > 0) {
+      s.cabinet -= 1;
+      s.fetched += 1;
+      moved += 1;
+    }
+    return moved;
+  }
+
+  /** Complete one box trip: stage every box, land the Blood kit contents. */
+  private finishBoxTrip(trip: { boxes: string[] }): void {
+    for (const boxId of trip.boxes) {
+      this.stagedBoxes.add(boxId);
+      const label = TRUCK_BOXES.find((b) => b.id === boxId)?.label ?? boxId;
+      this.addLog("fetch", `${label} staged at the patient.`);
+      if (boxId === "box_blood_kit") {
+        for (const [itemId, n] of BLOOD_KIT_MOVES) {
+          const moved = this.moveToPatient(itemId, n);
+          if (moved > 0) this.addLog("fetch", `Blood kit lands ${moved}x ${itemId} at the patient.`);
+        }
+      }
+    }
+  }
+
   removeWetClothing(): ActionResult {
     if (!this.wetClothing) return { ok: false, reason: "Clothing already dry or removed." };
     return this.start("dry_clothes", "Remove wet clothing", 45, () => {
@@ -965,13 +1126,14 @@ export class Sim {
 
   applyWrap(): ActionResult {
     if (this.wrapped) return { ok: false, reason: "Already wrapped." };
-    if (!this.take("hypothermia_wrap_blanket")) {
+    const grabbed = this.takeTraced("hypothermia_wrap_blanket");
+    if (grabbed === null) {
       return { ok: false, reason: "No wrap blanket at the patient. Fetch one from the truck." };
     }
-    return this.start("wrap", "Wrap for hypothermia", 30, () => {
+    return this.startRefunding("wrap", "Wrap for hypothermia", 30, () => {
       this.wrapped = true;
       this.addLog("action", "Patient wrapped. Hypothermia slide cut.");
-    });
+    }, [["hypothermia_wrap_blanket", grabbed]]);
   }
 
   // - Oct 29 shared helpers -
@@ -1261,9 +1423,10 @@ export class Sim {
     const blocked = this.airwayBlocked();
     if (blocked !== null) return { ok: false, reason: blocked };
     const item = kind === "igel" ? "igel_set" : "kinglt_set";
-    if (!this.take(item)) return { ok: false, reason: `No ${kind === "igel" ? "i-gel" : "King LT"} at the patient.` };
+    const grabbed = this.takeTraced(item);
+    if (grabbed === null) return { ok: false, reason: `No ${kind === "igel" ? "i-gel" : "King LT"} at the patient.` };
     const label = kind === "igel" ? `i-gel #${size}` : `King LT #${size}`;
-    return this.start("sga", `Place ${label}`, 25, () => {
+    return this.startRefunding("sga", `Place ${label}`, 25, () => {
       const fit = fitSupraglottic(size, 4);
       this.airway.adjunct = { kind, size: `#${size}`, fit };
       if (fit === "correct") {
@@ -1276,14 +1439,15 @@ export class Sim {
       } else {
         this.addLog("trap", `${label} too big: will not seat properly.`);
       }
-    });
+    }, [[item, grabbed]]);
   }
 
   intubate(size_mm: number, depth_cm: number, blind: boolean, cuff_cmH2O: number): ActionResult {
     const blocked = this.airwayBlocked();
     if (blocked !== null) return { ok: false, reason: blocked };
-    if (!this.take("ett_set")) return { ok: false, reason: "No ETT set at the patient." };
-    return this.start("ett", `Intubate ${size_mm} mm at ${depth_cm} cm`, 60, () => {
+    const grabbed = this.takeTraced("ett_set");
+    if (grabbed === null) return { ok: false, reason: "No ETT set at the patient." };
+    return this.startRefunding("ett", `Intubate ${size_mm} mm at ${depth_cm} cm`, 60, () => {
       const fit = fitEtt(size_mm);
       if (fit === "big") {
         this.airway.patency_0_to_1 = Math.max(0.1, this.airway.patency_0_to_1 - 0.2);
@@ -1324,7 +1488,7 @@ export class Sim {
         this.airway.patency_0_to_1 = 1;
         this.addLog("airway", `ETT ${size_mm} at ${depth_cm} cm: tracheal. Confirm on waveform EtCO2, then secure it.`);
       }
-    });
+    }, [["ett_set", grabbed]]);
   }
 
   secureTube(): ActionResult {
@@ -1375,18 +1539,20 @@ export class Sim {
   suctionAirway(site: "mouth" | "ett", seconds: number): ActionResult {
     if (seconds < 10 || seconds > 15) return { ok: false, reason: "Suction passes run 10-15 s max." };
     if (this.atPatient("suction_unit") < 1) return { ok: false, reason: "Need the suction unit at the patient." };
+    let grabbed: "belt" | "jump" | "fetched" | "tool" | null = null;
     if (site === "ett") {
       if (this.airway.ett === null) return { ok: false, reason: "No ETT to suction." };
-      if (!this.take("suction_catheter_14fr")) {
+      grabbed = this.takeTraced("suction_catheter_14fr");
+      if (grabbed === null) {
         return { ok: false, reason: "Need a 14 Fr catheter for the ETT." };
       }
     }
-    return this.start("suction", `Suction ${site} (${seconds}s)`, seconds, () => {
+    return this.startRefunding("suction", `Suction ${site} (${seconds}s)`, seconds, () => {
       this.airway.soiled = false;
       this.airway.patency_0_to_1 = Math.min(1, this.airway.patency_0_to_1 + 0.3);
       this.airway.suctionDip_pct = 4;
       this.addLog("airway", `Suction ${site} clear. Pass cost about -4 percent SpO2, recovers over a minute.`);
-    });
+    }, [["suction_catheter_14fr", grabbed]]);
   }
 
   // - Oct 29 O2 and BVM actions -
@@ -1403,17 +1569,20 @@ export class Sim {
             : device === "cpap"
               ? "cpap_unit"
               : "bvm_adult";
+    let grabbed: "belt" | "jump" | "fetched" | "tool" | null = null;
     if (device === "bvm_reservoir") {
       if (this.atPatient("bvm_adult") < 1) return { ok: false, reason: "Need the BVM at the patient." };
     } else if (device === "cpap") {
       if (this.atPatient("cpap_unit") < 1) return { ok: false, reason: "No CPAP at the patient. Fetch it from the truck." };
-    } else if (!this.take(item)) {
-      return { ok: false, reason: `No ${device} at the patient.` };
+    } else {
+      grabbed = this.takeTraced(item);
+      if (grabbed === null) return { ok: false, reason: `No ${device} at the patient.` };
     }
     if (this.atPatient("o2_tank_d") < 1 && this.o2.tankPsi <= 200 && this.atPatient("o2_tank_m") < 1) {
+      this.refund(item, grabbed);
       return { ok: false, reason: "No O2 cylinder at the patient." };
     }
-    return this.start("o2", `Apply ${device} at ${device === "cpap" ? cpap_cmH2O + " cmH2O" : flow_L_per_min + " L/min"}`, 20, () => {
+    return this.startRefunding("o2", `Apply ${device} at ${device === "cpap" ? cpap_cmH2O + " cmH2O" : flow_L_per_min + " L/min"}`, 20, () => {
       this.o2.device = device;
       this.o2.flow_L_per_min = flow_L_per_min;
       this.o2.reservoirInflated = reservoirInflated;
@@ -1424,7 +1593,7 @@ export class Sim {
       } else {
         this.addLog("airway", `${device} flowing. Tank ${Math.round(this.o2.tankPsi)} psi.`);
       }
-    });
+    }, [[item, grabbed]]);
   }
 
   preinflateReservoir(): ActionResult {
@@ -1444,15 +1613,16 @@ export class Sim {
   }
 
   swapTank(): ActionResult {
-    if (!this.take("o2_tank_m")) {
+    const grabbed = this.takeTraced("o2_tank_m");
+    if (grabbed === null) {
       return { ok: false, reason: "No M cylinder at the patient. Fetch one from the truck." };
     }
-    return this.start("tank_swap", "Swap to the M cylinder", 30, () => {
+    return this.startRefunding("tank_swap", "Swap to the M cylinder", 30, () => {
       this.o2.tankPsi = 2000;
       this.o2.tankFactor = 1.56;
       this.o2.tankEmptyWarned = false;
       this.addLog("airway", "M cylinder on (factor 1.56): tank math restarts at 2,000 psi.");
-    });
+    }, [["o2_tank_m", grabbed]]);
   }
 
   setBvmMask(size: "small" | "medium" | "large"): ActionResult {
@@ -1490,13 +1660,24 @@ export class Sim {
 
   // - Oct 29 lines and fluids actions -
 
+  /** NS mL to prime a Y set (TUNE, needs medic sign-off). */
+  private static readonly Y_PRIME_NS_ML = 40;
+  /** NS mL flushed per blood unit on a Y set (TUNE). */
+  private static readonly Y_FLUSH_NS_ML = 10;
+  /** Max blood units per Y set before replacement (TUNE). */
+  private static readonly Y_MAX_UNITS = 4;
+  /** Max Y set age in seconds before replacement: 4 h (TUNE). */
+  private static readonly Y_MAX_AGE_S = 4 * 3600;
+
   startIv(site: "ac" | "forearm" | "hand", gauge: number): ActionResult {
     const flow = IV_GRAVITY_FLOW[gauge];
     if (flow === undefined) return { ok: false, reason: `No ${gauge}g catheter in the kit.` };
-    if (!this.take(`iv_cath_${gauge}g`)) {
+    const cathId = `iv_cath_${gauge}g`;
+    const grabbed = this.takeTraced(cathId);
+    if (grabbed === null) {
       return { ok: false, reason: `No ${gauge}g catheter at the patient.` };
     }
-    return this.start("iv", `Start ${gauge}g IV (${site})`, 75, () => {
+    return this.startRefunding("iv", `Start ${gauge}g IV (${site})`, 75, () => {
       const p = ivSuccessP({
         shock: this.effectiveLoss_pct() >= 15,
         darkOrRain: this.config.darkScene,
@@ -1516,25 +1697,31 @@ export class Sim {
           flow_mL_per_min: flow,
           bag: null,
           infused_mL: 0,
-          ioLidoGiven: false
+          ioLidoGiven: false,
+          ySet: null,
+          warmerOn: false,
+          dripSetOn: false
         });
         this.addLog("fluid", `IV ${gauge}g ${site} in, flash confirmed. Gravity ${flow} mL/min.`);
       } else {
         this.addLog("trap", `IV ${gauge}g ${site} missed (${Math.round(p * 100)} percent shot). Try again or go IO.`);
       }
-    });
+    }, [[cathId, grabbed]]);
   }
 
   startIo(site: "tibial" | "humeral", needle_mm: number, lidoFirst: boolean): ActionResult {
     if (this.atPatient("io_drill_ezio") < 1) return { ok: false, reason: "Need the EZ-IO drill at the patient." };
-    if (!this.take(`io_needle_${needle_mm}mm`)) {
+    const needleId = `io_needle_${needle_mm}mm`;
+    const grabbed = this.takeTraced(needleId);
+    if (grabbed === null) {
       return { ok: false, reason: `No ${needle_mm} mm needle at the patient.` };
     }
     if (!ioNeedleOk(site, needle_mm)) {
+      this.refund(needleId, grabbed);
       const want = site === "tibial" ? "25 mm" : "45 mm";
       return { ok: false, reason: `${needle_mm} mm is the wrong needle for ${site} (Josh needs ${want}).` };
     }
-    return this.start("io", `Start IO ${site} (${needle_mm} mm)`, 30, () => {
+    return this.startRefunding("io", `Start IO ${site} (${needle_mm} mm)`, 30, () => {
       if (!this.rng.chance(0.95)) {
         this.addLog("trap", `IO ${site} missed (5 percent miss). Reposition and try again.`);
         return;
@@ -1554,7 +1741,10 @@ export class Sim {
         flow_mL_per_min: IO_FLOW.gravity,
         bag: null,
         infused_mL: 0,
-        ioLidoGiven: lidoFirst
+        ioLidoGiven: lidoFirst,
+        ySet: null,
+        warmerOn: false,
+        dripSetOn: false
       });
       this.addLog(
         "fluid",
@@ -1569,7 +1759,62 @@ export class Sim {
       } else if (lidoFirst) {
         this.addLog("fluid", "Lidocaine 40 mg IO before the flush (drug box).");
       }
-    });
+    }, [[needleId, grabbed]]);
+  }
+
+  /**
+   * Sternal IO, FAST1-style, implemented from the Nov 2 notes. No drill,
+   * no needle choice: the device sets depth. One attempt per patient, hit
+   * or miss. 30 s, 95 percent success, humeral-range pressure-bag flow:
+   * all TUNE, needs medic sign-off, not presented as signed off.
+   */
+  startSternalIo(lidoFirst: boolean): ActionResult {
+    if (this.sternalAttempted) {
+      return { ok: false, reason: "Sternal IO already attempted on this patient: one attempt only." };
+    }
+    const grabbed = this.takeTraced("io_fast1");
+    if (grabbed === null) {
+      return { ok: false, reason: "No FAST1 at the patient. Fetch one from the truck." };
+    }
+    const res = this.startRefunding("io_sternal", "Place sternal IO (FAST1)", 30, () => {
+      if (!this.rng.chance(0.95)) {
+        this.addLog("trap", "IO sternal missed (5 percent miss, TUNE). No second sternal attempt on this patient.");
+        return;
+      }
+      const id = this.fluids.nextLineId++;
+      const range = IO_FLOW.humeral;
+      const pressureFlow = Math.round(this.rng.range(range[0], range[1]));
+      this.fluids.lines.push({
+        id,
+        kind: "io",
+        site: "sternal",
+        patent: true,
+        infiltrated: false,
+        placedAt_s: this.t_s,
+        pressureBag: false,
+        flow_mL_per_min: IO_FLOW.gravity,
+        bag: null,
+        infused_mL: 0,
+        ioLidoGiven: lidoFirst,
+        ySet: null,
+        warmerOn: false,
+        dripSetOn: false
+      });
+      this.addLog(
+        "fluid",
+        `IO sternal in (FAST1, no drill, device-set depth). Gravity poor (${IO_FLOW.gravity} mL/min); ` +
+          `with a pressure bag about ${pressureFlow} mL/min (humeral range, TUNE).`
+      );
+      this.ioPressureFlows.set(id, pressureFlow);
+      if (!lidoFirst && this.vitals.gcs_total >= 14) {
+        this.pain_0_to_10 = 10;
+        this.addLog("trap", "IO flushed in a conscious patient with no lidocaine 40 mg first: pain 10/10.");
+      } else if (lidoFirst) {
+        this.addLog("fluid", "Lidocaine 40 mg IO before the flush (drug box).");
+      }
+    }, [["io_fast1", grabbed]]);
+    if (res.ok) this.sternalAttempted = true;
+    return res;
   }
 
   applyPressureBag(lineId: number): ActionResult {
@@ -1600,43 +1845,202 @@ export class Sim {
     }
   }
 
-  hangFluids(lineId: number, fluid: "ns" | "lr" | "blood", drip: string): ActionResult {
+  hangFluids(lineId: number, fluid: "ns" | "lr", drip: string): ActionResult {
     const line = this.fluids.lines.find((l) => l.id === lineId);
     if (line === undefined) return { ok: false, reason: `No line ${lineId}.` };
     if (!line.patent || line.infiltrated) return { ok: false, reason: `Line ${lineId} is not running.` };
     if (line.bag !== null) return { ok: false, reason: `Line ${lineId} already has a bag hanging.` };
-    const bagItem = fluid === "ns" ? "ns_1000ml" : fluid === "lr" ? "lr_1000ml" : "whole_blood_unit";
-    if (!this.take(bagItem)) return { ok: false, reason: `No ${fluid} bag at the patient.` };
-    if (fluid === "blood") {
-      if (!this.take("blood_tubing_filter")) {
-        return { ok: false, reason: "Blood needs blood tubing with a filter. Fetch it from the truck." };
-      }
-      if (this.atPatient("fluid_warmer") < 1) {
-        return { ok: false, reason: "Blood needs the warmer at 38 C. Fetch it from the truck." };
-      }
-    } else if (!this.take(drip === "micro60" ? "micro_drip_set" : "macro_drip_set")) {
-      return { ok: false, reason: "No drip set at the patient." };
+    if (line.ySet !== null) {
+      return { ok: false, reason: `Line ${lineId} has blood tubing: only Y-set NS and blood run here. LR and NS 1 L are refused.` };
     }
-    const what = fluid === "blood" ? "whole blood (500 mL)" : `${fluid.toUpperCase()} 1,000 mL`;
-    return this.start("hang", `Hang ${what} on line ${lineId}`, 30, () => {
+    const bagItem = fluid === "ns" ? "ns_1000ml" : "lr_1000ml";
+    const grabbedBag = this.takeTraced(bagItem);
+    if (grabbedBag === null) return { ok: false, reason: `No ${fluid} bag at the patient.` };
+    // Reusable drip set: only the first crystalloid bag on a line uses one.
+    // Later bags reuse it and hang in 20 s instead of 30 s.
+    const setItem = drip === "micro60" ? "micro_drip_set" : "macro_drip_set";
+    if (!line.dripSetOn) {
+      const grabbedSet = this.takeTraced(setItem);
+      if (grabbedSet === null) {
+        this.refund(bagItem, grabbedBag);
+        return { ok: false, reason: "No drip set at the patient." };
+      }
+      const what = `${fluid.toUpperCase()} 1,000 mL`;
+      const res = this.startRefunding("hang", `Hang ${what} on line ${lineId}`, 30, () => {
+        this.finishHang(lineId, fluid, drip);
+      }, [[bagItem, grabbedBag], [setItem, grabbedSet]]);
+      if (res.ok) line.dripSetOn = true;
+      return res;
+    }
+    const what = `${fluid.toUpperCase()} 1,000 mL`;
+    return this.startRefunding("hang", `Hang ${what} on line ${lineId} (set on line)`, 20, () => {
+      this.finishHang(lineId, fluid, drip);
+    }, [[bagItem, grabbedBag]]);
+  }
+
+  /**
+   * Prime Y tubing + warmer on a line (45 s), implemented from the Nov 2
+   * notes. Blood on one spike, NS on the other; the set stays on the line.
+   * Uses NS 250 mL, falling back to NS 1 L. The warmer (reusable, one line
+   * at a time) goes on with the set.
+   */
+  primeYSet(lineId: number): ActionResult {
+    const line = this.fluids.lines.find((l) => l.id === lineId);
+    if (line === undefined) return { ok: false, reason: `No line ${lineId}.` };
+    if (!line.patent || line.infiltrated) return { ok: false, reason: `Line ${lineId} is not running.` };
+    if (line.ySet !== null) return { ok: false, reason: `Line ${lineId} already has a Y set primed.` };
+    const grabbedSet = this.takeTraced("y_tubing_blood");
+    if (grabbedSet === null) {
+      return { ok: false, reason: "No Y tubing at the patient. Fetch it from the truck." };
+    }
+    let nsItem = "ns_250ml";
+    let grabbedNs = this.takeTraced(nsItem);
+    if (grabbedNs === null) {
+      nsItem = "ns_1000ml";
+      grabbedNs = this.takeTraced(nsItem);
+    }
+    if (grabbedNs === null) {
+      this.refund("y_tubing_blood", grabbedSet);
+      return { ok: false, reason: "Prime needs NS 250 mL or NS 1 L at the patient." };
+    }
+    if (this.atPatient("fluid_warmer") < 1) {
+      this.refund("y_tubing_blood", grabbedSet);
+      this.refund(nsItem, grabbedNs);
+      return { ok: false, reason: "Prime needs the fluid warmer at 38 C at the patient." };
+    }
+    const nsTotal = nsItem === "ns_250ml" ? 250 : 1000;
+    return this.startRefunding("y_prime", `Prime Y tubing + warmer on line ${lineId}`, 45, () => {
       const target = this.fluids.lines.find((l) => l.id === lineId);
-      if (target === undefined || !target.patent || target.infiltrated) {
-        this.addLog("trap", `Line ${lineId} went bad while hanging the bag. Bag wasted.`);
+      if (target === undefined || !target.patent || target.infiltrated || target.ySet !== null) {
+        this.addLog("trap", `Line ${lineId} went bad while priming the Y set. Set and NS wasted.`);
         return;
       }
-      target.bag = {
-        fluid,
-        volumeTotal_mL: fluid === "blood" ? 500 : 1000,
-        volumeLeft_mL: fluid === "blood" ? 500 : 1000,
-        drip
+      target.ySet = {
+        primedAt_s: this.t_s,
+        unitsHung: 0,
+        nsLeft_mL: nsTotal - Sim.Y_PRIME_NS_ML
       };
+      this.attachWarmer(target);
+      this.addLog(
+        "fluid",
+        `Y tubing primed on line ${lineId} with ${nsItem === "ns_250ml" ? "NS 250" : "NS 1 L"} ` +
+          `(${Sim.Y_PRIME_NS_ML} mL prime, TUNE). Blood on one spike, NS on the other. Warmer 38 C on.`
+      );
+    }, [["y_tubing_blood", grabbedSet], [nsItem, grabbedNs]]);
+  }
+
+  /**
+   * Hang 1 unit (500 mL) or 2 units back to back (1,000 mL) of whole blood
+   * through a primed Y set, implemented from the Nov 2 notes. 10 mL NS
+   * flush per unit (TUNE). Up to 4 units or 4 h per set (TUNE), then
+   * replace the set.
+   */
+  hangBloodUnits(lineId: number, units: 1 | 2): ActionResult {
+    const line = this.fluids.lines.find((l) => l.id === lineId);
+    if (line === undefined) return { ok: false, reason: `No line ${lineId}.` };
+    if (!line.patent || line.infiltrated) return { ok: false, reason: `Line ${lineId} is not running.` };
+    if (line.bag !== null) return { ok: false, reason: `Line ${lineId} already has a bag hanging.` };
+    const ySet = line.ySet;
+    if (ySet === null) return { ok: false, reason: `Prime the Y set on line ${lineId} first.` };
+    if (ySet.unitsHung + units > Sim.Y_MAX_UNITS) {
+      return { ok: false, reason: `Y set on line ${lineId} is at its ${Sim.Y_MAX_UNITS}-unit cap (TUNE). Replace the Y set.` };
+    }
+    if (this.t_s - ySet.primedAt_s > Sim.Y_MAX_AGE_S) {
+      return { ok: false, reason: `Y set on line ${lineId} is past 4 hours (TUNE). Replace the Y set.` };
+    }
+    const flushNeed = units * Sim.Y_FLUSH_NS_ML;
+    if (ySet.nsLeft_mL < flushNeed) {
+      return { ok: false, reason: `Only ${Math.round(ySet.nsLeft_mL)} mL NS left on the set: short for the ${flushNeed} mL flush.` };
+    }
+    const grabbed: [string, "belt" | "jump" | "fetched" | "tool" | null][] = [];
+    for (let i = 0; i < units; i++) {
+      const one = this.takeTraced("whole_blood_unit");
+      if (one === null) {
+        for (const [itemId, src] of grabbed) this.refund(itemId, src);
+        return { ok: false, reason: `Need ${units} whole blood unit(s) at the patient: only ${i} here.` };
+      }
+      grabbed.push(["whole_blood_unit", one]);
+    }
+    const volume = units * 500;
+    const label = units === 1 ? `Hang 1 unit blood (500 mL) on line ${lineId}` : `Hang 2 units blood (1,000 mL) on line ${lineId}`;
+    return this.startRefunding("hang_blood", label, 30, () => {
+      const target = this.fluids.lines.find((l) => l.id === lineId);
+      if (target === undefined || !target.patent || target.infiltrated || target.ySet === null) {
+        this.addLog("trap", `Line ${lineId} went bad while hanging blood. Units wasted.`);
+        return;
+      }
+      target.bag = { fluid: "blood", volumeTotal_mL: volume, volumeLeft_mL: volume, drip: "y-set" };
+      target.ySet.unitsHung += units;
+      target.ySet.nsLeft_mL -= flushNeed;
       this.refreshLineFlow(target);
       this.addLog(
         "fluid",
-        `${what} hanging on line ${lineId} at ${Math.round(target.flow_mL_per_min)} mL/min` +
-          `${target.pressureBag ? " (pressure bag)" : " (gravity)"}.`
+        `${units === 1 ? "1 unit" : "2 units"} whole blood (${volume.toLocaleString("en-US")} mL) hanging on line ${lineId} ` +
+          `via Y set (unit ${target.ySet.unitsHung - units + 1}${units === 2 ? `-${target.ySet.unitsHung}` : ""}/${Sim.Y_MAX_UNITS}, ` +
+          `${flushNeed} mL NS flush).`
       );
-    });
+    }, grabbed);
+  }
+
+  /**
+   * Replace the Y set on a line (45 s): a fresh set, fresh 4-unit / 4-hour
+   * clock. The already-spiked NS carries over to the new set.
+   */
+  replaceYSet(lineId: number): ActionResult {
+    const line = this.fluids.lines.find((l) => l.id === lineId);
+    if (line === undefined) return { ok: false, reason: `No line ${lineId}.` };
+    if (!line.patent || line.infiltrated) return { ok: false, reason: `Line ${lineId} is not running.` };
+    if (line.ySet === null) return { ok: false, reason: `Line ${lineId} has no Y set to replace.` };
+    const grabbed = this.takeTraced("y_tubing_blood");
+    if (grabbed === null) {
+      return { ok: false, reason: "No Y tubing at the patient. Fetch it from the truck." };
+    }
+    return this.startRefunding("y_replace", `Replace the Y set on line ${lineId}`, 45, () => {
+      const target = this.fluids.lines.find((l) => l.id === lineId);
+      if (target === undefined || !target.patent || target.infiltrated || target.ySet === null) {
+        this.addLog("trap", `Line ${lineId} went bad while replacing the Y set. Set wasted.`);
+        return;
+      }
+      const carried = target.ySet.nsLeft_mL;
+      target.ySet = { primedAt_s: this.t_s, unitsHung: 0, nsLeft_mL: carried };
+      this.addLog(
+        "fluid",
+        `Y set replaced on line ${lineId}. Spiked NS carries over (${Math.round(carried)} mL left). Warmer stays on.`
+      );
+    }, [["y_tubing_blood", grabbed]]);
+  }
+
+  /** Warmer goes on one line at a time: attaching moves it, like the pressure bag. */
+  private attachWarmer(target: LineState): void {
+    for (const other of this.fluids.lines) {
+      if (other.id !== target.id && other.warmerOn) {
+        other.warmerOn = false;
+        this.addLog("fluid", `Warmer moved from line ${other.id} to line ${target.id} (one line at a time).`);
+      }
+    }
+    target.warmerOn = true;
+  }
+
+  /** Crystalloid hang completion: the line may have gone bad mid-hang. */
+  private finishHang(lineId: number, fluid: "ns" | "lr", drip: string): void {
+    const target = this.fluids.lines.find((l) => l.id === lineId);
+    if (target === undefined || !target.patent || target.infiltrated) {
+      this.addLog("trap", `Line ${lineId} went bad while hanging the bag. Bag wasted.`);
+      return;
+    }
+    this.hangBagOnLine(target, fluid, drip);
+  }
+
+  /** Seat a crystalloid bag on a live line and log it. Caller validated the line. */
+  private hangBagOnLine(target: LineState, fluid: "ns" | "lr", drip: string): void {
+    target.bag = { fluid, volumeTotal_mL: 1000, volumeLeft_mL: 1000, drip };
+    this.refreshLineFlow(target);
+    const what = `${fluid.toUpperCase()} 1,000 mL`;
+    this.addLog(
+      "fluid",
+      `${what} hanging on line ${target.id} at ${Math.round(target.flow_mL_per_min)} mL/min` +
+        `${target.pressureBag ? " (pressure bag)" : " (gravity)"}.`
+    );
   }
 
   pullLine(lineId: number): ActionResult {
@@ -1647,6 +2051,14 @@ export class Sim {
       this.addLog("fluid", `Line ${lineId} pulled with ${Math.round(line.bag.volumeLeft_mL)} mL still in the bag: bag wasted.`);
     } else {
       this.addLog("fluid", `Line ${lineId} pulled.`);
+    }
+    // The Y set is disposed with the line; the reusable warmer comes off
+    // and is back in hand.
+    if (line?.ySet !== null && line?.ySet !== undefined) {
+      this.addLog("fluid", `Y set on line ${lineId} disposed with the line.`);
+    }
+    if (line?.warmerOn === true) {
+      this.addLog("fluid", "Fluid warmer 38 C off the line, back in hand.");
     }
     this.fluids.lines.splice(index, 1);
     this.ioPressureFlows.delete(lineId);
@@ -1670,20 +2082,33 @@ export class Sim {
     if (pres.math.maxUnits !== null && amount > pres.math.maxUnits * 4) {
       return { ok: false, reason: `That is more than 4 ${pres.math.unitLabel === "mL" ? "vials" : "units"} worth: split the prep.` };
     }
-    if (!this.take(syringeId)) return { ok: false, reason: `No ${syringeId} at the patient.` };
+    // Boxed drugs stay locked until the partner stages their box. Drug box
+    // and jump bag drugs are at hand.
+    const needBox = drugBoxFor(entry.drug.location);
+    if (needBox !== null && !this.stagedBoxes.has(needBox.id)) {
+      return { ok: false, reason: `${entry.drug.name} is in the ${needBox.label}: stage it first.` };
+    }
+    const grabbed = this.takeTraced(syringeId);
+    if (grabbed === null) return { ok: false, reason: `No ${syringeId} at the patient.` };
     const routeUpper = entry.standard.route.toUpperCase();
     const needsLine = routeUpper.startsWith("IV") || routeUpper.startsWith("IO");
     let line: LineState | null = null;
     if (needsLine) {
       const candidates = this.fluids.lines.filter((l) => l.patent && !l.infiltrated);
-      if (candidates.length === 0) return { ok: false, reason: "IV/IO push needs a patent line. Start one first." };
+      if (candidates.length === 0) {
+        this.refund(syringeId, grabbed);
+        return { ok: false, reason: "IV/IO push needs a patent line. Start one first." };
+      }
       line = lineId === null ? null : (candidates.find((l) => l.id === lineId) ?? null);
-      if (line === null) return { ok: false, reason: "Pick which line to push through." };
+      if (line === null) {
+        this.refund(syringeId, grabbed);
+        return { ok: false, reason: "Pick which line to push through." };
+      }
     }
     const doseMcg = amount * pres.math.mcgPer;
     const ratio = doseMcg / entry.standard.mcg;
     const lineNote = line !== null ? ` via line ${line.id}` : "";
-    return this.start("drug", `Prep and push ${entry.drug.name} (${formatDose(doseMcg)} ${entry.standard.route}${lineNote})`, 45, () => {
+    return this.startRefunding("drug", `Prep and push ${entry.drug.name} (${formatDose(doseMcg)} ${entry.standard.route}${lineNote})`, 45, () => {
       const push: ActiveDrug = {
         drugId: entry.drug.id,
         givenAt_s: this.t_s,
@@ -1713,7 +2138,7 @@ export class Sim {
             `(${push.ratio_to_standard}x standard). Peak in ${entry.pk_s[1]}s.`
         );
       }
-    });
+    }, [[syringeId, grabbed]]);
   }
 
   // - Oct 29 manual vitals and monitor actions -
@@ -1827,6 +2252,14 @@ export class Sim {
     if (this.atPatient("monitor_defib") < 1) return { ok: false, reason: "Need the monitor at the patient." };
     this.monitor.etco2Attached = true;
     this.addLog("exam", "Waveform EtCO2 attached: the only reliable ETT confirmation.");
+    return { ok: true };
+  }
+
+  attachDefibPads(): ActionResult {
+    if (this.defibPadsOn) return { ok: false, reason: "Defib pads already on." };
+    if (this.atPatient("monitor_defib") < 1) return { ok: false, reason: "Need the monitor at the patient." };
+    this.defibPadsOn = true;
+    this.addLog("exam", "Defib pads on the chest: monitor display only, no shock in this build.");
     return { ok: true };
   }
 

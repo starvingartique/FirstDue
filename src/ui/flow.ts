@@ -7,6 +7,7 @@
 import type { FixedCall, DifficultyLevel } from "../data/types";
 import type { Sim } from "../sim/engine";
 import { sayLine, word } from "./wording";
+import { FTO_FRAMING, collectDebrief, fetchDebrief } from "./debrief";
 
 export type Phase = "level" | "dispatch" | "sizeup" | "care" | "package" | "transport" | "radio" | "end";
 export type Destination = "trauma" | "stemi" | "stroke" | "ed";
@@ -29,6 +30,7 @@ export interface RunRecord {
   destinationLabel: string;
   outcome: Outcome | null;
   outcomeReason: string;
+  radioComplete: boolean;
 }
 
 export function freshRecord(): RunRecord {
@@ -39,7 +41,8 @@ export function freshRecord(): RunRecord {
     destination: null,
     destinationLabel: "not chosen",
     outcome: null,
-    outcomeReason: ""
+    outcomeReason: "",
+    radioComplete: false
   };
 }
 
@@ -219,6 +222,8 @@ export class RunFlow {
   private hintBar: HTMLElement;
   private transportTimer: number | null = null;
   private sizeupLogged = false;
+  private lastEnd: { sim: Sim; win: boolean; checks: HandoffCheck[]; report: HTMLElement; pathway: string } | null = null;
+  private endView: "report" | "debrief" = "report";
 
   constructor() {
     const overlay = document.getElementById("flow-overlay");
@@ -597,6 +602,7 @@ export class RunFlow {
 
     const finish = (complete: boolean): void => {
       if (complete) {
+        this.record.radioComplete = true;
         handoff.hidden = false;
         nothingMore.hidden = true;
       }
@@ -658,7 +664,8 @@ export class RunFlow {
 
   // - end of run -
 
-  showEnd(params: { sim: Sim; win: boolean; checks: HandoffCheck[]; report: HTMLElement }): void {
+  showEnd(params: { sim: Sim; win: boolean; checks: HandoffCheck[]; report: HTMLElement; pathway: string }): void {
+    const firstEnd = this.phase !== "end";
     this.phase = "end";
     this.tickingSuspended = true;
     this.hintBar.hidden = true;
@@ -666,9 +673,13 @@ export class RunFlow {
       window.clearTimeout(this.transportTimer);
       this.transportTimer = null;
     }
-    const { sim, win, checks, report } = params;
+    const { sim, win, checks, report, pathway } = params;
+    this.lastEnd = { sim, win, checks, report, pathway };
+    this.endView = "report";
     this.record.outcome = win ? "win" : "lose";
-    sim.addLog("info", win ? "Run over: WIN - patient handed off alive, criteria met." : `Run over: LOSE - ${this.record.outcomeReason}`);
+    if (firstEnd) {
+      sim.addLog("info", win ? "Run over: WIN - patient handed off alive, criteria met." : `Run over: LOSE - ${this.record.outcomeReason}`);
+    }
     const card = h("div", "flow-card flow-card-wide");
     card.appendChild(h("div", "flow-kicker", "End of run"));
     const banner = h("h1", win ? "flow-win" : "flow-lose", win ? "HANDOFF - PATIENT ALIVE" : "RUN LOST");
@@ -695,10 +706,69 @@ export class RunFlow {
     card.appendChild(ul);
     card.appendChild(h("div", "flow-h", "Run report"));
     card.appendChild(report);
-    const again = h("button", "flow-btn flow-btn-big", "Run again (reload)");
+    const debrief = h("button", "flow-btn flow-btn-big", "Open FTO debrief");
+    debrief.type = "button";
+    debrief.addEventListener("click", () => this.showDebrief());
+    card.appendChild(debrief);
+    const again = h("button", "flow-btn flow-btn-ghost", "Run again (reload)");
     again.type = "button";
     again.addEventListener("click", () => window.location.reload());
     card.appendChild(again);
     this.show(card);
+  }
+
+  /**
+   * FTO debrief screen, reached from the run report. Spark FTO when the
+   * server answers, code-built fallback from the same facts when it does
+   * not. Never blank, never a made-up grade.
+   */
+  /**
+   * Wording mode changed on the end screen: swap in a freshly built
+   * report and rebuild the card in the new mode. Fresh text nodes each
+   * time, so Plain never sticks when toggling back to Medical. A no-op
+   * anywhere else, and never yanks the debrief view.
+   */
+  refreshEndReport(report: HTMLElement): void {
+    if (this.phase !== "end" || this.lastEnd === null) return;
+    this.lastEnd = { ...this.lastEnd, report };
+    if (this.endView === "report") this.showEnd(this.lastEnd);
+  }
+
+  showDebrief(): void {
+    if (this.lastEnd === null) return;
+    const { sim, win, checks, pathway } = this.lastEnd;
+    this.phase = "end";
+    this.endView = "debrief";
+    const facts = collectDebrief(sim, {
+      levelLabel: this.record.levelLabel,
+      destination: this.record.destinationLabel,
+      sizeupCount: this.record.sizeup.length,
+      radioComplete: this.record.radioComplete,
+      checks,
+      win,
+      pathway
+    });
+    const card = h("div", "flow-card flow-card-wide");
+    card.appendChild(h("div", "flow-kicker", "FTO debrief"));
+    card.appendChild(h("h1", "flow-title", "Debrief with the FTO"));
+    card.appendChild(h("div", "flow-note", FTO_FRAMING));
+    const status = h("div", "flow-note", "Asking the FTO...");
+    card.appendChild(status);
+    const body = h("div", "flow-debrief-text");
+    body.dataset["noWord"] = "true";
+    body.hidden = true;
+    card.appendChild(body);
+    const back = h("button", "flow-btn flow-btn-ghost", "Back to report");
+    back.type = "button";
+    back.addEventListener("click", () => {
+      if (this.lastEnd !== null) this.showEnd(this.lastEnd);
+    });
+    card.appendChild(back);
+    this.show(card);
+    void fetchDebrief(facts).then(({ text, live }) => {
+      status.textContent = live ? "Live FTO debrief." : "Local fallback - Spark unreachable, built from the run log only, no grade invented.";
+      body.textContent = text;
+      body.hidden = false;
+    });
   }
 }

@@ -34,12 +34,14 @@ export function newBikeDownSim(): Sim {
 }
 
 /** Bare-bones Sim for curve tests: no bystander, no belt, custom start loss. */
-export function newTestSim(seed = 1027, startLoss_mL = 0): Sim {
+export function newTestSim(seed = 1027, startLoss_mL = 0, opts: { femoralBleed?: boolean; roadRash?: boolean } = {}): Sim {
   const sim = new Sim({
     seed,
     startLoss_mL,
     bystanderShirt: false,
     beltTrap: false,
+    femoralBleed: opts.femoralBleed,
+    roadRash: opts.roadRash,
     stressActive: false,
     betaBlocked: false,
     wetClothing: false,
@@ -76,11 +78,13 @@ export function newTestSim(seed = 1027, startLoss_mL = 0): Sim {
   sim.stock("io_needle_15mm", 0, 1, 2);
   sim.stock("io_needle_25mm", 0, 2, 2);
   sim.stock("io_needle_45mm", 0, 2, 2);
+  sim.stock("io_fast1", 0, 1, 2);
   sim.stock("macro_drip_set", 0, 2, 4);
   sim.stock("micro_drip_set", 0, 1, 3);
   sim.stock("pressure_bag_300", 0, 1, 1);
   sim.stock("fluid_warmer", 0, 0, 1);
-  sim.stock("blood_tubing_filter", 0, 0, 2);
+  sim.stock("y_tubing_blood", 0, 0, 2);
+  sim.stock("ns_250ml", 0, 2, 2);
   sim.stock("ns_1000ml", 0, 3, 4);
   sim.stock("lr_1000ml", 0, 2, 2);
   sim.stock("whole_blood_unit", 0, 0, 2);

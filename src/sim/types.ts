@@ -206,6 +206,14 @@ export interface FluidBag {
   drip: string;
 }
 
+/** Y tubing state on a line: primed once, then up to 4 units or 4 h. */
+export interface YSetState {
+  primedAt_s: number;
+  unitsHung: number;
+  /** NS mL still spiked on the set after the prime and flushes. */
+  nsLeft_mL: number;
+}
+
 export interface LineState {
   id: number;
   kind: LineKind;
@@ -221,6 +229,12 @@ export interface LineState {
   bag: FluidBag | null;
   infused_mL: number;
   ioLidoGiven: boolean;
+  /** Blood Y set on this line. Null until primed. */
+  ySet: YSetState | null;
+  /** Fluid warmer at 38 C on this line (one line at a time). */
+  warmerOn: boolean;
+  /** Reusable drip set spiked on this line (first crystalloid bag). */
+  dripSetOn: boolean;
 }
 
 export interface FluidsState {

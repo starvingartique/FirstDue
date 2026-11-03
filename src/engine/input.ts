@@ -64,7 +64,7 @@ export function bindInput(canvas: HTMLCanvasElement, handlers: InputHandlers): v
       handlers.onSpotKey(Number(event.key) - 1);
       return;
     }
-    // V opens the Talk tab. Typing in an input field must not retrigger it.
+    // V focuses the chat dock. Typing in an input field must not retrigger it.
     if (event.key === "v" || event.key === "V") {
       handlers.onTalkKey();
       return;

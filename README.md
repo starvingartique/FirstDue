@@ -5,6 +5,7 @@ Source of truth: `MUSE_BRIEF_1.md` (Project Brief v2). When in doubt, the brief 
 Clinical source of truth today: `OCT28_MEDICAL_ANSWERS` (sections 1-7 + item 8).
 Values are textbook anchors (ATLS / TCCC / NREMT / PHTLS) and still need
 sign-off from a certified medic before Nov 4.
+Thank you to Wyatt for medical knowledge help and playtesting.
 
 This milestone, on top of Oct 28 (commit 6d1074c, untouched curve): Airway and
 Breathing tabs with Josh-exact sizing and failure modes, IV/IO with explicit
@@ -95,6 +96,61 @@ hypothermia_trauma (temp slide plus wrap), crash_stress_offset (stress
 vitals offset), road_rash (ooze plus clot). The 11 conditions.json entries
 are unreviewed stubs and stay generatorReady false. No flag flipped. Floor
 met, target not met.
+
+## Nov 2 pass on clean: FTO debrief + feedback fixes
+
+- FTO debrief after handoff, from the run report: timeline, what went
+  right, misses, time to critical intervention, traps, reassessment,
+  destination and radio as logged. Spark FTO through the existing server
+  setup; code-built fallback from the same facts when Spark fails, never
+  blank, never a made-up grade. Destination and the four open clinical
+  questions stay logged and open. Screen carries the sim-only framing.
+- Pulse ox vitals pill: HR plus lagged monitor SpO2 stays in the top bar
+  while the probe or defib pads are on, across all menu tabs. Engine
+  numbers only. Pads are monitor display only, no shock modeled.
+- Chat dock bottom middle: text the patient while working the menu, with
+  push-to-talk mic through the server transcribe proxy
+  (muse-voice-transcribe-1.0, file upload; realtime left for later). Text
+  always works, including when the mic is unavailable.
+- Blood sweep: one 12-second whole-patient look for immediate wounds,
+  bleeding and tenderness, from engine state only. Logged and reported;
+  changes nothing clinical; says a full region exam is still needed.
+- Tests: `npm.cmd run sim:nov02` (sweep, pads, fallback debrief).
+
+## Nov 2 kit pass on clean: blood, IO, boxes (Phases 1-3; Phase 4 cut)
+
+- Kit actions that fail after taking stock now refund the item instead of
+  using it up. Blood counts read "here N, truck M".
+- Sternal IO (FAST1-style): one attempt, 30 s, 95 percent, humeral-range
+  pressure flow (all TUNE, needs medic sign-off), with lidocaine option.
+- Y tubing blood lines: 45 s prime with NS through the warmer, 1-2 units,
+  4-unit/4 h cap (TUNE), LR refused on blood lines, NS 250 with NS 1 L
+  fallback. Warmer rides the Y set. Drip sets stay on the line; rehangs
+  take 20 s.
+- Truck boxes staged by one 50 s partner trip: Narc, cooler, blood kit,
+  RSI, critical care, OB, CBRN. Narc/RSI/CC drugs gated until staged.
+- Stock table rebuilt to ALS levels; belt CAT stays 1 but 5 land at the
+  patient. Pelvic binder, needle decompression, cric, LifeFlow have no
+  action yet. Phase 4 diagram/Body view work cut: clean-rebuild has no
+  diagram or Body view.
+- Tests: `npm.cmd run sim:kit` (refund, sternal, Y set, drip reuse,
+  box gates, staging, fetch landing).
+
+## Nov 2 small pass on clean: paper doll + wording toggle
+
+- Paper doll body view at the top of the Examine tab: front-view outline,
+  all 15 regions clickable (back is a button), opens the same region menu
+  as the scene and chips. Dots and rings mirror engine state only: TQ,
+  packing and dressing on the left thigh (the 3D wound side), sternal on
+  the chest, limb lines on the right by convention (no laterality is
+  tracked), Y set as a dashed ring, warmer as an orange ring.
+- Medical / Plain toggle in the top bar now rewords tabs, chips, region
+  panel, vitals pill, tips bubble, kit labels, menu, doll names, and the
+  end report (fresh build per toggle, both directions). Persists in
+  localStorage (fd.wording). Wording only, nothing clinical changes. Log
+  history, MARCH letters, and talk lines stay verbatim.
+- Tests: `npm.cmd run sim:ui` (doll coverage, markers, plain pairs,
+  second-sweep safety).
 
 ## Prereqs
 

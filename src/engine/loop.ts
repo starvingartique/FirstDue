@@ -19,8 +19,20 @@ export interface LoopRefs {
   onTick: () => void;
   /** When true the sim clock holds (transport skip, end card). Rendering never stops. */
   paused?: () => boolean;
+  /** Sim seconds per real second: 0.5, 1, or 2 from the speed bar. */
+  rate?: () => number;
   /** Per-frame UI hook (kit label projection). Runs even while paused. */
   onFrame?: () => void;
+}
+
+/**
+ * One frame of sim debt. Rate changes only the real-time pace at which
+ * sim-seconds accrue; tick() still advances exactly one sim-second, so no
+ * sim duration, bleed rate, or procedure length changes at any speed.
+ */
+export function advanceDebt(debt_s: number, dt_s: number, rate: number): number {
+  const safe = Number.isFinite(rate) ? Math.min(Math.max(rate, 0), 4) : 1;
+  return debt_s + dt_s * safe;
 }
 
 export function startLoop(refs: LoopRefs): void {
@@ -41,11 +53,12 @@ export function startLoop(refs: LoopRefs): void {
     const dt = Math.min(clock.getDelta(), 0.25);
     const t = clock.getElapsedTime();
 
-    // Fixed 1 sim-second tick, decoupled from frame rate.
+    // Fixed 1 sim-second tick, decoupled from frame rate. The speed bar
+    // scales only how fast debt accrues; pause zeroes it.
     if (refs.paused?.() === true) {
       simDebt_s = 0;
     } else {
-      simDebt_s += dt;
+      simDebt_s = advanceDebt(simDebt_s, dt, refs.rate?.() ?? 1);
     }
     while (simDebt_s >= 1) {
       simDebt_s -= 1;

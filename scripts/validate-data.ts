@@ -167,7 +167,7 @@ try {
       `volume ${String(base["bloodVolume_mL"])} mL, arterial_major 700)`
   );
   console.log(`interventions.json OK (${interventions.interventions.map((i) => i.id).join(", ")})`);
-  console.log(`equipment.json OK (${equipment.equipment.length} items, CAT belt 1 / jump 2 / cabinet 4)`);
+  console.log(`equipment.json OK (${equipment.equipment.length} items, CAT belt 1 / jump 4 / cabinet 6)`);
   console.log(
     `dispatch v1 OK (${complaints.complaints.length} complaints, ` +
       `${mechanisms.complaintMechanisms?.length ?? 0} complaint links, ` +

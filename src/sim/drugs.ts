@@ -24,6 +24,20 @@ import type { DrugTokens } from "./types";
 /** Engine weight for weight-based doses. Never shown in UI. */
 export const ENGINE_WEIGHT_KG = 80;
 
+/**
+ * The truck box a drug location lives in, or null when the drug is at
+ * hand (drug box, jump bag). Reads the location prefix from drugs.json:
+ * narcotics_safe needs the Narc box, rsi_kit the RSI kit, cc_box the
+ * Critical care box. Shared by the push gate and the menu labels.
+ */
+export function drugBoxFor(location: string): { id: string; label: string } | null {
+  const head = location.split(" ")[0];
+  if (head === "narcotics_safe") return { id: "box_narc", label: "Narc box" };
+  if (head === "rsi_kit") return { id: "box_rsi", label: "RSI kit" };
+  if (head === "cc_box") return { id: "box_cc", label: "Critical care box" };
+  return null;
+}
+
 const MAPPED_KEYS = [
   "heartRate",
   "sbp",

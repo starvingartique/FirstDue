@@ -1,6 +1,7 @@
 // ACM medical menu, Oct 29 slice: Examine, Airway, Breathing, Circulation,
-// Medications, Lines/Fluids, Monitor and Talk tabs work. Procedures and Log
-// tabs land later. ACM rules hold: everything is present, nothing is greyed
+// Medications, Lines/Fluids and Monitor tabs work; Talk moved to the bottom
+// chat dock. Procedures and Log tabs land later. ACM rules hold: everything
+// is present, nothing is greyed
 // out for being wrong, consequences are modeled instead of locks. Gameplay
 // UI never shows true engine vitals (F1 only) or the patient weight.
 
@@ -8,14 +9,22 @@ import type { RegionId } from "../patient/regions";
 import { REGION_LABELS } from "../patient/regions";
 import { loadOct28Conditions, loadTraumaLibrary } from "../data/loaders";
 import type { Sim } from "../sim/engine";
+import { TRUCK_BOXES } from "../sim/engine";
 import type { Holder } from "../sim/types";
 import type { CuffFit } from "../sim/exams";
-import { drugCatalog, formatDose, presentationMath } from "../sim/drugs";
+import { drugBoxFor, drugCatalog, formatDose, presentationMath } from "../sim/drugs";
 import { bvmRatePerMin, gttPerMin, tankMinutesLeft } from "../sim/airway";
-import { TalkClient } from "./talk";
-import { word } from "./wording";
+import { sayLine, word } from "./wording";
+import { buildDoll } from "./bodyDoll";
 
-export type Tab = "examine" | "airway" | "breathing" | "circulation" | "meds" | "lines" | "monitor" | "talk";
+export type Tab = "examine" | "airway" | "breathing" | "circulation" | "meds" | "lines" | "monitor";
+
+export interface MedicalMenuHooks {
+  /** Fires on every user-driven tab open (clicks and kit jumps). */
+  onTab?: (tab: Tab) => void;
+  /** Paper doll region pick. Wired to the same path as scene and chips. */
+  onSelectRegion?: (region: RegionId) => void;
+}
 
 const TAB_LABELS: Record<Tab, string> = {
   examine: "Examine",
@@ -24,8 +33,7 @@ const TAB_LABELS: Record<Tab, string> = {
   circulation: "Circulation",
   meds: "Meds",
   lines: "Lines",
-  monitor: "Monitor",
-  talk: "Talk"
+  monitor: "Monitor"
 };
 
 function el<T extends HTMLElement>(id: string): T {
@@ -66,8 +74,6 @@ export class MedicalMenu {
   private tabsNav = el("menu-tabs");
   private body = el("menu-body");
   private status = el("action-status");
-  private logBox = el("menu-log");
-  private readonly talkClient: TalkClient;
   private drugId = "fentanyl";
   private drugPres = 0;
   // Oct 30 run context for the report rows. Set by the phase flow.
@@ -77,21 +83,27 @@ export class MedicalMenu {
   // Kit side pass: section jumped to from a kit preview, static highlight.
   private kitFocus: string | null = null;
 
-  constructor(private readonly sim: Sim) {
-    this.talkClient = new TalkClient(sim);
+  constructor(
+    private readonly sim: Sim,
+    private readonly hooks: MedicalMenuHooks = {}
+  ) {
     this.tabsNav.innerHTML = "";
     for (const tab of Object.keys(TAB_LABELS) as Tab[]) {
       const button = document.createElement("button");
       button.type = "button";
       button.className = "tab-btn";
-      button.textContent = TAB_LABELS[tab];
+      button.dataset["tab"] = tab;
+      button.textContent = sayLine(TAB_LABELS[tab]);
       button.addEventListener("click", () => {
-        this.tab = tab;
-        this.render(true);
+        this.setTab(tab);
       });
       this.tabsNav.appendChild(button);
     }
     this.render(true);
+  }
+
+  get currentTab(): Tab {
+    return this.tab;
   }
 
   setRegion(region: RegionId | null): void {
@@ -103,6 +115,7 @@ export class MedicalMenu {
   setTab(tab: Tab): void {
     this.tab = tab;
     this.render(true);
+    this.hooks.onTab?.(tab);
   }
 
   /**
@@ -119,13 +132,6 @@ export class MedicalMenu {
     head?.scrollIntoView({ block: "start" });
   }
 
-  /** V key: open Talk and focus the patient line. */
-  openTalk(): void {
-    this.tab = "talk";
-    this.render(true);
-    document.getElementById("talk-input")?.focus();
-  }
-
   /** Oct 30 run context for the report rows. Updated by the phase flow. */
   setRunInfo(info: { level: string; destination: string; outcome: string }): void {
     this.runLevel = info.level;
@@ -138,11 +144,13 @@ export class MedicalMenu {
     this.render(true);
   }
 
-  /** The run report as a standalone element for the end screen. */
+  /**
+   * The run report as a standalone element for the end screen. Returned
+   * unworded: the flow overlay words it at show time, so toggling wording
+   * on the end screen rewords both directions instead of sticking.
+   */
   reportElement(): HTMLElement {
-    const report = this.buildReport();
-    word(report);
-    return report;
+    return this.buildReport();
   }
 
   /**
@@ -163,7 +171,8 @@ export class MedicalMenu {
       ["Blood lost", `${Math.round(s.loss_mL)} mL`],
       ["Bleed rate now", `${Math.round(rate)} mL/min${rate < 30 ? " (controlled)" : " (NOT controlled)"}`],
       ["Shock class", s.arrested ? "arrested" : s.vitals.atlsClass],
-      ["First hands on the bleed", firstHandsText(s)]
+      ["First hands on the bleed", firstHandsText(s)],
+      ["Blood sweep", s.sweepReport ?? "not done"]
     ];
     for (const [k, v] of rows) {
       const dt = document.createElement("dt");
@@ -213,11 +222,13 @@ export class MedicalMenu {
       s.airway.ett?.secured ?? false, s.airway.soiled, s.airway.vomited,
       s.o2.device, Math.round(s.o2.tankPsi / 50), s.o2.reservoirInflated,
       s.bvm.breaths.length, Math.round(s.bvm.gastric_0_to_10),
-      s.fluids.lines.map((l) => `${l.id}:${l.kind}:${l.infiltrated}:${Math.round(l.bag?.volumeLeft_mL ?? -1)}`).join(","),
+      s.fluids.lines.map((l) => `${l.id}:${l.kind}:${l.infiltrated}:${Math.round(l.bag?.volumeLeft_mL ?? -1)}:${l.ySet === null ? "noy" : `y${l.ySet.unitsHung}/${Math.round(l.ySet.nsLeft_mL)}`}:${l.warmerOn}:${l.dripSetOn}`).join(","),
+      [...s.stagedBoxes].sort().join(","),
+      s.boxTrips.map((t) => `${t.boxes.join("+")}:${t.remaining_s}`).join(","),
       s.drugs.active.length, s.drugs.flags.length,
       Object.keys(s.observed).length,
-      s.monitor.spo2Attached, s.monitor.etco2Attached,
-      s.level, this.talkClient.turns.length, this.talkClient.sending,
+      s.monitor.spo2Attached, s.monitor.etco2Attached, s.defibPadsOn,
+      s.level,
       this.drugId, this.drugPres
     ].join("|");
   }
@@ -225,8 +236,10 @@ export class MedicalMenu {
   private render(force: boolean): void {
     void force;
     this.signature = this.stateSignature();
-    for (const btn of this.tabsNav.querySelectorAll(".tab-btn")) {
-      btn.classList.toggle("active", btn.textContent === TAB_LABELS[this.tab]);
+    for (const btn of this.tabsNav.querySelectorAll<HTMLElement>(".tab-btn")) {
+      const id = btn.dataset["tab"] as Tab | undefined;
+      if (id !== undefined) btn.textContent = sayLine(TAB_LABELS[id]);
+      btn.classList.toggle("active", id === this.tab);
     }
     this.body.innerHTML = "";
     if (this.tab === "examine") this.renderExamine();
@@ -235,8 +248,7 @@ export class MedicalMenu {
     else if (this.tab === "circulation") this.renderCirculation();
     else if (this.tab === "meds") this.renderMeds();
     else if (this.tab === "lines") this.renderLines();
-    else if (this.tab === "monitor") this.renderMonitor();
-    else this.renderTalk();
+    else this.renderMonitor();
     this.renderStatus();
   }
 
@@ -250,14 +262,6 @@ export class MedicalMenu {
     if (s.o2.tankPsi <= 200 && s.o2.device !== "none") bits.push("O2: TANK EMPTY");
     this.status.textContent = bits.join(" - ");
     word(this.status);
-    const tail = s.log.slice(-3);
-    this.logBox.innerHTML = "";
-    for (const e of tail) {
-      const div = document.createElement("div");
-      div.textContent = `T+${fmtClock(e.t_s)} [${e.kind}] ${e.text}`;
-      this.logBox.appendChild(div);
-      word(div);
-    }
   }
 
   // - shared widgets -
@@ -379,6 +383,15 @@ export class MedicalMenu {
   private renderExamine(): void {
     const s = this.sim;
     const region = this.region;
+    this.section("Body view");
+    this.body.appendChild(
+      buildDoll(s, region, (picked) => {
+        this.hooks.onSelectRegion?.(picked);
+      })
+    );
+    this.section("Blood sweep");
+    this.note("A fast 12-second look for immediate wounds, bleeding and tenderness. Region exams still find the rest.");
+    this.action("Blood sweep (12s)", () => s.bloodSweep());
     this.section(region ? `Examine: ${REGION_LABELS[region]}` : "Examine");
 
     if (region === null) {
@@ -436,7 +449,7 @@ export class MedicalMenu {
     }
     this.action("Remove wet clothing (45s)", () => s.removeWetClothing());
     this.action(`Wrap for hypothermia (30s, blankets: ${s.atPatient("hypothermia_wrap_blanket")})`, () => s.applyWrap());
-    this.note(`Talk to ${s.patientName} on the Talk tab (V). Airway sizing, O2, lines and drugs live in their tabs.`);
+    this.note(`Talk to ${s.patientName} in the chat dock (V). Airway sizing, O2, lines and drugs live in their tabs.`);
   }
 
   // - Airway -
@@ -776,8 +789,8 @@ export class MedicalMenu {
           { value: "junctional_tourniquet_samjt", label: "SAM JT" },
           { value: "hypothermia_wrap_blanket", label: "Wrap blanket" },
           { value: "o2_tank_m", label: "O2 M cylinder" },
-          { value: "whole_blood_unit", label: "Whole blood" },
-          { value: "blood_tubing_filter", label: "Blood tubing" },
+          { value: "whole_blood_unit", label: `Whole blood (here ${s.atPatient("whole_blood_unit")}, truck ${s.cabinetLeft("whole_blood_unit")})` },
+          { value: "y_tubing_blood", label: `Y tubing (here ${s.atPatient("y_tubing_blood")}, truck ${s.cabinetLeft("y_tubing_blood")})` },
           { value: "fluid_warmer", label: "Fluid warmer" },
           { value: "cpap_unit", label: "CPAP" }
         ]
@@ -792,6 +805,22 @@ export class MedicalMenu {
     this.action("Fetch from the truck (50s round trip)", () =>
       s.fetchFromTruck(fetchSel.get("item")?.value ?? "cat_tourniquet", (fetchSel.get("runner")?.value ?? "partner") as Holder)
     );
+
+    this.section("Truck: stage boxes at the patient");
+    this.note("One partner trip (50s) brings the whole box. A box joins a trip already running. Narc, RSI, and critical care drugs stay locked until their box stages.");
+    for (const trip of s.boxTrips) {
+      const labels = trip.boxes.map((id) => TRUCK_BOXES.find((b) => b.id === id)?.label ?? id).join(", ");
+      this.note(`Partner trip running: ${labels} (${trip.remaining_s}s left).`);
+    }
+    for (const box of TRUCK_BOXES) {
+      if (s.stagedBoxes.has(box.id)) {
+        this.note(`${box.label}: staged at the patient.`);
+      } else if (s.boxTrips.some((t) => t.boxes.includes(box.id))) {
+        this.note(`${box.label}: on the way.`);
+      } else {
+        this.action(`Partner: bring the ${box.label} (50s)`, () => s.stageBox(box.id));
+      }
+    }
   }
 
   // - Medications (minimal prep loop) -
@@ -816,7 +845,10 @@ export class MedicalMenu {
     this.selects([
       {
         id: "drug", label: "Drug", current: this.drugId,
-        options: catalog.usable.map((u) => ({ value: u.drug.id, label: u.drug.name })),
+        options: catalog.usable.map((u) => {
+          const box = drugBoxFor(u.drug.location);
+          return { value: u.drug.id, label: box === null ? u.drug.name : `${u.drug.name} (in ${box.label})` };
+        }),
         onPick: (value) => {
           this.drugId = value;
           this.drugPres = 0;
@@ -867,6 +899,10 @@ export class MedicalMenu {
       const lineId = lineMap === null ? null : Number(lineMap.get("line")?.value ?? "-1");
       return s.prepPush(usable.drug.id, presEntry.index, Number(amountInput.value), syrSel.get("syr")?.value ?? "syringe_10ml", lineId);
     });
+    const needBox = drugBoxFor(usable.drug.location);
+    if (needBox !== null && !s.stagedBoxes.has(needBox.id)) {
+      this.action(`Partner: bring the ${needBox.label} (50s)`, () => s.stageBox(needBox.id));
+    }
 
     this.section("On board");
     if (s.drugs.active.length === 0) this.note("No active drugs.");
@@ -888,9 +924,19 @@ export class MedicalMenu {
         ? "no bag"
         : `${line.bag.fluid} ${Math.round(line.bag.volumeLeft_mL)}/${line.bag.volumeTotal_mL} mL (${line.bag.drip})`;
       const gtt = line.bag === null ? "" : ` ${Math.round(gttPerMin(line.flow_mL_per_min * 60, line.bag.drip === "micro60" ? 60 : 15))} gtt/min ref`;
+      const device = line.gauge !== undefined
+        ? ` ${line.gauge}g`
+        : line.site === "sternal"
+          ? " (FAST1)"
+          : ` ${line.needle_mm}mm`;
+      const ySet = line.ySet === null
+        ? ""
+        : `, Y set ${line.ySet.unitsHung}/4 units, NS ${Math.round(line.ySet.nsLeft_mL)} mL` +
+          `${line.warmerOn ? ", warmer 38 C" : ""}`;
       this.note(
-        `Line ${line.id}: ${line.kind} ${line.site}${line.gauge !== undefined ? ` ${line.gauge}g` : ` ${line.needle_mm}mm`}` +
-          `${line.infiltrated ? " INFILTRATED" : ""}${line.pressureBag ? " +pressure bag" : ""}, ` +
+        `Line ${line.id}: ${line.kind} ${line.site}${device}` +
+          `${line.infiltrated ? " INFILTRATED" : ""}${line.pressureBag ? " +pressure bag" : ""}` +
+          `${line.dripSetOn ? " +drip set" : ""}${ySet}, ` +
           `${Math.round(line.flow_mL_per_min)} mL/min, ${bag}.${gtt}`
       );
     }
@@ -920,11 +966,13 @@ export class MedicalMenu {
 
     this.section("Start IO (30s, 95 percent)");
     this.note(`${s.patientName}: 25 mm tibial, 45 mm humeral. No fracture, burn, prior IO or prosthesis at either site.`);
+    this.note(`Sternal: FAST1, no drill, device sets depth, one attempt per patient (have ${s.atPatient("io_fast1")}). Sternal values are TUNE and need medic sign-off.`);
     const ioSel = this.selects([
       {
         id: "site", label: "Site", options: [
           { value: "tibial", label: "Tibial" },
-          { value: "humeral", label: "Humeral" }
+          { value: "humeral", label: "Humeral" },
+          { value: "sternal", label: "Sternal (FAST1)" }
         ]
       },
       {
@@ -940,13 +988,15 @@ export class MedicalMenu {
         ]
       }
     ]);
-    this.action("Drill IO", () =>
-      s.startIo(
-        (ioSel.get("site")?.value ?? "tibial") as "tibial" | "humeral",
+    this.action("Place IO", () => {
+      const site = ioSel.get("site")?.value ?? "tibial";
+      if (site === "sternal") return s.startSternalIo(ioSel.get("lido")?.value === "yes");
+      return s.startIo(
+        site as "tibial" | "humeral",
         Number(ioSel.get("needle")?.value ?? "25"),
         ioSel.get("lido")?.value === "yes"
-      )
-    );
+      );
+    });
 
     this.section("Fluids (explicit volumes)");
     const running = s.fluids.lines.filter((l) => l.patent && !l.infiltrated);
@@ -960,8 +1010,7 @@ export class MedicalMenu {
         {
           id: "fluid", label: "Bag", options: [
             { value: "ns", label: `NS 1 L (have ${s.atPatient("ns_1000ml")})` },
-            { value: "lr", label: `LR 1 L (have ${s.atPatient("lr_1000ml")})` },
-            { value: "blood", label: `Whole blood (truck ${s.cabinetLeft("whole_blood_unit")})` }
+            { value: "lr", label: `LR 1 L (have ${s.atPatient("lr_1000ml")})` }
           ]
         },
         {
@@ -973,10 +1022,10 @@ export class MedicalMenu {
           ]
         }
       ]);
-      this.action("Hang bag (30s)", () =>
+      this.action("Hang bag (30s, 20s on a set line)", () =>
         s.hangFluids(
           Number(hangSel.get("line")?.value ?? "-1"),
-          (hangSel.get("fluid")?.value ?? "ns") as "ns" | "lr" | "blood",
+          (hangSel.get("fluid")?.value ?? "ns") as "ns" | "lr",
           hangSel.get("drip")?.value ?? "macro15"
         )
       );
@@ -987,7 +1036,39 @@ export class MedicalMenu {
       ]);
       this.action("Apply pressure bag (300 mmHg)", () => s.applyPressureBag(Number(pbSel.get("line")?.value ?? "-1")));
     }
-    this.note("Blood needs blood tubing with a filter plus the warmer at 38 C (both truck fetch). Crystal: +1 L now, ~250 mL at 60 min.");
+    this.note("First bag on a line spikes the drip set; later bags reuse it and hang in 20 s. Crystal: +1 L now, ~250 mL at 60 min.");
+
+    this.section("Blood (Y tubing + warmer)");
+    this.note(
+      `Prime needs a Y set (here ${s.atPatient("y_tubing_blood")}, truck ${s.cabinetLeft("y_tubing_blood")}), ` +
+        `NS 250 (have ${s.atPatient("ns_250ml")}, else NS 1 L), and the warmer. ` +
+        `Whole blood: here ${s.atPatient("whole_blood_unit")}, truck ${s.cabinetLeft("whole_blood_unit")}. ` +
+        `Set stays on the line: up to 4 units or 4 h (TUNE), then replace it. Only NS and blood run on a Y line.`
+    );
+    if (running.length === 0) {
+      this.note("Prime and hang once a line is in.");
+    } else {
+      const bloodSel = this.selects([
+        {
+          id: "line", label: "Line", options: running.map((l) => ({ value: String(l.id), label: `Line ${l.id}` }))
+        },
+        {
+          id: "units", label: "Units", options: [
+            { value: "1", label: "1 unit (500 mL)" },
+            { value: "2", label: "2 units back to back (1,000 mL)" }
+          ]
+        }
+      ]);
+      const bloodLine = (): number => Number(bloodSel.get("line")?.value ?? "-1");
+      this.action("Prime Y tubing + warmer (45s)", () => s.primeYSet(bloodLine()));
+      this.action("Hang blood (30s)", () =>
+        s.hangBloodUnits(bloodLine(), bloodSel.get("units")?.value === "2" ? 2 : 1)
+      );
+      this.action("Replace the Y set (45s)", () => s.replaceYSet(bloodLine()));
+      if (!s.stagedBoxes.has("box_blood_kit")) {
+        this.action("Partner: bring the Blood kit (50s)", () => s.stageBox("box_blood_kit"));
+      }
+    }
     if (s.fluids.lines.length > 0) {
       const pullSel = this.selects([
         {
@@ -1059,11 +1140,14 @@ export class MedicalMenu {
     this.action("Attach SpO2 probe", () => s.attachSpo2());
     this.action("Read SpO2 (15s)", () => s.readSpo2());
     this.action("Attach waveform EtCO2", () => s.attachEtco2());
+    if (s.defibPadsOn) this.note("Defib pads on.");
+    this.action("Stick defib pads (monitor only)", () => s.attachDefibPads());
     this.action("NIBP auto cycle (40s)", () => s.runNibp());
 
     this.section("Manual vitals");
     this.action("Pulse: radial/carotid (20s, 60s if irregular)", () => s.checkPulse());
     this.action("RR: watch chest (30s, do not announce)", () => s.checkRR());
+    this.note("Counting breaths right after talking reads +4: the patient knows you are watching.");
     const bpSel = this.selects([
       {
         id: "cuff", label: "Cuff", options: [
@@ -1103,65 +1187,4 @@ export class MedicalMenu {
     this.action("GCS eyes/verbal/motor (20s)", () => s.checkGcs());
   }
 
-  // - Talking patient -
-
-  private renderTalk(): void {
-    const client = this.talkClient;
-    this.section(`Talk to ${this.sim.patientName} (V)`);
-    this.note("Short questions get short answers. Speech follows patient state: pain, tourniquet, breathing, confusion.");
-    const box = document.createElement("div");
-    box.className = "talk-log";
-    if (client.turns.length === 0) {
-      const empty = document.createElement("div");
-      empty.className = "talk-empty";
-      empty.textContent = "He is watching you work. Say something.";
-      box.appendChild(empty);
-    }
-    for (const turn of client.turns.slice(-10)) {
-      const div = document.createElement("div");
-      div.className = turn.from === "player" ? "talk-player" : "talk-josh";
-      div.textContent = `${turn.from === "player" ? "You" : this.sim.patientName}: ${turn.text}`;
-      box.appendChild(div);
-    }
-    if (client.sending) {
-      const typing = document.createElement("div");
-      typing.className = "talk-josh talk-typing";
-      typing.textContent = `${this.sim.patientName}: ...`;
-      box.appendChild(typing);
-    }
-    this.body.appendChild(box);
-
-    const row = document.createElement("div");
-    row.className = "talk-row";
-    const input = document.createElement("input");
-    input.id = "talk-input";
-    input.type = "text";
-    input.maxLength = 300;
-    input.placeholder = "What happened? How bad is the pain?";
-    input.autocomplete = "off";
-    const send = document.createElement("button");
-    send.type = "button";
-    send.className = "talk-send";
-    send.textContent = "Ask";
-    const submit = (): void => {
-      const text = input.value;
-      if (text.trim() === "") return;
-      input.value = "";
-      void client.send(text).then(() => {
-        if (this.tab === "talk") this.render(true);
-      });
-      this.render(true);
-    };
-    send.addEventListener("click", submit);
-    input.addEventListener("keydown", (event) => {
-      if (event.key === "Enter") {
-        event.preventDefault();
-        submit();
-      }
-      event.stopPropagation();
-    });
-    row.append(input, send);
-    this.body.appendChild(row);
-    this.note("Counting his breaths right after talking reads +4: he knows you are watching.");
-  }
 }

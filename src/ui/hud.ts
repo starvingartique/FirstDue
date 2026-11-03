@@ -5,7 +5,7 @@
 import { REGION_IDS, REGION_LABELS, type RegionId } from "../patient/regions";
 import type { SpotId } from "../engine/camera";
 import type { FixedCall } from "../data/types";
-import { getWording, type WordingMode } from "./wording";
+import { getWording, sayLine, type WordingMode } from "./wording";
 
 export interface HudHandlers {
   onSelectRegion: (region: RegionId) => void;
@@ -23,6 +23,7 @@ function el<T extends HTMLElement>(id: string): T {
 export class Hud {
   private title = el("call-title");
   private clock = el("clock");
+  private vitalsPill = el("vitals-pill");
   private regionTitle = el("region-title");
   private regionSub = el("region-sub");
   private chips = el("region-chips");
@@ -31,6 +32,8 @@ export class Hud {
   private packageButton = el<HTMLButtonElement>("package-btn");
   private wordingButton = el<HTMLButtonElement>("wording-btn");
   private wording: WordingMode = getWording();
+  private lastRegion: RegionId | null = null;
+  private lastVitals: string | null = null;
 
   constructor(handlers: HudHandlers) {
     this.packageButton.addEventListener("click", () => handlers.onPackage());
@@ -41,7 +44,7 @@ export class Hud {
       const button = document.createElement("button");
       button.type = "button";
       button.className = "chip";
-      button.textContent = REGION_LABELS[region];
+      button.textContent = sayLine(REGION_LABELS[region]);
       button.addEventListener("click", () => handlers.onSelectRegion(region));
       this.chips.appendChild(button);
       this.chipButtons.set(region, button);
@@ -68,12 +71,13 @@ export class Hud {
   }
 
   showRegion(region: RegionId | null): void {
+    this.lastRegion = region;
     if (region === null) {
-      this.regionTitle.textContent = "No region selected";
-      this.regionSub.textContent = "Click a body region, or pick a tab below.";
+      this.regionTitle.textContent = sayLine("No region selected");
+      this.regionSub.textContent = sayLine("Click a body region, or pick a tab below.");
     } else {
-      this.regionTitle.textContent = `Region: ${REGION_LABELS[region]}`;
-      this.regionSub.textContent = "Examine tab follows this region. Other tabs hold the kit.";
+      this.regionTitle.textContent = sayLine(`Region: ${REGION_LABELS[region]}`);
+      this.regionSub.textContent = sayLine("Examine tab follows this region. Other tabs hold the kit.");
     }
     for (const [id, button] of this.chipButtons) {
       button.classList.toggle("active", id === region);
@@ -87,6 +91,22 @@ export class Hud {
   showWording(mode: WordingMode): void {
     this.wording = mode;
     this.wordingButton.textContent = mode === "medical" ? "Wording: Medical" : "Wording: Plain";
+  }
+
+  /** Persistent monitor pill: null hides it. Engine numbers only. */
+  showVitals(text: string | null): void {
+    this.lastVitals = text;
+    this.vitalsPill.hidden = text === null;
+    if (text !== null) this.vitalsPill.textContent = sayLine(text);
+  }
+
+  /** Wording mode changed: reword chips, region panel and vitals pill. */
+  reword(): void {
+    for (const [id, button] of this.chipButtons) {
+      button.textContent = sayLine(REGION_LABELS[id]);
+    }
+    this.showRegion(this.lastRegion);
+    this.showVitals(this.lastVitals);
   }
 
   showSpot(spot: SpotId): void {

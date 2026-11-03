@@ -19,7 +19,7 @@
 
 #partner-hint {
   position: absolute;
-  top: 56px;
+  top: 108px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 30;
@@ -256,6 +256,18 @@
   padding: 8px 10px;
   font-size: 14px;
   font-family: inherit;
+}
+
+.flow-debrief-text {
+  white-space: pre-wrap;
+  max-height: 320px;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  font-size: 13px;
+  line-height: 1.5;
 }
 
 .flow-seed {

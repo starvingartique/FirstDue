@@ -12,6 +12,7 @@
       <header id="hud-top">
         <div id="call-title">Loading call data...</div>
         <div id="clock">T+00:00 since contact</div>
+        <div id="vitals-pill" hidden></div>
         <nav id="spot-nav" aria-label="Camera spots">
           <button type="button" data-spot="patient" class="spot-btn active">1 Patient</button>
           <button type="button" data-spot="kit" class="spot-btn">2 Kit bags</button>
@@ -20,22 +21,31 @@
         <button type="button" id="wording-btn" class="spot-btn" title="Medical or everyday words">Wording: Medical</button>
         <button type="button" id="package-btn" class="spot-btn" title="Package for transport (G)" hidden>Package</button>
       </header>
+      <div id="march-strip" hidden></div>
       <div id="partner-hint" hidden></div>
       <div id="flow-overlay" hidden></div>
-      <aside id="region-panel" aria-live="polite">
-        <div id="region-title">No region selected</div>
-        <div id="region-sub">Click a body region, or pick Examine / Circulation below.</div>
-        <nav id="menu-tabs" aria-label="Medical menu"></nav>
-        <div id="menu-body"></div>
-        <div id="action-status">T+00:00 - Hands free</div>
-        <div id="menu-log" aria-label="Recent events"></div>
-        <div id="region-chips" aria-label="Body regions"></div>
-      </aside>
+      <div id="left-col">
+        <aside id="region-panel" aria-live="polite">
+          <div id="region-title">No region selected</div>
+          <div id="region-sub">Click a body region, or pick Examine / Circulation below.</div>
+          <nav id="menu-tabs" aria-label="Medical menu"></nav>
+          <div id="menu-body"></div>
+          <div id="action-status">T+00:00 - Hands free</div>
+          <div id="region-chips" aria-label="Body regions"></div>
+        </aside>
+        <div id="chat-dock" hidden></div>
+      </div>
       <aside id="debug-overlay" hidden>
         <h2>DEBUG - live engine state</h2>
         <dl id="debug-vitals"></dl>
         <p id="debug-note">True state, ticking every sim-second. Hidden from the player; F1 only.</p>
       </aside>
+      <div id="tips-bubble" hidden></div>
+      <aside id="scene-log" hidden>
+        <div class="scene-log-head">Actions</div>
+        <div id="scene-log-rows" aria-label="Recent actions"></div>
+      </aside>
+      <div id="speed-bar" hidden></div>
       <footer id="hud-bottom">
         <span>Drag to look - Click body to select - 1/2/3 camera - V talk - G package - F1 debug</span>
       </footer>

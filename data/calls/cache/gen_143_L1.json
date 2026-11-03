@@ -1,0 +1,107 @@
+{
+  "id": "gen_143_L1",
+  "seed": 143,
+  "patient": {
+    "name": "Marcus T.",
+    "nameLocked": false,
+    "age": 30,
+    "sex": "M",
+    "weight_kg": 95,
+    "weightNote": "V1: weight is narrative-only; the engine runs 80 kg adult physiology for every patient.",
+    "complaint": "assault"
+  },
+  "dispatch": {
+    "nature": "Assault",
+    "address": "14 Maple Ct, Apt B",
+    "cadText": "Caller says husband was hit in home bathroom, bleeding from face. Caller thinks maybe he fell and hit sink, not sure. Door was locked at first, now open. Night call, indoor.",
+    "updates": [
+      "Caller crying, hard to understand, says patient is awake and scared"
+    ]
+  },
+  "scene": {
+    "location": "bathroom",
+    "timeOfDay": "night",
+    "weather": "indoor",
+    "mechanism": "struck_by_against",
+    "mechanismSubtype": "assault_blunt",
+    "hazards": [
+      "confined space",
+      "locked door"
+    ],
+    "description": "Small home bathroom at night. Tight space, wet tile floor, locked door now ajar. Patient sitting against tub."
+  },
+  "backstory": "Fearful and jumpy, voice shaky and short answers at first. Holds towel to face and keeps looking toward the door. Calms a little with steady reassurance but startles with sudden movement.",
+  "injuries": [],
+  "conditions": [
+    "crash_stress_offset"
+  ],
+  "conditionsNote": "Dispatch Engine v1: generatorReady conditions only; see skeleton.",
+  "marchFocus": [
+    "R",
+    "C",
+    "H",
+    "P"
+  ],
+  "bystander": {
+    "archetypeId": "panicked_spouse",
+    "label": "Panicked spouse",
+    "notes": "Hovers, cries, answers in fragments, needs one clear job or keeps crowding your workspace."
+  },
+  "levels": [
+    1
+  ],
+  "skeleton": {
+    "version": "dispatch-v1",
+    "seed": 143,
+    "level": 1,
+    "complaintId": "assault",
+    "mechanismId": "struck_by_against",
+    "subtypeId": "assault_blunt",
+    "conditionIds": [
+      "crash_stress_offset"
+    ],
+    "patient": {
+      "age": 30,
+      "sex": "M",
+      "weight_kg": 95
+    },
+    "comorbidityIds": [],
+    "homeMeds": [],
+    "environmentId": "bathroom_home",
+    "timeOfDay": "night",
+    "weather": "indoor",
+    "bystanderId": "panicked_spouse",
+    "complication": null
+  },
+  "persona": "Fearful and jumpy, voice shaky and short answers at first. Holds towel to face and keeps looking toward the door. Calms a little with steady reassurance but startles with sudden movement.",
+  "historyCard": {
+    "SAMPLE": {
+      "signs_symptoms": "Face pain and nosebleed after being struck, says he feels shaky with fear",
+      "allergies": "No known allergies",
+      "medications": "Takes no daily medications",
+      "past_history": "No major medical history reported",
+      "last_meal": "Dinner a few hours ago, does not remember exactly",
+      "events": "Says someone struck him in bathroom during an argument, then he fell against sink"
+    },
+    "OPQRST": {
+      "onset": "Started just before call when he was struck",
+      "provokes": "Touch and movement make face pain worse",
+      "quality": "Achy throbbing face pain with pressure",
+      "radiates": "Pain stays in nose and cheek, headache from fear and stress",
+      "severity_words": "Worst pain of his life in his face, very frightened",
+      "time": "Pain constant since it happened a short time ago"
+    },
+    "secrets": [
+      {
+        "fact": "Knows who hit him but afraid to say in front of spouse, will name person if asked privately about safety",
+        "revealWhen": "Are you safe at home or who did this to you"
+      }
+    ]
+  },
+  "bystanderLines": [
+    "Please please help him - there is so much blood - do something!",
+    "I - I heard a bang - I could not get the door - I did not - oh god!"
+  ],
+  "expectedPathway": "Ensure scene safety and separate parties if needed. Control facial bleeding with direct pressure, assess airway, breathing, and mental status. Expose for other injury while respecting privacy, support c-spine if mechanism suggests. Calm patient, screen for safety and domestic violence privately, notify law enforcement per protocol, transport for evaluation.",
+  "complication": null
+}

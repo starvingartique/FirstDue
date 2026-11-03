@@ -295,6 +295,9 @@ function calmAirway(sim: Sim): void {
   // TQ pain (+3) is real: reset to a clean 8 before the analgesia check.
   a.pain_0_to_10 = 8;
   const lineId = a.fluids.lines[0]?.id ?? -1;
+  // Fentanyl lives in the Narc box: stage it before the push.
+  a.stageBox("box_narc");
+  tick(a, 50);
   // Fentanyl vial is 50 mcg/mL: 1.6 mL = 80 mcg = 1x.
   a.prepPush("fentanyl", 0, 1.6, "syringe_3ml", lineId);
   finishPending(a);
@@ -307,6 +310,8 @@ function calmAirway(sim: Sim): void {
   b.startIo("tibial", 25, true);
   finishPending(b);
   const line2 = b.fluids.lines[0]?.id ?? -1;
+  b.stageBox("box_narc");
+  tick(b, 50);
   b.prepPush("fentanyl", 0, 4.8, "syringe_3ml", line2);
   finishPending(b);
   check("3x dose flags toxicity", b.drugs.active[0]?.toxic === true && b.drugs.flags.length > 0, b.drugs.flags[0] ?? "none");

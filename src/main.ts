@@ -18,9 +18,15 @@ import type { RegionId } from "./patient/regions";
 import { Hud } from "./ui/hud";
 import { DebugOverlay } from "./ui/debug";
 import { MedicalMenu } from "./ui/medicalMenu";
+import { ChatDock } from "./ui/chatDock";
+import { SpeedBar } from "./ui/speedBar";
+import { MarchStrip } from "./ui/marchStrip";
+import { TipsBubble } from "./ui/tipsBubble";
+import { SceneLog } from "./ui/sceneLog";
 import { KIT_LINKS, KitLabels } from "./ui/kitLabels";
 import { getWording, setWording, type WordingMode } from "./ui/wording";
 import { RunFlow, evaluateHandoff, type HandoffCheck } from "./ui/flow";
+import { BIKE_DOWN_PATHWAY } from "./ui/debrief";
 import type { Sim } from "./sim/engine";
 import { newBikeDownSim } from "./sim/scenario";
 import { newGeneratedSim } from "./dispatch/instantiate";
@@ -34,6 +40,19 @@ function showBootError(message: string): void {
   if (box === null) return;
   box.hidden = false;
   box.textContent = `Startup failed: ${message}`;
+}
+
+/**
+ * Persistent vitals pill text. Shows while the pulse ox probe or defib pads
+ * are on: pleth HR plus the lagged monitor SpO2, engine numbers only. Null
+ * hides the pill. No new vital is invented here.
+ */
+function vitalsPillText(s: Sim): string | null {
+  if (!s.monitor.spo2Attached && !s.defibPadsOn) return null;
+  const spo2 = s.monitorSpo2();
+  const spo2Text =
+    spo2 === null ? "--" : "none" in spo2 ? "no pleth" : `${spo2.value}`;
+  return `HR ${s.vitals.hr_bpm} - SpO2 ${spo2Text}`;
 }
 
 function arrestReason(phase: string): string {
@@ -65,6 +84,7 @@ function main(): void {
   let sim: Sim | null = null;
   let menu: MedicalMenu | null = null;
   let debug: DebugOverlay | null = null;
+  let acceptedCall: FixedCall | null = null;
 
   // Kit labels and preview. Item taps open existing menu tabs only.
   const kitRoot = scene.getObjectByName("kit");
@@ -85,6 +105,15 @@ function main(): void {
   const hands = new ProcedureHands(kitRoot);
   scene.add(hands.group);
 
+  // Left chat dock under the menu: talk while working the menu. Bound to
+  // the sim on dispatch accept, hidden before that and on the end screen.
+  const dock = new ChatDock();
+  // UI pass panels: speed bar, MARCH strip, L1 tips bubble, scene log.
+  const speed = new SpeedBar();
+  const march = new MarchStrip();
+  const tips = new TipsBubble();
+  const sceneLog = new SceneLog();
+
   const hud = new Hud({
     onSelectRegion: (region: RegionId) => {
       highlight.setSelected(region);
@@ -100,8 +129,11 @@ function main(): void {
     onWording: (mode: WordingMode) => {
       setWording(mode);
       hud.showWording(mode);
+      hud.reword();
       menu?.reword();
       kitLabels.reword();
+      tips.reword();
+      if (menu !== null && flow.phase === "end") flow.refreshEndReport(menu.reportElement());
     }
   });
   hud.showWording(getWording());
@@ -114,12 +146,22 @@ function main(): void {
   const finishEnd = (win: boolean, checks: HandoffCheck[]): void => {
     if (sim === null || menu === null) return;
     hud.showPackage(false);
+    dock.setVisible(false);
+    speed.setVisible(false);
+    march.bind(null);
+    tips.bind(null);
+    sceneLog.bind(null);
     menu.setRunInfo({
       level: flow.record.levelLabel,
       destination: flow.record.destinationLabel,
       outcome: win ? "Win" : "Lose"
     });
-    flow.showEnd({ sim, win, checks, report: menu.reportElement() });
+    const fleshed = acceptedCall as FleshedCall | null;
+    const pathway =
+      fleshed !== null && typeof fleshed.expectedPathway === "string" && fleshed.expectedPathway !== ""
+        ? fleshed.expectedPathway
+        : BIKE_DOWN_PATHWAY;
+    flow.showEnd({ sim, win, checks, report: menu.reportElement(), pathway });
   };
   const endRunLost = (reason: string): void => {
     if (flow.phase === "end" || sim === null) return;
@@ -199,7 +241,7 @@ function main(): void {
       kitLabels.setSpot(spot);
     },
     onDebugKey: () => debug?.toggle(),
-    onTalkKey: () => menu?.openTalk(),
+    onTalkKey: () => dock.focus(),
     onPackageKey: () => openPackage()
   });
 
@@ -232,11 +274,24 @@ function main(): void {
           return;
         }
         hud.showCall(accepted);
+        acceptedCall = accepted;
         s.setLevel(level);
         s.addLog("info", `Level chosen: ${flow.record.levelLabel}.`);
         sim = s;
         debug = new DebugOverlay(s);
-        menu = new MedicalMenu(s);
+        dock.bind(s);
+        speed.setVisible(true);
+        march.bind(s);
+        tips.bind(s);
+        sceneLog.bind(s);
+        menu = new MedicalMenu(s, {
+          onTab: (tab) => tips.show(tab),
+          onSelectRegion: (region) => {
+            highlight.setSelected(region);
+            hud.showRegion(highlight.getSelected());
+            menu?.setRegion(highlight.getSelected());
+          }
+        });
         menu.setRunInfo({ level: flow.record.levelLabel, destination: "not chosen", outcome: "run in progress" });
         spotCamera.applySpot("patient");
         hud.showSpot("patient");
@@ -250,14 +305,21 @@ function main(): void {
           patient,
           sim: s,
           onResize: () => spotCamera.onResize(),
-          paused: () => flow.tickingSuspended,
+          paused: () => flow.tickingSuspended || speed.isPaused(),
+          rate: () => speed.getRate(),
           onFrame: () => {
             kitLabels.update(spotCamera.camera);
             hands.update(spotCamera.camera, s.pending);
+            dock.setVisible(flow.phase !== "end");
           },
           onTick: () => {
             hud.showClock(s.t_s);
+            hud.showVitals(vitalsPillText(s));
             m.refresh();
+            dock.refresh();
+            march.refresh();
+            sceneLog.refresh();
+            dock.tickUnprompted(flow.phase === "sizeup" || flow.phase === "care");
             flow.updateHint(s);
             if (
               s.arrested &&
@@ -271,6 +333,7 @@ function main(): void {
         flow.showSizeup(s, () => {
           flow.hideOverlay();
           hud.showPackage(true);
+          tips.show(m.currentTab);
         });
       },
       onGenerate: async (seedText: string) => {
