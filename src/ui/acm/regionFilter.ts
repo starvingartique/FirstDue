@@ -67,6 +67,16 @@ export function rowRegions(category: AcmCategory, rowId: string): RegionId[] | n
   return null;
 }
 
+/**
+ * Categories that render their full content under any region pick.
+ * Meds only: no drug carries a body-region link in code, so filtering
+ * would zero the whole tab for being systemic. Implemented from scratch
+ * Nov 3 night.
+ */
+export function categoryIgnoresRegion(category: AcmCategory): boolean {
+  return category === "meds";
+}
+
 /** True when a row shows for the open region. Null region shows all. */
 export function rowAllowed(category: AcmCategory, rowId: string, region: RegionId | null): boolean {
   if (region === null) return true;

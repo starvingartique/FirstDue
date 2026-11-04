@@ -1,12 +1,12 @@
 // ACM center body image, implemented from scratch Nov 3. The same 15
 // regions as the paper doll, drawn bigger to fill the column. Default
 // orientation is patient-left on viewer-left (Carlos's choice); the ACE
-// orientation setting mirrors the figure. Regions paint by state: visible
-// bleeding uses the ACE blood scale after the part is examined (before
-// that, only the blood pool hint shows), examined findings use the damage
-// scale, unexamined parts stay dark. Icons mirror engine state only:
-// TQ bands with written time, belt, packing, dressing, pressure, lines,
-// O2 mask, airway marker, SpO2 dot, and the wrapped outline.
+// orientation setting mirrors the figure. Regions paint by state: the
+// bleeding thigh uses the shared ACE blood scale live, examined findings
+// use the damage scale, unexamined parts stay dark. Icons mirror engine
+// state only: TQ bands with written time, belt, packing, dressing,
+// pressure, lines, O2 mask, airway marker, SpO2 dot, and the wrapped
+// outline.
 
 import type { RegionId } from "../../patient/regions";
 import { REGION_IDS, REGION_LABELS } from "../../patient/regions";
@@ -20,9 +20,9 @@ type DollShape =
   | { kind: "rect"; x: number; y: number; w: number; h: number };
 import { sayLine } from "../wording";
 import {
+  bleedFillForRegion,
   bleedTierForRate,
   bloodStepColor,
-  bloodStepForTier,
   damageStepColor,
   fmtBandTime
 } from "./format";
@@ -82,15 +82,19 @@ function titleEl(text: string): SVGTitleElement {
   return t;
 }
 
-/** Region fill: bleed scale when examined and bleeding, else damage/base. */
+/**
+ * Region fill: the shared bleed scale while bleeding, else damage/base.
+ * Bleeding is visible without an exam (same as the 3D wound pulse and the
+ * pool hint), so the bleed branch is ungated; examined findings still
+ * need an Inspect before they paint the damage scale.
+ */
 function regionFill(
   host: AcmBodyHost,
   region: RegionId,
-  bleedStep: number
+  rate_mL_per_min: number
 ): string {
-  if (region === "leg_left" && bleedStep > 0 && host.exam.inspected.has(region)) {
-    return bloodStepColor(bleedStep);
-  }
+  const bleed = bleedFillForRegion(rate_mL_per_min, region);
+  if (bleed !== null) return bleed;
   if (host.exam.inspected.has(region)) {
     return damageStepColor(damageStepForFindings(host.exam.findings.get(region) ?? []));
   }
@@ -114,7 +118,6 @@ export function buildAcmBody(host: AcmBodyHost): HTMLElement {
 
   const rate = sim.bleedRate_mL_per_min();
   const tier = bleedTierForRate(rate);
-  const bleedStep = bloodStepForTier(tier);
 
   for (const id of REGION_IDS) {
     if (id === "back") continue;
@@ -122,7 +125,7 @@ export function buildAcmBody(host: AcmBodyHost): HTMLElement {
     for (const shape of shapes) {
       const node = shapeEl(shape);
       node.setAttribute("class", `acm-part${host.selected === id ? " acm-part-sel" : ""}`);
-      node.setAttribute("fill", regionFill(host, id, bleedStep));
+      node.setAttribute("fill", regionFill(host, id, rate));
       node.appendChild(titleEl(REGION_LABELS[id]));
       node.addEventListener("click", () => host.onSelect(id));
       canvas.appendChild(node);

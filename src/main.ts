@@ -31,6 +31,7 @@ import { SceneLog } from "./ui/sceneLog";
 import { DollPanel } from "./ui/dollPanel";
 import { QuickActions } from "./ui/quickActions";
 import { ProgressBar } from "./ui/progressBar";
+import { PartnerBar } from "./ui/partnerBar";
 import { HeldItemPanel } from "./ui/heldItem";
 import { SettingsPanel } from "./ui/settings";
 import { initClickSounds, playAlert, playDone } from "./ui/sound";
@@ -164,6 +165,15 @@ function main(): void {
     progress.refresh(sim);
     quick?.refresh();
   });
+  const partnerBar = new PartnerBar((key) => {
+    if (sim === null) return;
+    sim.cancelPartnerJob(key);
+    shell?.refresh();
+    sceneLog.refresh();
+    dock.refresh();
+    partnerBar.refresh(sim);
+    quick?.refresh();
+  });
   const heldItem = new HeldItemPanel();
   const rightRail = document.getElementById("right-rail");
   if (rightRail === null) throw new Error("missing #right-rail in index.html");
@@ -197,6 +207,7 @@ function main(): void {
       dollPanel.reword();
       quick?.reword();
       progress.refresh(sim);
+      partnerBar.refresh(sim);
       if (sim !== null) heldItem.reword(sim.pending, kitLabels.getSelected());
       if (menu !== null && flow.phase === "end") flow.refreshEndReport(menu.reportElement());
     }
@@ -269,6 +280,7 @@ function main(): void {
     dollPanel.bind(null);
     rightRail.hidden = true;
     progress.refresh(null);
+    partnerBar.refresh(null);
     menu.setRunInfo({
       level: flow.record.levelLabel,
       destination: flow.record.destinationLabel,
@@ -413,6 +425,7 @@ function main(): void {
         dollPanel.bind(s);
         rightRail.hidden = false;
         progress.refresh(s);
+        partnerBar.refresh(s);
         heldItem.refresh(s.pending, kitLabels.getSelected());
         quick?.refresh();
         // Legacy menu instance kept for the end report only. Its panel
@@ -453,6 +466,7 @@ function main(): void {
             // The ACM center bar covers open-overlay runs; the bottom bar
             // covers closed-overlay runs. Never both at once.
             progress.refresh(shell?.isOpen() === true ? null : s);
+            partnerBar.refresh(s);
             heldItem.refresh(s.pending, kitLabels.getSelected());
             dock.setPartnerHint(s.level === 1 && flow.phase !== "end" ? hintFor(s) : null);
             // New log lines since the last tick drive feedback sounds.

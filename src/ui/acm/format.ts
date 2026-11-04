@@ -4,6 +4,7 @@
 // bleed tiers bucket the same mL/min rate the 3D wound pulse already
 // uses, with the same 30 mL/min visible cut. No numbers reach the UI.
 
+import type { RegionId } from "../../patient/regions";
 import type { Sim } from "../../sim/engine";
 import type { LogEvent } from "../../sim/types";
 
@@ -109,4 +110,18 @@ export function bloodStepForTier(tier: BleedTier): number {
   if (tier === "severe") return 8;
   if (tier === "massive") return 10;
   return 0;
+}
+
+/**
+ * Shared doll bleed fill, implemented from scratch Nov 3 night. Both the
+ * main rail doll and the menu doll call this. Only the femoral site
+ * bleeds in the engine, so only leg_left ever takes the blood scale;
+ * anything else returns null and the caller keeps its own dark base.
+ * Tiers and steps reuse the existing ACE scale untouched.
+ */
+export function bleedFillForRegion(rate_mL_per_min: number, region: RegionId): string | null {
+  if (region !== "leg_left") return null;
+  const tier = bleedTierForRate(rate_mL_per_min);
+  if (tier === "none") return null;
+  return bloodStepColor(bloodStepForTier(tier));
 }

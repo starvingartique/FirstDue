@@ -480,7 +480,7 @@ function bleedingRows(host: AcmActionHost): AcmRowDef[] {
       duration: "180s",
       badge:
         sim.packing.stage === "holding"
-          ? { text: `RUNNING ${sim.packing.holder ?? ""}`, cls: "running" }
+          ? { text: `RUNNING ${sim.packing.holder === "player" ? "YOU" : (sim.packing.holder ?? "")}`, cls: "running" }
           : sim.packing.stage === "set"
             ? { text: "CHECK", cls: "check" }
             : null,
@@ -522,7 +522,7 @@ function bleedingRows(host: AcmActionHost): AcmRowDef[] {
       glyph: "DP",
       name: "Start direct pressure (3s)",
       duration: "3s",
-      badge: sim.pressure.active ? { text: `ON ${sim.pressure.holder}`, cls: "on" } : null,
+      badge: sim.pressure.active ? { text: `ON ${sim.pressure.holder === "player" ? "YOU" : sim.pressure.holder}`, cls: "on" } : null,
       selects: [
         {
           id: "acm-press-qual",

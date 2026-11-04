@@ -22,6 +22,7 @@ import { DOLL_SHAPES, dollCovers, markersFor } from "../src/ui/bodyDoll";
 import { sayLine, setWording } from "../src/ui/wording";
 import type { LineState } from "../src/sim/types";
 import {
+  bleedFillForRegion,
   bleedLineForTier,
   bleedTierForRate,
   bloodStepColor,
@@ -33,6 +34,9 @@ import {
   pulseRateWords
 } from "../src/ui/acm/format";
 import { ACM_CATEGORIES, TRIAGE_LEVELS, freshRunState } from "../src/ui/acm/types";
+import { actionRowsFor, type AcmActionHost } from "../src/ui/acm/actions";
+import { partnerJobLabel } from "../src/ui/partnerBar";
+import { categoryIgnoresRegion, rowAllowed, rowRegions } from "../src/ui/acm/regionFilter";
 import { ndcFromClient } from "../src/engine/raycast";
 import { DISCLAIMER_TEXT } from "../src/ui/disclaimer";
 import { KEYBINDING_GROUPS } from "../src/ui/settings";
@@ -314,6 +318,7 @@ function logLine(t_s: number, kind: LogEvent["kind"], text: string): LogEvent {
     "src/ui/monitorWords.ts",
     "src/ui/dollPanel.ts",
     "src/ui/progressBar.ts",
+    "src/ui/partnerBar.ts",
     "src/ui/heldItem.ts",
     "src/ui/settings.ts",
     "src/ui/sound.ts",
@@ -352,6 +357,7 @@ function logLine(t_s: number, kind: LogEvent["kind"], text: string): LogEvent {
     "src/ui/acm/actions.ts",
     "src/ui/acm/actions2.ts",
     "src/ui/acm/cards.ts",
+    "src/ui/acm/regionFilter.ts",
     "src/ui/acm/overview.ts",
     "src/ui/acm/bottom.ts",
     "src/ui/acm/monitor.ts",
@@ -525,6 +531,101 @@ function logLine(t_s: number, kind: LogEvent["kind"], text: string): LogEvent {
   check("title no full dim", !css.includes("title-ui") || !/\.title-ui \{[^}]*background:/s.test(css), "wordmark stays bright");
   check("title logo wired", title.includes("First_Due__Paramedic_Simulator.png"), "real asset path");
   check("title logo card + poster", title.includes("title-card-img") && title.includes("video.poster"), "fallback + poster");
+}
+
+// 18. Nov 3 night bleed fix: one shared region fill both dolls use.
+// Only the femoral site bleeds in the engine, so only leg_left ever
+// takes the blood scale; every other region stays null (each doll keeps
+// its own dark base). Tiers reuse the existing ACE scale untouched.
+{
+  const at = (rate: number): string | null => bleedFillForRegion(rate, "leg_left");
+  check("bleed fill none below cut", at(0) === null && at(29) === null, "null under 30");
+  check(
+    "bleed fill tiers reuse the ACE scale",
+    at(30) === bloodStepColor(3) && at(150) === bloodStepColor(5) && at(400) === bloodStepColor(8) && at(700) === bloodStepColor(10),
+    "steps 3/5/8/10"
+  );
+  check(
+    "bleed fill changes with severity",
+    at(30) !== at(150) && at(150) !== at(400) && at(400) !== at(700),
+    "slow/moderate/severe/massive differ"
+  );
+  const others = REGION_IDS.filter((r) => r !== "leg_left").every((r) => bleedFillForRegion(900, r) === null);
+  check("bleed fill leg only", others, "14 other regions null at 900");
+  const dollSrc = fs.readFileSync(path.join(root, "src/ui/bodyDoll.ts"), "utf8");
+  const acmSrc = fs.readFileSync(path.join(root, "src/ui/acm/body.ts"), "utf8");
+  check("main doll uses the shared fill", dollSrc.includes("bleedFillForRegion"), "bodyDoll.ts");
+  check("menu doll uses the shared fill", acmSrc.includes("bleedFillForRegion"), "acm/body.ts");
+}
+
+// 19. Nov 3 night partner pass: nobody calls the player "player". Log
+// lines and menu badges name the holder as you/YOU, matching the selects
+// that already say You. Checked in both wordings; no invented names.
+{
+  const engineSrc = fs.readFileSync(path.join(root, "src/sim/engine.ts"), "utf8");
+  const actionsSrc = fs.readFileSync(path.join(root, "src/ui/acm/actions.ts"), "utf8");
+  check("speech: no Player stays free", !engineSrc.includes("Player stays free"), "engine.ts");
+  check("speech: no raw holder badge", !actionsSrc.includes("RUNNING ${sim.packing.holder ?? " + '""' + "}"), "actions.ts");
+  const sim = newBikeDownSim();
+  sim.packing.stage = "packed_pending_hold";
+  sim.holdPacking("partner");
+  const holdLine = sim.log[sim.log.length - 1]?.text ?? "";
+  check("speech: hold ack stays in character", holdLine.includes("You stay free") && !holdLine.includes("Player"), holdLine);
+  sim.startPressure({ quality: "firm", holder: "player" });
+  for (let i = 0; i < 5; i++) sim.tick();
+  const pressLine = sim.log.find((e) => e.text.startsWith("Direct pressure"))?.text ?? "";
+  check("speech: pressure log says you", pressLine.includes("by you"), pressLine);
+  sim.swapPressureHolder("player");
+  const swapLine = sim.log[sim.log.length - 1]?.text ?? "";
+  check("speech: swap log says You", swapLine.startsWith("You swap in"), swapLine);
+  const host = (s: Sim): AcmActionHost => ({
+    sim: s,
+    state: freshRunState(),
+    rerender: () => {},
+    onCannot: () => {},
+    region: null,
+    onFindings: () => {},
+    examFindings: () => []
+  });
+  const holdSim = newBikeDownSim();
+  holdSim.packing.stage = "holding";
+  holdSim.packing.holder = "player";
+  const holdBadge = actionRowsFor(host(holdSim), "bleeding").find((r) => r.id === "hold")?.badge?.text ?? "";
+  check("speech: hold badge says YOU", holdBadge === "RUNNING YOU", holdBadge);
+  const pressSim = newBikeDownSim();
+  pressSim.pressure.active = true;
+  pressSim.pressure.holder = "player";
+  const onBadge = actionRowsFor(host(pressSim), "bleeding").find((r) => r.id === "pressure")?.badge?.text ?? "";
+  check("speech: pressure badge says YOU", onBadge === "ON YOU", onBadge);
+  for (const mode of ["medical", "plain"] as const) {
+    setWording(mode);
+    const lines = [holdLine, pressLine, swapLine, holdBadge, onBadge].map((l) => sayLine(l));
+    check(`speech ${mode}: no player address`, lines.every((l) => !l.includes("player") && !l.includes("Player")), mode);
+  }
+  setWording("medical");
+  check(
+    "partner labels plain",
+    partnerJobLabel({ key: "hold", kind: "hold", ref: "", remaining_s: 1, total_s: 1 }) === "Hold packing pressure" &&
+      partnerJobLabel({ key: "fetch:cat_tourniquet", kind: "fetch", ref: "cat_tourniquet", remaining_s: 1, total_s: 1 }) === "Fetch CAT" &&
+      partnerJobLabel({ key: "box", kind: "box", ref: "box_blood_kit", remaining_s: 1, total_s: 1 }) === "Bring Blood kit",
+    "hold/fetch/box"
+  );
+}
+
+// 20. Nov 3 night meds pass: drugs are systemic, so the Rx tab never
+// zeroes under a region pick. No drug carries a body-region link in
+// code (rowRegions meds is null: unmapped), and the category bypasses
+// the region block. Every other category keeps its filter.
+{
+  check("meds rows unmapped", rowRegions("meds", "push") === null && rowRegions("meds", "any") === null, "systemic");
+  check("meds bypasses region block", categoryIgnoresRegion("meds") === true, "always full list");
+  const rest = (["triage", "examine", "bleeding", "airway", "breathing", "lines", "monitor"] as const).every(
+    (c) => !categoryIgnoresRegion(c)
+  );
+  check("other categories keep filter", rest, "7 still gated");
+  check("null region still shows all", rowAllowed("bleeding", "tq", null) === true, "full list rule");
+  const shellSrc = fs.readFileSync(path.join(root, "src/ui/acm/shell.ts"), "utf8");
+  check("shell consults the bypass", shellSrc.includes("categoryIgnoresRegion"), "shell.ts");
 }
 
 if (failures > 0) {

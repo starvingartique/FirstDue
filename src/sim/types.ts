@@ -117,6 +117,21 @@ export interface FetchJob {
   runner: Holder;
 }
 
+/**
+ * One partner job with progress, for the right-side partner bar.
+ * Display order: packing hold, box trip, then fetches. Bystander jobs
+ * never appear here; the partner bar and its cancel leave them alone.
+ */
+export interface PartnerJob {
+  /** Stable cancel key: "hold", "box", or "fetch:<itemId>". */
+  key: string;
+  kind: "hold" | "box" | "fetch";
+  /** Box ids joined (box) or the item id (fetch); empty for the hold. */
+  ref: string;
+  remaining_s: number;
+  total_s: number;
+}
+
 export interface PendingAction {
   id: string;
   label: string;

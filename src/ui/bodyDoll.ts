@@ -4,15 +4,17 @@
 // menu, exactly like the scene click and the chips. The patient's left is
 // on the viewer's left, matching the default 3D view where the left-thigh
 // wound reads on the left; L and R tags mark the patient's own sides.
-// Markers mirror engine state only: TQ, packing and dressing sit on the
-// left thigh, the same side the 3D wound marker uses. The engine tracks no
-// laterality for lines, so limb line sites sit on the right by convention
-// and the caption says so. Sternal sits on the chest center. A Y set draws
-// a dashed ring around its line dot, a running warmer an orange ring.
-// Simple dots and rings only.
+// The bleeding thigh paints the shared ACE blood scale, same as the menu
+// doll; markers sit on top of that fill. Markers mirror engine state
+// only: TQ, packing and dressing sit on the left thigh, the same side
+// the 3D wound marker uses. The engine tracks no laterality for lines,
+// so limb line sites sit on the right by convention and the caption says
+// so. Sternal sits on the chest center. A Y set draws a dashed ring
+// around its line dot, a running warmer an orange ring.
 
 import { REGION_IDS, REGION_LABELS, type RegionId } from "../patient/regions";
 import type { Sim } from "../sim/engine";
+import { bleedFillForRegion } from "./acm/format";
 import { sayLine } from "./wording";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
@@ -208,6 +210,10 @@ export function buildDoll(
   const name = document.createElement("div");
   name.className = "doll-name";
   name.textContent = selected === null ? sayLine("Pick a region") : sayLine(REGION_LABELS[selected]);
+  // Live bleed rate once per build: the fill attribute on each shape
+  // beats the inherited CSS fill, so bleeding regions paint over the
+  // dark base while selection still shows through the stroke.
+  const rate = sim.bleedRate_mL_per_min();
   for (const region of REGION_IDS) {
     if (region === "back") continue;
     const shapes = DOLL_SHAPES[region];
@@ -220,7 +226,12 @@ export function buildDoll(
     const title = document.createElementNS(SVG_NS, "title");
     title.textContent = sayLine(REGION_LABELS[region]);
     g.appendChild(title);
-    for (const shape of shapes) g.appendChild(shapeEl(shape));
+    const fill = bleedFillForRegion(rate, region);
+    for (const shape of shapes) {
+      const node = shapeEl(shape);
+      if (fill !== null) node.setAttribute("fill", fill);
+      g.appendChild(node);
+    }
     g.addEventListener("click", () => onSelect(region));
     g.addEventListener("keydown", (ev) => {
       if (ev.key === "Enter" || ev.key === " ") {

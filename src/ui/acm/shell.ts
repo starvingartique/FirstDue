@@ -22,7 +22,7 @@ import { buildAcmBody } from "./body";
 import { buildLineCards, buildMeds, buildTriage, type AcmCardHost } from "./cards";
 import { bleedLineForTier, bleedTierForRate, fmtBandTime, fmtClockT, pulseRateWords } from "./format";
 import { buildMonitorScreen } from "./monitor";
-import { lineAllowed, rowAllowed } from "./regionFilter";
+import { categoryIgnoresRegion, lineAllowed, rowAllowed } from "./regionFilter";
 import { acmNote, buildRow } from "./rows";
 import { ACM_CATEGORIES, freshRunState, type AcmCategory, type AcmRunState, type TriageLevel } from "./types";
 
@@ -89,6 +89,14 @@ export class AcmShell {
   private readonly bodyEl = document.createElement("div");
   private readonly progressEl = document.createElement("div");
   private readonly modalEl = document.createElement("div");
+  // Center progress nodes, built once in build() and updated in place.
+  // Rebuilding them every frame would swap the cancel button out from
+  // under a press, so the button, track, and fill are stable on purpose.
+  private readonly progLabel = document.createElement("div");
+  private readonly progTrack = document.createElement("div");
+  private readonly progFill = document.createElement("div");
+  private readonly progCancel = document.createElement("button");
+  private progPartners: { row: HTMLDivElement; text: HTMLDivElement; fill: HTMLDivElement }[] = [];
 
   constructor(root: HTMLElement, peekRoot: HTMLElement, hooks: AcmHooks) {
     this.root = root;
@@ -210,6 +218,25 @@ export class AcmShell {
     main.append(left, center);
 
     this.progressEl.className = "acm-progress";
+    this.progLabel.className = "acm-prog-label";
+    this.progTrack.className = "acm-prog-track";
+    this.progFill.className = "acm-prog-fill";
+    this.progTrack.appendChild(this.progFill);
+    this.progCancel.type = "button";
+    this.progCancel.className = "acm-prog-cancel";
+    this.progCancel.textContent = CANCEL_GLYPH;
+    this.progCancel.addEventListener("click", () => {
+      // Same cancel semantics as the Prompt 10 bar: refund, log, nothing
+      // completes after. A cancelled check never pops its modal.
+      const sim = this.hooks.sim();
+      if (sim === null || sim.pending === null) return;
+      this.armed = null;
+      sim.cancelPending();
+      this.forced = true;
+      this.refresh();
+      this.hooks.onRun();
+    });
+    this.progressEl.append(this.progLabel, this.progTrack, this.progCancel);
     this.modalEl.className = "acm-modal";
     this.modalEl.hidden = true;
     panel.append(header, main);
@@ -479,20 +506,15 @@ export class AcmShell {
     const noneForRegion = (): void => {
       acmNote(this.actionsEl, "No tasks for this region in this category. Tap empty ground to clear the region and see all.");
     };
-    if (category === "triage") {
-      if (region !== null) {
+    if (category === "triage" || category === "meds") {
+      // Meds is systemic (see categoryIgnoresRegion): a region pick
+      // never zeroes the drug list. Triage keeps its region block.
+      if (region !== null && !categoryIgnoresRegion(category)) {
         noneForRegion();
         return;
       }
-      buildTriage(this.cardHost(sim), this.actionsEl);
-      return;
-    }
-    if (category === "meds") {
-      if (region !== null) {
-        noneForRegion();
-        return;
-      }
-      buildMeds(this.cardHost(sim), this.actionsEl);
+      if (category === "triage") buildTriage(this.cardHost(sim), this.actionsEl);
+      else buildMeds(this.cardHost(sim), this.actionsEl);
       return;
     }
     if (category === "lines") {
@@ -553,39 +575,20 @@ export class AcmShell {
   }
 
   private renderProgress(sim: Sim): void {
-    this.progressEl.replaceChildren();
     const pending = sim.pending;
     if (pending === null) {
       this.progressEl.hidden = true;
+      this.syncPartnerRows([]);
       return;
     }
     this.progressEl.hidden = false;
-    const label = document.createElement("div");
-    label.className = "acm-prog-label";
-    label.textContent = sayLine(`${pending.label} - ${pending.remaining_s}s left`).toUpperCase();
-    const track = document.createElement("div");
-    track.className = "acm-prog-track";
-    const fill = document.createElement("div");
-    fill.className = "acm-prog-fill";
+    this.progLabel.textContent = sayLine(`${pending.label} - ${pending.remaining_s}s left`).toUpperCase();
     const done = pending.total_s <= 0 ? 1 : 1 - pending.remaining_s / pending.total_s;
-    fill.style.width = `${Math.round(Math.min(1, Math.max(0, done)) * 100)}%`;
-    track.appendChild(fill);
-    const cancel = document.createElement("button");
-    cancel.type = "button";
-    cancel.className = "acm-prog-cancel";
-    cancel.textContent = CANCEL_GLYPH;
-    cancel.title = sayLine("Cancel the running action");
-    cancel.setAttribute("aria-label", sayLine("Cancel the running action"));
-    cancel.addEventListener("click", () => {
-      // Same cancel semantics as the Prompt 10 bar: refund, log, nothing
-      // completes after. A cancelled check never pops its modal.
-      this.armed = null;
-      sim.cancelPending();
-      this.forced = true;
-      this.refresh();
-      this.hooks.onRun();
-    });
-    this.progressEl.append(label, track, cancel);
+    this.progFill.style.width = `${Math.round(Math.min(1, Math.max(0, done)) * 100)}%`;
+    // Wording can flip mid-action; the stable cancel button re-words here
+    // instead of being rebuilt.
+    this.progCancel.title = sayLine("Cancel the running action");
+    this.progCancel.setAttribute("aria-label", sayLine("Cancel the running action"));
     // Partner jobs: truck fetches and packing holds ride the small bar.
     const jobs: { label: string; remaining_s: number; total_s: number }[] = [];
     for (const fetch of sim.fetches) {
@@ -598,21 +601,40 @@ export class AcmShell {
         total_s: sim.packing.holdTotal_s
       });
     }
-    for (const job of jobs) {
+    this.syncPartnerRows(jobs);
+  }
+
+  /**
+   * Partner rows by index: reuse the nodes from the last frame, adding or
+   * dropping rows only when the job count changes. No per-frame rebuild,
+   * so nothing under the menu churns while an action runs.
+   */
+  private syncPartnerRows(jobs: { label: string; remaining_s: number; total_s: number }[]): void {
+    while (this.progPartners.length < jobs.length) {
       const row = document.createElement("div");
       row.className = "acm-partner";
       const text = document.createElement("div");
       text.className = "acm-partner-label";
-      text.textContent = sayLine(`${job.label} - ${Math.ceil(job.remaining_s)}s left`).toUpperCase();
       const ptrack = document.createElement("div");
       ptrack.className = "acm-partner-track";
-      const pfill = document.createElement("div");
-      pfill.className = "acm-partner-fill";
-      const pdone = job.total_s <= 0 ? 1 : 1 - job.remaining_s / job.total_s;
-      pfill.style.width = `${Math.round(Math.min(1, Math.max(0, pdone)) * 100)}%`;
-      ptrack.appendChild(pfill);
+      const fill = document.createElement("div");
+      fill.className = "acm-partner-fill";
+      ptrack.appendChild(fill);
       row.append(text, ptrack);
       this.progressEl.appendChild(row);
+      this.progPartners.push({ row, text, fill });
+    }
+    while (this.progPartners.length > jobs.length) {
+      const last = this.progPartners.pop();
+      last?.row.remove();
+    }
+    for (let i = 0; i < jobs.length; i++) {
+      const job = jobs[i];
+      const node = this.progPartners[i];
+      if (job === undefined || node === undefined) continue;
+      node.text.textContent = sayLine(`${job.label} - ${Math.ceil(job.remaining_s)}s left`).toUpperCase();
+      const pdone = job.total_s <= 0 ? 1 : 1 - job.remaining_s / job.total_s;
+      node.fill.style.width = `${Math.round(Math.min(1, Math.max(0, pdone)) * 100)}%`;
     }
   }
 
@@ -634,6 +656,7 @@ export class AcmShell {
       sim.pending === null ? "idle" : `${sim.pending.id}:${sim.pending.remaining_s}`,
       sim.fetches.map((f) => `${f.itemId}:${Math.ceil(f.remaining_s)}`).join(","),
       Math.ceil(sim.packing.holdRemaining_s),
+      bleedTierForRate(sim.bleedRate_mL_per_min()),
       observed, gear, exam,
       this.state.category, this.hooks.region() ?? "-", this.state.triage,
       this.hooks.mirrored(), this.hooks.painAsked(), this.refusal ?? ""

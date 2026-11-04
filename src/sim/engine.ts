@@ -60,6 +60,7 @@ import type {
   O2State,
   ObservedVitals,
   PackingState,
+  PartnerJob,
   PendingAction,
   PressureState,
   ShockFlag,
@@ -883,7 +884,7 @@ export class Sim {
     this.packing.holdRemaining_s = 180;
     if (holder === "partner") {
       this.partnerHold_s = 180;
-      this.addLog("action", "Partner holds packing pressure (3 min). Player stays free.");
+      this.addLog("action", "Partner holds packing pressure (3 min). You stay free.");
       return { ok: true };
     }
     this.addLog("action", `${holder === "player" ? "You hold" : "Bystander holds"} packing pressure (3 min, continuous).`);
@@ -955,7 +956,8 @@ export class Sim {
       this.pressure.holder = o.holder;
       this.pressure.held_s = 0;
       const what = o.quality === "firm" ? "firm, bodyweight" : o.quality === "light" ? "light" : "off the source";
-      this.addLog("action", `Direct pressure (${what}) by ${o.holder}. A bridge, not a fix.`);
+      const who = o.holder === "player" ? "you" : o.holder;
+      this.addLog("action", `Direct pressure (${what}) by ${who}. A bridge, not a fix.`);
     };
     if (o.holder === "player") {
       return this.start("pressure", "Take over direct pressure", 3, apply);
@@ -977,7 +979,9 @@ export class Sim {
     if (!this.pressure.active) return { ok: false, reason: "Nobody is holding pressure." };
     this.pressure.holder = holder;
     this.pressure.held_s = 0;
-    this.addLog("action", `${holder} swaps in on pressure. Fatigue clock reset.`);
+    const line =
+      holder === "player" ? "You swap in on pressure." : holder === "partner" ? "Partner swaps in on pressure." : "Bystander swaps in on pressure.";
+    this.addLog("action", `${line} Fatigue clock reset.`);
     return { ok: true };
   }
 
@@ -1123,6 +1127,85 @@ export class Sim {
     this.boxTrips.push({ boxes: [boxId], remaining_s: seconds, total_s: seconds });
     this.addLog("fetch", `Partner to the truck for the ${box.label} (${seconds}s round trip).`);
     return { ok: true };
+  }
+
+  /**
+   * Partner jobs with progress, in bar display order: the packing hold,
+   * then the box trip, then partner fetches. Read-only: timings and
+   * effects live where they always have. Implemented from scratch Nov 3.
+   */
+  partnerJobs(): PartnerJob[] {
+    const jobs: PartnerJob[] = [];
+    if (this.packing.stage === "holding" && this.packing.holder === "partner") {
+      jobs.push({
+        key: "hold",
+        kind: "hold",
+        ref: "",
+        remaining_s: Math.max(0, Math.ceil(this.packing.holdRemaining_s)),
+        total_s: this.packing.holdTotal_s
+      });
+    }
+    const trip = this.boxTrips.find((t) => t.remaining_s > 0);
+    if (trip !== undefined) {
+      jobs.push({
+        key: "box",
+        kind: "box",
+        ref: trip.boxes.join(","),
+        remaining_s: Math.max(0, Math.ceil(trip.remaining_s)),
+        total_s: trip.total_s
+      });
+    }
+    for (const f of this.fetches) {
+      if (f.runner !== "partner") continue;
+      jobs.push({
+        key: `fetch:${f.itemId}`,
+        kind: "fetch",
+        ref: f.itemId,
+        remaining_s: Math.max(0, Math.ceil(f.remaining_s)),
+        total_s: f.total_s
+      });
+    }
+    return jobs;
+  }
+
+  /**
+   * Stop one partner job before it completes. The completion never runs:
+   * a fetch takes nothing (the cabinet moves at completion), a box trip
+   * stages nothing, and a packing hold reverts to packed-pending-hold
+   * with pressure restarting from zero and no rebleed gamble, the same
+   * rule as cancelling a player hold. The player pending action is never
+   * touched. Implemented from scratch Nov 3.
+   */
+  cancelPartnerJob(key: string): ActionResult {
+    if (key === "hold") {
+      if (this.packing.stage !== "holding" || this.packing.holder !== "partner") {
+        return { ok: false, reason: "The partner is not holding pressure." };
+      }
+      this.packing.stage = "packed_pending_hold";
+      this.packing.holder = null;
+      this.packing.holdRemaining_s = this.packing.holdTotal_s;
+      this.partnerHold_s = 0;
+      this.addLog("action", "Cancelled: partner packing hold.");
+      return { ok: true };
+    }
+    if (key === "box") {
+      const at = this.boxTrips.findIndex((t) => t.remaining_s > 0);
+      if (at < 0) return { ok: false, reason: "No partner box trip running." };
+      const trip = this.boxTrips[at];
+      this.boxTrips.splice(at, 1);
+      const names = (trip?.boxes ?? []).map((b) => TRUCK_BOXES.find((box) => box.id === b)?.label ?? b).join(", ");
+      this.addLog("action", `Cancelled: partner box trip (${names}).`);
+      return { ok: true };
+    }
+    if (key.startsWith("fetch:")) {
+      const itemId = key.slice("fetch:".length);
+      const at = this.fetches.findIndex((f) => f.itemId === itemId && f.runner === "partner");
+      if (at < 0) return { ok: false, reason: "That partner fetch is not running." };
+      this.fetches.splice(at, 1);
+      this.addLog("action", `Cancelled: partner fetch ${itemId}.`);
+      return { ok: true };
+    }
+    return { ok: false, reason: "Unknown partner job." };
   }
 
   /** Move up to n units of an item from the cabinet to the patient. */

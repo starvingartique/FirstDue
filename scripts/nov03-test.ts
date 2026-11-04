@@ -81,6 +81,134 @@ function check(name: string, cond: boolean, detail: string): void {
   );
 }
 
+// Nov 3 night cancel fix: early, mid, and just-before-completion cancel
+// on a 30 s kit-grabbing action. Each must stop the action, skip the
+// effect, refund the kit, log cancelled, and leave a fresh action
+// startable. Nothing completes after.
+for (const [tag, ticks] of [["early", 2], ["mid", 15], ["late", 29]] as const) {
+  const sim = newBikeDownSim();
+  sim.setLevel(2);
+  const before = sim.atPatient("cat_tourniquet");
+  const started = sim.applyTQ({ strapTight: true, placement: "high_thigh", halfTurns: 4, writeTime: true });
+  for (let i = 0; i < ticks; i++) sim.tick();
+  const running = sim.pending !== null;
+  const cancelled = sim.cancelPending();
+  const stopped = cancelled.ok && sim.pending === null;
+  const after = sim.atPatient("cat_tourniquet");
+  const logged = sim.log.some((e) => e.text.startsWith("Cancelled: Apply CAT"));
+  const restart = sim.bloodSweep();
+  for (let i = 0; i < 60; i++) sim.tick();
+  const completed = sim.log.some((e) => e.text.startsWith("Done: Apply CAT")) || sim.tq.applied;
+  check(`cancel ${tag}: stops a running action`, started.ok && running && stopped, `${ticks} ticks in`);
+  check(`cancel ${tag}: no effect and nothing completes after`, !completed, `tq=${sim.tq.applied}`);
+  check(`cancel ${tag}: CAT refunded`, after === before, `${before} -> ${after}`);
+  check(`cancel ${tag}: logged as cancelled`, logged, "Cancelled: Apply CAT");
+  check(`cancel ${tag}: new action starts after`, restart.ok, "Blood sweep runs");
+}
+
+// Nov 3 night partner pass: partner fetch, box trip, and packing-hold
+// cancel. Each stops its job, skips the effect, leaves kit counts alone
+// (partner jobs take nothing up front), logs cancelled, and leaves the
+// same task restartable. The player pending action is never touched.
+{
+  const sim = newBikeDownSim();
+  sim.setLevel(2);
+  sim.fetchFromTruck("cat_tourniquet", "partner");
+  sim.bloodSweep();
+  for (let i = 0; i < 10; i++) sim.tick();
+  const keys = sim.partnerJobs().map((j) => j.key);
+  const stash = sim.stashes.get("cat_tourniquet");
+  const cabBefore = stash?.cabinet ?? -1;
+  const fetchBefore = stash?.fetched ?? -1;
+  const cancelled = sim.cancelPartnerJob("fetch:cat_tourniquet");
+  const sweepAlive = sim.pending?.id === "sweep";
+  for (let i = 0; i < 60; i++) sim.tick();
+  const stashAfter = sim.stashes.get("cat_tourniquet");
+  check("partner cancel: fetch listed", keys.includes("fetch:cat_tourniquet"), keys.join(",") || "none");
+  check("partner cancel: fetch stops", cancelled.ok && sim.fetches.length === 0, "job gone");
+  check(
+    "partner cancel: fetch takes nothing, kit unchanged",
+    stashAfter?.cabinet === cabBefore && stashAfter?.fetched === fetchBefore,
+    `cab=${stashAfter?.cabinet} fetched=${stashAfter?.fetched}`
+  );
+  check(
+    "partner cancel: fetch never completes",
+    !sim.log.some((e) => e.text.includes("cat_tourniquet fetched from the truck")),
+    "no completion"
+  );
+  check(
+    "partner cancel: fetch logged",
+    sim.log.some((e) => e.text.startsWith("Cancelled: partner fetch")),
+    "logged"
+  );
+  check("partner cancel: player sweep untouched", sweepAlive, "still pending after partner cancel");
+  check("partner cancel: fetch restartable", sim.fetchFromTruck("cat_tourniquet", "partner").ok, "runs again");
+}
+
+{
+  const sim = newBikeDownSim();
+  sim.setLevel(2);
+  sim.stageBox("box_blood_kit");
+  for (let i = 0; i < 10; i++) sim.tick();
+  const keys = sim.partnerJobs().map((j) => j.key);
+  const cancelled = sim.cancelPartnerJob("box");
+  for (let i = 0; i < 60; i++) sim.tick();
+  check("partner cancel: box trip listed", keys.includes("box"), keys.join(",") || "none");
+  check("partner cancel: box trip stops", cancelled.ok && sim.boxTrips.length === 0, "trip gone");
+  check("partner cancel: box never stages", !sim.stagedBoxes.has("box_blood_kit"), "not staged");
+  check("partner cancel: box logged", sim.log.some((e) => e.text.startsWith("Cancelled: partner box")), "logged");
+  check("partner cancel: box restartable", sim.stageBox("box_blood_kit").ok, "runs again");
+}
+
+{
+  const sim = newBikeDownSim();
+  sim.setLevel(2);
+  sim.exposeWound();
+  for (let i = 0; i < 15; i++) sim.tick();
+  sim.packWound({ technique: "packed", gauze: "hemostatic" });
+  for (let i = 0; i < 70; i++) sim.tick();
+  sim.holdPacking("partner");
+  for (let i = 0; i < 30; i++) sim.tick();
+  const keys = sim.partnerJobs().map((j) => j.key);
+  const cancelled = sim.cancelPartnerJob("hold");
+  const stage = sim.packing.stage;
+  for (let i = 0; i < 200; i++) sim.tick();
+  check("partner cancel: hold listed", keys.includes("hold"), keys.join(",") || "none");
+  check(
+    "partner cancel: hold reverts to packed-pending-hold",
+    cancelled.ok && stage === "packed_pending_hold" && sim.packing.holder === null,
+    stage
+  );
+  check(
+    "partner cancel: hold never completes, no gamble",
+    sim.packing.stage === "packed_pending_hold",
+    sim.packing.stage
+  );
+  check("partner cancel: hold logged", sim.log.some((e) => e.text.startsWith("Cancelled: partner packing hold")), "logged");
+  check("partner cancel: hold restartable", sim.holdPacking("partner").ok, "runs again");
+}
+
+{
+  // Bystander jobs are not partner jobs: the partner bar and its cancel
+  // never touch them.
+  const sim = newBikeDownSim();
+  sim.setLevel(2);
+  // TQ first: 200+ seconds of free bleeding would arrest (and an arrest
+  // freezes the background hold timer by the existing PEA rule), which
+  // would prove nothing about cancel immunity.
+  sim.applyTQ({ strapTight: true, placement: "high_thigh", halfTurns: 4, writeTime: true });
+  for (let i = 0; i < 35; i++) sim.tick();
+  sim.exposeWound();
+  for (let i = 0; i < 15; i++) sim.tick();
+  sim.packWound({ technique: "packed", gauze: "hemostatic" });
+  for (let i = 0; i < 70; i++) sim.tick();
+  sim.holdPacking("bystander");
+  check("partner cancel: bystander hold unlisted", sim.partnerJobs().length === 0, "partner free");
+  check("partner cancel: bystander hold immune", !sim.cancelPartnerJob("hold").ok, "refused");
+  for (let i = 0; i < 200; i++) sim.tick();
+  check("partner cancel: bystander hold still completes", sim.packing.stage === "set", sim.packing.stage);
+}
+
 // - doll flip: patient left on the viewer left -
 
 {

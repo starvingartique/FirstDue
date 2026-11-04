@@ -6,6 +6,7 @@
 
 import type { RegionId } from "../patient/regions";
 import type { Sim } from "../sim/engine";
+import { bleedTierForRate } from "./acm/format";
 import { buildDoll, markersFor } from "./bodyDoll";
 
 function el<T extends HTMLElement>(id: string): T {
@@ -48,7 +49,9 @@ export class DollPanel {
       this.root.innerHTML = "";
       return;
     }
-    const sig = JSON.stringify(markersFor(sim)) + (this.selected ?? "none");
+    // Bleed tier rides the signature so the thigh fill repaints as the
+    // bleed changes, not only when markers or selection change.
+    const sig = JSON.stringify(markersFor(sim)) + (this.selected ?? "none") + bleedTierForRate(sim.bleedRate_mL_per_min());
     if (sig === this.signature) return;
     this.signature = sig;
     this.root.innerHTML = "";

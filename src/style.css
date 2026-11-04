@@ -425,7 +425,8 @@ body {
 
 .doll-packing {
   fill: #f2f5f9;
-  stroke: none;
+  stroke: #333;
+  stroke-width: 1;
   pointer-events: none;
 }
 
@@ -1275,6 +1276,86 @@ body {
 
 .progress-cancel:hover {
   background: rgba(179, 55, 55, 0.4);
+}
+
+/* Partner progress bar: smaller than the player center bar, lives in the
+   right rail flow under the doll, so it cannot overlap the doll, the log,
+   the chat, or the menu. Fill matches the menu partner-row blue. */
+#partner-bar {
+  flex: 0 0 auto;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 12px;
+}
+
+#partner-bar[hidden] {
+  display: none;
+}
+
+.partner-head {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.partner-label {
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.partner-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 6px;
+}
+
+.partner-track {
+  flex: 1 1 auto;
+  height: 10px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 5px;
+  overflow: hidden;
+}
+
+.partner-fill {
+  height: 100%;
+  width: 0;
+  background: #8ab8ff;
+}
+
+.partner-cancel {
+  flex: 0 0 auto;
+  appearance: none;
+  border: 1px solid #b33737;
+  background: rgba(179, 55, 55, 0.2);
+  color: #ffb3b3;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 2px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.partner-cancel:hover {
+  background: rgba(179, 55, 55, 0.4);
+}
+
+.partner-more {
+  font-size: 11px;
+  color: var(--dim);
+  margin-top: 4px;
+}
+
+.partner-more[hidden] {
+  display: none;
 }
 
 #settings-panel {
