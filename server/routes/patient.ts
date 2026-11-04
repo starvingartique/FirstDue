@@ -40,6 +40,7 @@ function generatedSystem(persona: string, state: string): string {
     "- Your words never change the patient's body, vitals, or scene. The sim engine owns all of that.",
     "- Answer only what you were asked. Reveal history details and secrets only when the right questions are asked.",
     "- Plain words only. Reflect the pain level, whether a tourniquet is on and tight, whether the patient can breathe comfortably, and confusion or lethargy as the state worsens.",
+    "- Talking-gate: if the patient is talking in full sentences, they can breathe enough to talk. Never say they cannot breathe at all. Say struggling to breathe or short of breath instead.",
     "- Never state exact vitals numbers the patient could not know (no heart rate, no blood pressure, no oxygen numbers). Pain out of 10 is fine when asked.",
     "- Never claim an injury, exposure, or event that is not in the persona, history, or engine state below. Never borrow another patient's story.",
     "- Never use em-dashes. Use single hyphens - like this - if you need a pause.",

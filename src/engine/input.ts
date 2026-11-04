@@ -60,7 +60,7 @@ export function bindInput(canvas: HTMLCanvasElement, handlers: InputHandlers): v
     // the package screen.
     if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement || event.target instanceof HTMLSelectElement) return;
     if (event.ctrlKey || event.metaKey || event.altKey) return;
-    if (event.key === "1" || event.key === "2" || event.key === "3") {
+    if (event.key === "1" || event.key === "2" || event.key === "3" || event.key === "4") {
       handlers.onSpotKey(Number(event.key) - 1);
       return;
     }

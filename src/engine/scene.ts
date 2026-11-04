@@ -142,6 +142,32 @@ export function buildWorld(canvas: HTMLCanvasElement): World {
   witness.add(torso, head);
   scene.add(witness);
 
+  // - partner kneeling at the patient left side, mid-leg, facing the bleed -
+  const partner = new THREE.Group();
+  partner.position.set(-0.78, 0, 0.9);
+  partner.rotation.y = -Math.PI / 2;
+  const pTorso = new THREE.Mesh(new THREE.CapsuleGeometry(0.15, 0.45, 6, 14), mat(0x1f3350));
+  pTorso.position.y = 0.62;
+  const pHead = new THREE.Mesh(new THREE.SphereGeometry(0.1, 16, 14), mat(0xb98d63, 0.6));
+  pHead.position.y = 1.05;
+  const pKnees = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.12, 0.24), mat(0x1a2a44));
+  pKnees.position.y = 0.06;
+  const pStrip = new THREE.Mesh(
+    new THREE.BoxGeometry(0.32, 0.04, 0.02),
+    new THREE.MeshStandardMaterial({
+      color: 0xd8dce2,
+      emissive: 0x9aa0a8,
+      emissiveIntensity: 0.4,
+      roughness: 0.4,
+      metalness: 0
+    })
+  );
+  pStrip.position.set(0, 0.72, 0.15);
+  pTorso.castShadow = true;
+  pHead.castShadow = true;
+  partner.add(pTorso, pHead, pKnees, pStrip);
+  scene.add(partner);
+
   // - traffic cones around the scene -
   for (const [x, z] of [[-1.4, -3.4], [-1.2, 2.6], [-3.4, 0.6]] as const) {
     const cone = new THREE.Mesh(new THREE.ConeGeometry(0.14, 0.5, 16), mat(0xd8621a, 0.7));

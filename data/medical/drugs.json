@@ -17,7 +17,17 @@
       "coverage: antibiotic activity 0-3 per organism class. Engine multiplies infection growth by (1 - coverage match vs the infection's organismProfile). Time-to-first-antibiotic is logged."
     ],
     "effectScale": "Effect tokens: '+', '++', '+++' / '-', '--', '---' = relative magnitude. Engine maps tokens to numbers in physiology.json (TUNE).",
-    "count": 104
+    "count": 104,
+    "pushChecksNote": "Advisor-sourced (First Due Drug Reference, Nov 3). Every value from it still needs certified medic sign-off.",
+    "pushChecks": [
+      "Right patient (Josh), right drug, right dose for this indication?",
+      "Expiry, concentration, and dilution verified on the vial?",
+      "Line patent, correct line, free of incompatible infusions?",
+      "Repeat and max checked against what was already given this run?",
+      "Too-much dangers and do-not-give-if reviewed for THIS patient?",
+      "Monitoring attached for what this drug changes (BP, rhythm, breathing, SpO2)?",
+      "Reversal or rescue ready where one exists (naloxone, calcium, airway kit)?"
+    ]
   },
   "drugs": [
     {

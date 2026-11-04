@@ -1,0 +1,159 @@
+/* Title screen, implemented from scratch Nov 3. Full-screen animation
+   behind the title UI, in the night-ops palette. Sits above the scene,
+   HUD, and flow cards, below the settings panel so Settings opens over
+   it. The static card is the base layer: if the video cannot load, the
+   title still shows, never a blank screen. */
+
+#title-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 45;
+  overflow: hidden;
+  background: #070b16;
+}
+
+#title-screen[hidden] {
+  display: none;
+}
+
+.title-root {
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  color: var(--text);
+}
+
+.title-card {
+  position: absolute;
+  inset: 0;
+  background: #070b16;
+}
+
+.title-card-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.title-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Buttons sit in the empty bottom third, over the road. No full-screen
+   dim: the wordmark and Star of Life stay bright. */
+.title-ui {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 0 24px 7vh;
+  pointer-events: none;
+}
+
+.title-btn-group {
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  background: rgba(4, 6, 12, 0.62);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 16px 30px;
+}
+
+.title-btn {
+  font: inherit;
+  font-size: 17px;
+  font-weight: 700;
+  padding: 10px 34px;
+  cursor: pointer;
+  color: var(--text);
+  background: var(--panel);
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  min-width: 220px;
+}
+
+.title-btn:hover {
+  border-color: var(--text);
+}
+
+.title-start {
+  color: var(--accent-ink);
+  background: var(--accent);
+}
+
+.title-link {
+  font: inherit;
+  font-size: 14px;
+  color: var(--dim);
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 6px 12px;
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.9);
+}
+
+.title-link:hover {
+  color: var(--text);
+}
+
+.title-modal {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(4, 6, 12, 0.72);
+}
+
+.title-modal[hidden] {
+  display: none;
+}
+
+.title-modal-panel {
+  max-width: 560px;
+  max-height: 80vh;
+  overflow-y: auto;
+  background: var(--panel);
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  padding: 18px 22px;
+}
+
+.title-modal-head {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 10px;
+}
+
+.title-modal-p {
+  font-size: 15px;
+  line-height: 1.5;
+  margin: 0 0 10px;
+}
+
+.title-modal-row {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 14px;
+}
+
+.title-modal-row .title-btn {
+  min-width: 0;
+  padding: 8px 22px;
+  font-size: 15px;
+}

@@ -4,9 +4,9 @@
 
 import * as THREE from "three";
 
-export type SpotId = "patient" | "kit" | "bystander";
+export type SpotId = "patient" | "kit" | "bystander" | "partner";
 
-export const SPOT_IDS: SpotId[] = ["patient", "kit", "bystander"];
+export const SPOT_IDS: SpotId[] = ["patient", "kit", "bystander", "partner"];
 
 interface Spot {
   position: THREE.Vector3;
@@ -25,6 +25,10 @@ const SPOTS: Record<SpotId, Spot> = {
   bystander: {
     position: new THREE.Vector3(0.35, 0.8, -0.1),
     target: new THREE.Vector3(-1.8, 1.1, 1.7)
+  },
+  partner: {
+    position: new THREE.Vector3(0.5, 0.85, -0.2),
+    target: new THREE.Vector3(-0.78, 0.7, 0.9)
   }
 };
 

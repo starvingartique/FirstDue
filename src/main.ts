@@ -6,6 +6,8 @@
 
 import "./style.css";
 import "./flow.css";
+import "./acm.css";
+import "./title.css";
 import { buildWorld } from "./engine/scene";
 import { SPOT_IDS, SpotCamera, type SpotId } from "./engine/camera";
 import { bindInput } from "./engine/input";
@@ -17,15 +19,24 @@ import { RegionHighlight } from "./patient/highlight";
 import type { RegionId } from "./patient/regions";
 import { Hud } from "./ui/hud";
 import { DebugOverlay } from "./ui/debug";
-import { MedicalMenu } from "./ui/medicalMenu";
+import { MedicalMenu, type Tab } from "./ui/medicalMenu";
+import { TitleScreen } from "./ui/title";
+import { AcmShell } from "./ui/acm/shell";
+import { TRIAGE_LEVELS, type AcmCategory } from "./ui/acm/types";
 import { ChatDock } from "./ui/chatDock";
 import { SpeedBar } from "./ui/speedBar";
 import { MarchStrip } from "./ui/marchStrip";
 import { TipsBubble } from "./ui/tipsBubble";
 import { SceneLog } from "./ui/sceneLog";
+import { DollPanel } from "./ui/dollPanel";
+import { ProgressBar } from "./ui/progressBar";
+import { HeldItemPanel } from "./ui/heldItem";
+import { SettingsPanel } from "./ui/settings";
+import { initClickSounds, playAlert, playDone } from "./ui/sound";
 import { KIT_LINKS, KitLabels } from "./ui/kitLabels";
 import { getWording, setWording, type WordingMode } from "./ui/wording";
-import { RunFlow, evaluateHandoff, type HandoffCheck } from "./ui/flow";
+import { vitalsPillText } from "./ui/monitorWords";
+import { RunFlow, evaluateHandoff, hintFor, type HandoffCheck } from "./ui/flow";
 import { BIKE_DOWN_PATHWAY } from "./ui/debrief";
 import type { Sim } from "./sim/engine";
 import { newBikeDownSim } from "./sim/scenario";
@@ -42,18 +53,28 @@ function showBootError(message: string): void {
   box.textContent = `Startup failed: ${message}`;
 }
 
-/**
- * Persistent vitals pill text. Shows while the pulse ox probe or defib pads
- * are on: pleth HR plus the lagged monitor SpO2, engine numbers only. Null
- * hides the pill. No new vital is invented here.
- */
-function vitalsPillText(s: Sim): string | null {
-  if (!s.monitor.spo2Attached && !s.defibPadsOn) return null;
-  const spo2 = s.monitorSpo2();
-  const spo2Text =
-    spo2 === null ? "--" : "none" in spo2 ? "no pleth" : `${spo2.value}`;
-  return `HR ${s.vitals.hr_bpm} - SpO2 ${spo2Text}`;
-}
+/** Legacy menu tabs to ACM categories for kit jumps. */
+const TAB_TO_ACM: Record<Tab, AcmCategory> = {
+  examine: "examine",
+  airway: "airway",
+  breathing: "breathing",
+  circulation: "bleeding",
+  meds: "meds",
+  lines: "lines",
+  monitor: "monitor"
+};
+
+/** ACM categories back to legacy tabs so the tips bubble follows along. */
+const ACM_TO_TAB: Record<AcmCategory, Tab> = {
+  triage: "examine",
+  examine: "examine",
+  bleeding: "circulation",
+  airway: "airway",
+  breathing: "breathing",
+  meds: "meds",
+  lines: "lines",
+  monitor: "monitor"
+};
 
 function arrestReason(phase: string): string {
   if (phase === "sizeup") return "PEA arrest during scene size-up.";
@@ -85,6 +106,10 @@ function main(): void {
   let menu: MedicalMenu | null = null;
   let debug: DebugOverlay | null = null;
   let acceptedCall: FixedCall | null = null;
+  // ACM overlay shell: constructed once the HUD exists, reset per run.
+  let shell: AcmShell | null = null;
+  // True once the player asked about pain in chat (gates the pain words).
+  let painAsked = false;
 
   // Kit labels and preview. Item taps open existing menu tabs only.
   const kitRoot = scene.getObjectByName("kit");
@@ -92,13 +117,15 @@ function main(): void {
   const kitLabels = new KitLabels({
     onSelect: (id) => {
       const link = KIT_LINKS[id];
-      if (link !== null) menu?.setTab(link.tab);
+      if (link !== null) shell?.showCategory(TAB_TO_ACM[link.tab]);
     },
     onOpenAction: (id) => {
+      // ACM fit: kit jumps land on the matching category. The legacy
+      // section scroll has no overlay equivalent, so it opens the list.
       const link = KIT_LINKS[id];
-      if (link !== null) menu?.openKitAction(link.tab, link.section);
+      if (link !== null) shell?.showCategory(TAB_TO_ACM[link.tab]);
     }
-  });
+  }, canvas);
 
   // First-person hands: visible only while a procedure runs, holding that
   // procedure's kit item. Own scene group, never raycast.
@@ -107,18 +134,45 @@ function main(): void {
 
   // Left chat dock under the menu: talk while working the menu. Bound to
   // the sim on dispatch accept, hidden before that and on the end screen.
-  const dock = new ChatDock();
+  const dock = new ChatDock({
+    onPlayerLine: (text) => {
+      if (/\bpain\b|\bhurt|\bache|\bsore\b|\bheadache/i.test(text)) painAsked = true;
+    }
+  });
   // UI pass panels: speed bar, MARCH strip, L1 tips bubble, scene log.
   const speed = new SpeedBar();
   const march = new MarchStrip();
-  const tips = new TipsBubble();
+  const tips = new TipsBubble({ onTip: (tip) => dock.postPartnerTip(tip) });
   const sceneLog = new SceneLog();
+  // Nov 3 rail: doll panel, progress bar, held item card, settings.
+  const dollPanel = new DollPanel((region: RegionId) => {
+    highlight.setSelected(region);
+    hud.showRegion(highlight.getSelected());
+    dollPanel.setSelected(highlight.getSelected());
+    shell?.showCategory("examine");
+  });
+  const progress = new ProgressBar(() => {
+    if (sim === null) return;
+    sim.cancelPending();
+    shell?.refresh();
+    sceneLog.refresh();
+    dock.refresh();
+    progress.refresh(sim);
+  });
+  const heldItem = new HeldItemPanel();
+  const rightRail = document.getElementById("right-rail");
+  if (rightRail === null) throw new Error("missing #right-rail in index.html");
+  const settingsPanel = new SettingsPanel();
+  initClickSounds();
+  let callNo = 0;
+  let soundSeen = 0;
 
   const hud = new Hud({
     onSelectRegion: (region: RegionId) => {
       highlight.setSelected(region);
       hud.showRegion(highlight.getSelected());
-      menu?.setRegion(highlight.getSelected());
+      dollPanel.setSelected(highlight.getSelected());
+      shell?.refresh();
     },
     onSelectSpot: (spot: SpotId) => {
       spotCamera.applySpot(spot);
@@ -131,8 +185,12 @@ function main(): void {
       hud.showWording(mode);
       hud.reword();
       menu?.reword();
+      shell?.reword();
+      settingsPanel.reword();
       kitLabels.reword();
-      tips.reword();
+      dollPanel.reword();
+      progress.refresh(sim);
+      if (sim !== null) heldItem.reword(sim.pending, kitLabels.getSelected());
       if (menu !== null && flow.phase === "end") flow.refreshEndReport(menu.reportElement());
     }
   });
@@ -143,14 +201,49 @@ function main(): void {
   hud.showClock(0);
   hud.showPackage(false);
 
+  // ACM overlay: replaces the left-side menu panel. The legacy
+  // MedicalMenu instance stays for the end report only.
+  const acmRoot = document.getElementById("acm-root");
+  if (acmRoot === null) throw new Error("missing #acm-root in index.html");
+  const acmPeek = document.getElementById("acm-peek");
+  if (acmPeek === null) throw new Error("missing #acm-peek in index.html");
+  shell = new AcmShell(acmRoot, acmPeek, {
+    sim: () => sim,
+    region: () => highlight.getSelected(),
+    setRegion: (region) => {
+      highlight.setSelected(region);
+      hud.showRegion(highlight.getSelected());
+      dollPanel.setSelected(highlight.getSelected());
+    },
+    mirrored: () => settingsPanel.current.aceOrientation,
+    painAsked: () => painAsked,
+    patientLabel: () => {
+      const p = acceptedCall?.patient;
+      return p === undefined ? "Josh, 28M" : `${p.name}, ${p.age}${p.sex}`;
+    },
+    onRun: () => {
+      sceneLog.refresh();
+      dock.refresh();
+      if (sim !== null) heldItem.refresh(sim.pending, kitLabels.getSelected());
+    },
+    onTriage: (level) => {
+      flow.record.triage = TRIAGE_LEVELS.find((t) => t.id === level)?.label ?? level;
+    },
+    onCategory: (cat) => tips.show(ACM_TO_TAB[cat])
+  });
+
   const finishEnd = (win: boolean, checks: HandoffCheck[]): void => {
     if (sim === null || menu === null) return;
     hud.showPackage(false);
+    shell?.setOpen(false);
     dock.setVisible(false);
     speed.setVisible(false);
     march.bind(null);
     tips.bind(null);
     sceneLog.bind(null);
+    dollPanel.bind(null);
+    rightRail.hidden = true;
+    progress.refresh(null);
     menu.setRunInfo({
       level: flow.record.levelLabel,
       destination: flow.record.destinationLabel,
@@ -198,7 +291,7 @@ function main(): void {
           s,
           {
             onClock: () => hud.showClock(s.t_s),
-            onMenu: () => m.refresh()
+            onMenu: () => shell?.refresh()
           },
           (arrested) => {
             if (arrested) {
@@ -219,10 +312,10 @@ function main(): void {
   bindInput(canvas, {
     onLook: (dx, dy) => spotCamera.addLook(dx, dy),
     onTap: (x, y) => {
-      const hit = pickRegion(spotCamera.camera, patient.group, x, y);
+      const hit = pickRegion(spotCamera.camera, patient.group, x, y, canvas);
       if (hit === null) {
         // No body region: a staged kit item may have been tapped.
-        const kitHit = pickKitItem(spotCamera.camera, kitRoot, x, y);
+        const kitHit = pickKitItem(spotCamera.camera, kitRoot, x, y, canvas);
         if (kitHit !== null) {
           kitLabels.select(kitHit);
           return;
@@ -231,9 +324,12 @@ function main(): void {
       // Tapping empty ground clears the selection.
       highlight.setSelected(hit);
       hud.showRegion(highlight.getSelected());
-      menu?.setRegion(highlight.getSelected());
+      dollPanel.setSelected(highlight.getSelected());
+      shell?.refresh();
     },
     onSpotKey: (index) => {
+      // While the overlay is open, digits pick ACM categories instead.
+      if (shell?.isOpen() === true) return;
       if (index < 0 || index >= SPOT_IDS.length) return;
       const spot: SpotId = SPOT_IDS[index];
       spotCamera.applySpot(spot);
@@ -257,7 +353,9 @@ function main(): void {
     renderer.render(scene, spotCamera.camera);
   });
 
-  flow.showLevel(levels, (level) => {
+  // Title screen first: the existing level -> dispatch -> care flow is
+  // unchanged, it just starts from the title's Continue instead of boot.
+  const onLevelPicked = (level: 1 | 2): void => {
     const picked = levels.find((l) => l.level === level);
     flow.record.level = level;
     flow.record.levelLabel = `L${level} ${picked?.role ?? ""}`.trim();
@@ -273,26 +371,30 @@ function main(): void {
           flow.showDispatch(call, level, hooks, "That generated call was malformed. Bike down is loaded instead - accept it or generate again.");
           return;
         }
-        hud.showCall(accepted);
+        callNo += 1;
+        hud.showCall(accepted, callNo);
         acceptedCall = accepted;
         s.setLevel(level);
         s.addLog("info", `Level chosen: ${flow.record.levelLabel}.`);
         sim = s;
+        soundSeen = s.log.length;
         debug = new DebugOverlay(s);
         dock.bind(s);
         speed.setVisible(true);
         march.bind(s);
         tips.bind(s);
         sceneLog.bind(s);
-        menu = new MedicalMenu(s, {
-          onTab: (tab) => tips.show(tab),
-          onSelectRegion: (region) => {
-            highlight.setSelected(region);
-            hud.showRegion(highlight.getSelected());
-            menu?.setRegion(highlight.getSelected());
-          }
-        });
+        dollPanel.bind(s);
+        rightRail.hidden = false;
+        progress.refresh(s);
+        heldItem.refresh(s.pending, kitLabels.getSelected());
+        // Legacy menu instance kept for the end report only. Its panel
+        // is hidden; the ACM overlay is the working menu from here on.
+        menu = new MedicalMenu(s);
         menu.setRunInfo({ level: flow.record.levelLabel, destination: "not chosen", outcome: "run in progress" });
+        shell?.resetRun();
+        painAsked = false;
+        flow.record.triage = "none";
         spotCamera.applySpot("patient");
         hud.showSpot("patient");
         kitLabels.setSpot("patient");
@@ -311,16 +413,33 @@ function main(): void {
             kitLabels.update(spotCamera.camera);
             hands.update(spotCamera.camera, s.pending);
             dock.setVisible(flow.phase !== "end");
+            shell?.refresh();
           },
           onTick: () => {
             hud.showClock(s.t_s);
             hud.showVitals(vitalsPillText(s));
-            m.refresh();
             dock.refresh();
             march.refresh();
             sceneLog.refresh();
+            dollPanel.refresh();
+            // The ACM center bar covers open-overlay runs; the bottom bar
+            // covers closed-overlay runs. Never both at once.
+            progress.refresh(shell?.isOpen() === true ? null : s);
+            heldItem.refresh(s.pending, kitLabels.getSelected());
+            dock.setPartnerHint(s.level === 1 && flow.phase !== "end" ? hintFor(s) : null);
+            // New log lines since the last tick drive feedback sounds.
+            let done = false;
+            let alarm = false;
+            while (soundSeen < s.log.length) {
+              const event = s.log[soundSeen];
+              soundSeen += 1;
+              if (event === undefined) continue;
+              if (event.kind === "trap" || event.kind === "arrest") alarm = true;
+              else if (event.text.startsWith("Done: ")) done = true;
+            }
+            if (alarm) playAlert();
+            else if (done) playDone();
             dock.tickUnprompted(flow.phase === "sizeup" || flow.phase === "care");
-            flow.updateHint(s);
             if (
               s.arrested &&
               (flow.phase === "sizeup" || flow.phase === "care" || flow.phase === "package" || flow.phase === "radio")
@@ -369,7 +488,14 @@ function main(): void {
       }
     };
     flow.showDispatch(call, level, hooks);
+  };
+  const titleRoot = document.getElementById("title-screen");
+  if (titleRoot === null) throw new Error("missing #title-screen in index.html");
+  const titleScreen = new TitleScreen(titleRoot, {
+    onStart: () => flow.showLevel(levels, onLevelPicked),
+    onSettings: () => settingsPanel.open()
   });
+  titleScreen.show();
 }
 
 window.addEventListener("error", (event) => {

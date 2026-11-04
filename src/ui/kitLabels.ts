@@ -44,7 +44,7 @@ export const KIT_LABELS: Record<KitItemId, string> = {
 };
 
 /** Visual-only descriptions. No clinical values, no instructions. */
-const KIT_BLURBS: Record<KitItemId, string> = {
+export const KIT_BLURBS: Record<KitItemId, string> = {
   cat: "Strap loop, orange windlass and white time band on the tarp.",
   kerlix: "Rolled gauze on the tarp.",
   zfold: "Tan packet with a red stripe on the tarp.",
@@ -101,7 +101,10 @@ export class KitLabels {
   private readonly toAnchor = new THREE.Vector3();
   private readonly camDir = new THREE.Vector3();
 
-  constructor(private readonly handlers: KitLabelHandlers) {
+  constructor(
+    private readonly handlers: KitLabelHandlers,
+    private readonly canvas?: HTMLCanvasElement
+  ) {
     const app = document.getElementById("app");
     const overlay = document.getElementById("flow-overlay");
     if (app === null || overlay === null) throw new Error("missing #app or #flow-overlay in index.html");
@@ -210,8 +213,13 @@ export class KitLabels {
   update(camera: THREE.Camera): void {
     if (this.spot !== "kit") return;
     camera.getWorldDirection(this.camDir);
-    const w = window.innerWidth;
-    const h = window.innerHeight;
+    // Label positions follow the canvas's own visible box, so the
+    // text-size zoom cannot drift them off their kit items.
+    const rect = this.canvas?.getBoundingClientRect();
+    const left = rect?.left ?? 0;
+    const top = rect?.top ?? 0;
+    const w = rect?.width ?? window.innerWidth;
+    const h = rect?.height ?? window.innerHeight;
     for (const [id, button] of this.buttons) {
       const anchor = this.anchors.get(id);
       if (anchor === undefined) continue;
@@ -223,8 +231,8 @@ export class KitLabels {
         continue;
       }
       button.style.display = "block";
-      button.style.left = `${((this.tmp.x * 0.5 + 0.5) * w).toFixed(1)}px`;
-      button.style.top = `${((-this.tmp.y * 0.5 + 0.5) * h).toFixed(1)}px`;
+      button.style.left = `${(left + (this.tmp.x * 0.5 + 0.5) * w).toFixed(1)}px`;
+      button.style.top = `${(top + (-this.tmp.y * 0.5 + 0.5) * h).toFixed(1)}px`;
     }
   }
 }

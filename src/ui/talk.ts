@@ -41,7 +41,10 @@ function joshSnapshot(sim: Sim): string {
   } else if (sim.airway.vomited && sim.airway.soiled) {
     bits.push("He vomited and his mouth needs suctioning. He coughs between words.");
   } else if (v.rr_per_min >= 30 || v.spo2_pct < 90) {
-    bits.push("He cannot breathe comfortably. He gasps between short phrases.");
+    // Talking-gate: he IS talking, so he can breathe enough to talk. Never
+    // "cannot breathe": he is struggling, short of breath, gasping between
+    // short phrases. Gated on the same engine state as before.
+    bits.push("He is struggling to breathe, short of breath. He gasps between short phrases.");
   } else if (v.rr_per_min >= 22) {
     bits.push("He breathes fast but can still talk.");
   } else {
@@ -81,7 +84,9 @@ function generatedSnapshot(sim: Sim): string {
   } else if (sim.airway.vomited && sim.airway.soiled) {
     bits.push(`${first} vomited and the mouth needs suctioning. Coughs between words.`);
   } else if (v.rr_per_min >= 30 || v.spo2_pct < 90) {
-    bits.push(`${first} cannot breathe comfortably. Gasps between short phrases.`);
+    // Same talking-gate as Josh: a talking patient struggles, short of
+    // breath, and gasps between short phrases. Never "cannot breathe".
+    bits.push(`${first} is struggling to breathe, short of breath. Gasps between short phrases.`);
   } else if (v.rr_per_min >= 22) {
     bits.push(`${first} breathes fast but can still talk.`);
   } else {
@@ -139,7 +144,9 @@ function joshReply(sim: Sim, message: string): string {
       : "My leg - do whatever you have to do.";
   }
   if (/(breathe|breath|air)/.test(lower)) {
-    return sim.vitals.rr_per_min >= 30 ? "I - can not - catch my breath." : "I can breathe okay. It is my leg.";
+    // Talking-gate: a full spoken sentence rules out "can not breathe".
+    // RR 30+ still shows: barely catching his breath, in his own words.
+    return sim.vitals.rr_per_min >= 30 ? "I - can barely - catch my breath." : "I can breathe okay. It is my leg.";
   }
   if (sim.vitals.atlsClass === "IV" || sim.vitals.gcs_total <= 8) return "Huh? - Sorry - what? Cold - so cold.";
   if (sim.vitals.atlsClass === "III") return "Sorry - what did you - my leg, it - sorry, say again?";
@@ -177,7 +184,7 @@ function generatedReply(sim: Sim, message: string): string {
       : "Do whatever you have to do.";
   }
   if (/(breathe|breath|air)/.test(lower)) {
-    return sim.vitals.rr_per_min >= 30 ? "I - can not - catch my breath." : "I can breathe okay.";
+    return sim.vitals.rr_per_min >= 30 ? "I - can barely - catch my breath." : "I can breathe okay.";
   }
   if (sim.vitals.atlsClass === "IV" || sim.vitals.gcs_total <= 8) return "Huh? - Sorry - what? Cold - so cold.";
   if (sim.vitals.atlsClass === "III") return "Sorry - what did you - sorry, say again?";
@@ -217,7 +224,9 @@ export function cannedUnprompted(sim: Sim): string {
   if (sim.airway.ett !== null) return "(No words past the tube. A hand squeezes back.)";
   const v = sim.vitals;
   if (v.gcs_total <= 8) return "(Only a low moan. There are no words left.)";
-  if (v.rr_per_min >= 30 || v.spo2_pct < 90) return "I - can not - get air. Help me breathe.";
+  // Talking-gate: unprompted speech IS talking, so the line fits a
+  // talking patient who is struggling to breathe. Same engine gate.
+  if (v.rr_per_min >= 30 || v.spo2_pct < 90) return "Help me - I am struggling to breathe.";
   if (v.pain_0_to_10 >= 7) return "Please - do something. It hurts so bad.";
   if (v.atlsClass === "III" || v.atlsClass === "IV" || v.gcs_total <= 13) {
     return "Sorry - I - what is happening? Stay with me.";

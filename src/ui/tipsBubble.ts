@@ -1,16 +1,15 @@
-// L1 partner tips, reimplemented from scratch as a speech bubble from the
-// top right. One why-it-matters line per menu tab, shown when the player
-// opens that tab, then gone: auto-dismiss after TIP_SHOW_MS, or click to
-// dismiss sooner. Each tab shows once per run; re-entering a tab does not
-// reshow it. L2 gets no tips. Tips never say which option is right, and
-// traps stay traps. The bubble sits top right, clear of the menu (left),
-// the chat (left), and the scene log (bottom right).
+// L1 partner tips, reimplemented from scratch. One why-it-matters line
+// per menu tab, posted to the group chat as a partner line when the
+// player opens that tab. Each tab posts once per run; re-entering a tab
+// does not repost it. L2 gets no tips. Tips never say which option is
+// right, and traps stay traps. The old top-right bubble is gone: chat
+// is the only home, and posted lines stay as posted (chat history is
+// verbatim), so there is no reword pass.
 
 import type { Sim } from "../sim/engine";
 import type { Tab } from "./medicalMenu";
-import { word } from "./wording";
 
-/** Bubble lifetime. UI timing only, 6 real seconds. */
+/** Bubble lifetime from the top-right era. Kept for history; unused now. */
 export const TIP_SHOW_MS = 6000;
 
 const TIPS: Record<Tab, string> = {
@@ -28,58 +27,25 @@ export function tipFor(tab: Tab, level: number): string | null {
   return level === 1 ? (TIPS[tab] ?? null) : null;
 }
 
-function el<T extends HTMLElement>(id: string): T {
-  const node = document.getElementById(id);
-  if (node === null) throw new Error(`missing #${id} in index.html`);
-  return node as T;
-}
-
 export class TipsBubble {
-  private readonly root = el("tips-bubble");
   private sim: Sim | null = null;
-  private currentTip: string | null = null;
   private shown = new Set<Tab>();
-  private timer: number | null = null;
 
-  constructor() {
-    this.root.addEventListener("click", () => this.hide());
-  }
+  constructor(private readonly hooks: { onTip: (tip: string) => void }) {}
 
-  /** Bind to a fresh sim on dispatch accept. Null hides the bubble. */
+  /** Bind to a fresh sim on dispatch accept. Null clears the run set. */
   bind(sim: Sim | null): void {
     this.sim = sim;
     this.shown.clear();
-    this.currentTip = null;
-    this.hide();
   }
 
-  /** Show the tip for a freshly opened tab, once per tab per run. */
+  /** Post the tip for a freshly opened tab, once per tab per run. */
   show(tab: Tab): void {
     const sim = this.sim;
     if (sim === null || this.shown.has(tab)) return;
     const tip = tipFor(tab, sim.level);
     if (tip === null) return;
     this.shown.add(tab);
-    this.currentTip = tip;
-    this.root.textContent = tip;
-    word(this.root);
-    this.root.hidden = false;
-    if (this.timer !== null) window.clearTimeout(this.timer);
-    this.timer = window.setTimeout(() => this.hide(), TIP_SHOW_MS);
-  }
-
-  /** Wording mode changed: reword the visible tip from the authored line. */
-  reword(): void {
-    if (this.root.hidden || this.currentTip === null) return;
-    this.root.textContent = this.currentTip;
-    word(this.root);
-  }
-
-  private hide(): void {
-    if (this.timer !== null) {
-      window.clearTimeout(this.timer);
-      this.timer = null;
-    }
-    this.root.hidden = true;
+    this.hooks.onTip(tip);
   }
 }

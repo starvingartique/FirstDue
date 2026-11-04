@@ -122,6 +122,12 @@ export interface PendingAction {
   label: string;
   total_s: number;
   remaining_s: number;
+  /**
+   * Kit units grabbed when the action started, with the pile each came
+   * from. A mid-action cancel refunds every entry through the same rule
+   * as a failed start. Empty for presence-only actions.
+   */
+  grabbed: [string, "belt" | "jump" | "fetched" | "tool" | null][];
 }
 
 // - Oct 29 airway and breathing -
@@ -186,7 +192,7 @@ export interface O2State {
 
 export interface BvmState {
   maskSize: "small" | "medium" | "large";
-  /** Trailing breath log for rate math: { t_s, volume_mL }. */
+  /** Trailing breath log: { t_s, delivered volume_mL } for rate and effect math. */
   breaths: { t_s: number; volume_mL: number }[];
   gastric_0_to_10: number;
   overventBreaths: number;

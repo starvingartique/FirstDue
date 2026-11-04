@@ -3,31 +3,48 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>First Due - Oct 30 Bike down end-to-end</title>
+    <title>First Due - Nov 3 demo day</title>
   </head>
   <body>
     <div id="app">
       <canvas id="scene"></canvas>
       <div id="crosshair" aria-hidden="true"></div>
       <header id="hud-top">
-        <div id="call-title">Loading call data...</div>
-        <div id="clock">T+00:00 since contact</div>
-        <div id="vitals-pill" hidden></div>
+        <div class="hud-block">
+          <div id="call-line">Call #1 | Night Shift</div>
+          <div id="call-nature" class="hud-sub">Motorcycle vs guardrail</div>
+        </div>
+        <div class="hud-sep" aria-hidden="true"></div>
+        <div class="hud-block">
+          <div id="patient-line">Josh, 28M</div>
+          <div id="allergy-line" class="hud-sub">Known Allergies: unknown</div>
+        </div>
+        <div class="hud-sep" aria-hidden="true"></div>
+        <div class="hud-block">
+          <div><span id="wall-clock">--:--</span> | <span id="clock">T+00:00 since contact</span></div>
+          <div id="weather-line" class="hud-sub">clear</div>
+        </div>
+        <div id="speed-bar" hidden></div>
+        <button type="button" id="wording-btn" class="spot-btn" title="Medical or everyday words">Medical / Plain: Medical</button>
+        <button type="button" id="settings-btn" class="spot-btn" title="Sound, color and text size">Settings</button>
         <nav id="spot-nav" aria-label="Camera spots">
           <button type="button" data-spot="patient" class="spot-btn active">1 Patient</button>
-          <button type="button" data-spot="kit" class="spot-btn">2 Kit bags</button>
+          <button type="button" data-spot="kit" class="spot-btn">2 Bag</button>
           <button type="button" data-spot="bystander" class="spot-btn">3 Bystander</button>
+          <button type="button" data-spot="partner" class="spot-btn">4 Partner</button>
         </nav>
-        <button type="button" id="wording-btn" class="spot-btn" title="Medical or everyday words">Wording: Medical</button>
         <button type="button" id="package-btn" class="spot-btn" title="Package for transport (G)" hidden>Package</button>
       </header>
-      <div id="march-strip" hidden></div>
-      <div id="partner-hint" hidden></div>
+      <div id="march-row" hidden>
+        <div id="march-strip" role="group" aria-label="MARCH steps"></div>
+        <div id="march-desc" aria-live="polite"></div>
+      </div>
+      <div id="settings-panel" hidden></div>
       <div id="flow-overlay" hidden></div>
       <div id="left-col">
         <aside id="region-panel" aria-live="polite">
           <div id="region-title">No region selected</div>
-          <div id="region-sub">Click a body region, or pick Examine / Circulation below.</div>
+          <div id="region-sub">Click a body region, or press H for the medical menu.</div>
           <nav id="menu-tabs" aria-label="Medical menu"></nav>
           <div id="menu-body"></div>
           <div id="action-status">T+00:00 - Hands free</div>
@@ -35,20 +52,29 @@
         </aside>
         <div id="chat-dock" hidden></div>
       </div>
+      <div id="right-rail" hidden>
+        <div id="doll-row">
+          <div id="vitals-pill" hidden></div>
+          <div id="doll-panel"></div>
+        </div>
+        <aside id="scene-log">
+          <div class="scene-log-head">Action Log</div>
+          <div id="scene-log-rows" aria-label="Recent actions"></div>
+        </aside>
+        <div id="held-item" hidden></div>
+      </div>
       <aside id="debug-overlay" hidden>
         <h2>DEBUG - live engine state</h2>
         <dl id="debug-vitals"></dl>
         <p id="debug-note">True state, ticking every sim-second. Hidden from the player; F1 only.</p>
       </aside>
-      <div id="tips-bubble" hidden></div>
-      <aside id="scene-log" hidden>
-        <div class="scene-log-head">Actions</div>
-        <div id="scene-log-rows" aria-label="Recent actions"></div>
-      </aside>
-      <div id="speed-bar" hidden></div>
+      <div id="progress-bar" hidden></div>
       <footer id="hud-bottom">
-        <span>Drag to look - Click body to select - 1/2/3 camera - V talk - G package - F1 debug</span>
+        <span>Drag to look - Click body to select - H menu - 1/2/3/4 camera - V talk - G package - F1 debug</span>
       </footer>
+      <div id="acm-root" hidden></div>
+      <div id="acm-peek" hidden></div>
+      <div id="title-screen" hidden></div>
       <div id="boot-error" hidden></div>
     </div>
     <script type="module" src="/src/main.ts"></script>

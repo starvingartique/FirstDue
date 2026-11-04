@@ -160,6 +160,12 @@ export interface Oct29DrugInput {
   apnea_0_to_1: number;
 }
 
+/** Deterministic breath around zero: exactly 0 at tick 0, bounded in [-1, 1]. */
+export function vitalWave(tick_s: number, p1: number, p2: number): number {
+  const TAU = Math.PI * 2;
+  return 0.65 * Math.sin((TAU * tick_s) / p1) + 0.35 * Math.sin((TAU * tick_s) / p2);
+}
+
 export interface DeriveInput {
   loss_mL: number;
   /** Crash stress offset active (fades with analgesia, Oct 29 drugs). */
@@ -169,6 +175,8 @@ export interface DeriveInput {
   temp_C: number;
   pain_0_to_10: number;
   arrested: boolean;
+  /** Sim seconds since contact. Drives vitals variation; 0 means steady. */
+  tick_s?: number;
   /** Oct 29: loss minus retained fluids. Defaults to loss_mL (Oct 28 path). */
   effectiveLoss_mL?: number;
   airway?: Oct29AirwayInput;
@@ -217,11 +225,28 @@ export function deriveVitals(input: DeriveInput): Vitals {
   const airway = input.airway;
   sbp -= airway?.overventSbpDrop_mmhg ?? 0;
 
-  const dbp = a.dbp;
+  // Small engine-driven variation: HR, RR, BP and SpO2 breathe around
+  // their derived values instead of freezing between ticks. Deterministic
+  // in (tick, shock): zero at tick 0 and in a stable patient, growing to
+  // full amplitude in deep shock. Anchors, classes and arrest rules are
+  // untouched. RR periods both divide 30, so 30 s-apart manual counts
+  // agree exactly; HR/SBP/DBP/SpO2 use unrelated periods.
+  const tick = input.tick_s ?? 0;
+  const labile = Math.min(1, Math.max(0, eff_pct / 25));
+  let dbp = a.dbp;
+  if (tick > 0 && labile > 0 && !input.arrested) {
+    hr += 2 * labile * vitalWave(tick, 13, 27);
+    rr += 1 * labile * vitalWave(tick, 30, 15);
+    sbp += 1 * labile * vitalWave(tick, 19, 37);
+    dbp += 1 * labile * vitalWave(tick, 23, 43);
+  }
   const map = dbp + (sbp - dbp) / 3;
   // SpO2 holds until late shock, then slides. EtCO2 falls as perfusion fails.
   let spo2 = Math.max(60, 98 - Math.max(0, eff_pct - 30) * 0.15);
   spo2 = spo2 - (airway?.spo2Penalty_pct ?? 0) + (airway?.spo2Bonus_pct ?? 0) + drug.spo2_pct;
+  if (tick > 0 && labile > 0 && !input.arrested) {
+    spo2 += 1 * labile * vitalWave(tick, 29, 47);
+  }
   spo2 = Math.min(100, Math.max(0, spo2));
   let etco2 = Math.max(10, 38 - Math.max(0, eff_pct - 15) * 0.25);
   etco2 += airway?.etco2Delta_mmhg ?? 0;

@@ -151,7 +151,15 @@ try {
   const bikeDown = loadBikeDown();
   const levels = loadDifficulty();
 
-  console.log(`drugs.json OK (${drugs.drugs.length} drugs)`);
+  const pushMeta = drugs._meta as unknown as Record<string, unknown>;
+  const pushChecks = Array.isArray(pushMeta["pushChecks"]) ? pushMeta["pushChecks"] : [];
+  if (pushChecks.length !== 7 || !pushChecks.every((c) => typeof c === "string" && c.length > 10)) {
+    throw new Error(`drugs.json _meta.pushChecks must hold 7 before-every-push checks, found ${pushChecks.length}`);
+  }
+  if (typeof pushMeta["pushChecksNote"] !== "string" || !(pushMeta["pushChecksNote"] as string).includes("medic sign-off")) {
+    throw new Error("drugs.json _meta.pushChecksNote must carry the advisor sign-off note");
+  }
+  console.log(`drugs.json OK (${drugs.drugs.length} drugs, 7 push checks)`);
   console.log(`conditions.json OK (${conditions.conditions.length} conditions, DRAFT, unused by Bike down)`);
   console.log(`oct28_conditions.json OK (${oct28.conditions.map((c) => c.id).join(", ")})`);
   console.log(`oct29_airway.json OK (${airway.airwayDevices.length} devices, O2 + tank + BVM)`);

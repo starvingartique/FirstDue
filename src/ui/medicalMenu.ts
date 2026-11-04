@@ -12,10 +12,21 @@ import type { Sim } from "../sim/engine";
 import { TRUCK_BOXES } from "../sim/engine";
 import type { Holder } from "../sim/types";
 import type { CuffFit } from "../sim/exams";
-import { drugBoxFor, drugCatalog, formatDose, presentationMath } from "../sim/drugs";
+import {
+  allDrugs,
+  doseLine,
+  drugBoxFor,
+  drugCatalog,
+  drugEffectWords,
+  formatDose,
+  joshWorkedDose,
+  presentationMath,
+  pushChecks
+} from "../sim/drugs";
+import type { Drug } from "../data/types";
 import { bvmRatePerMin, gttPerMin, tankMinutesLeft } from "../sim/airway";
 import { sayLine, word } from "./wording";
-import { buildDoll } from "./bodyDoll";
+import { defibMonitorLine } from "./monitorWords";
 
 export type Tab = "examine" | "airway" | "breathing" | "circulation" | "meds" | "lines" | "monitor";
 
@@ -76,6 +87,7 @@ export class MedicalMenu {
   private status = el("action-status");
   private drugId = "fentanyl";
   private drugPres = 0;
+  private refDrug = "";
   // Oct 30 run context for the report rows. Set by the phase flow.
   private runLevel = "not chosen";
   private runDestination = "not chosen";
@@ -229,7 +241,7 @@ export class MedicalMenu {
       Object.keys(s.observed).length,
       s.monitor.spo2Attached, s.monitor.etco2Attached, s.defibPadsOn,
       s.level,
-      this.drugId, this.drugPres
+      this.drugId, this.drugPres, this.refDrug
     ].join("|");
   }
 
@@ -285,10 +297,36 @@ export class MedicalMenu {
     word(p);
   }
 
-  private findingList(items: string[]): void {
+  /** Exam findings per region. Actions re-render the menu, so findings
+   * persist here and re-append on every Examine render; otherwise every
+   * Inspect click would wipe its own results. Monitor rows pass no region
+   * and rebuild from engine state instead. */
+  private examFindings = new Map<RegionId, string[]>();
+
+  private findingList(items: string[], stickyRegion?: RegionId | null): void {
     const ul = document.createElement("ul");
     ul.className = "menu-findings";
     for (const item of items) {
+      const li = document.createElement("li");
+      li.textContent = item;
+      ul.appendChild(li);
+    }
+    this.body.appendChild(ul);
+    word(ul);
+    if (stickyRegion !== undefined && stickyRegion !== null) {
+      const kept = this.examFindings.get(stickyRegion) ?? [];
+      kept.push(...items);
+      this.examFindings.set(stickyRegion, kept);
+    }
+  }
+
+  /** Re-append cached findings for the open region, without re-caching. */
+  private replayFindings(region: RegionId): void {
+    const kept = this.examFindings.get(region);
+    if (kept === undefined || kept.length === 0) return;
+    const ul = document.createElement("ul");
+    ul.className = "menu-findings";
+    for (const item of kept) {
       const li = document.createElement("li");
       li.textContent = item;
       ul.appendChild(li);
@@ -383,12 +421,7 @@ export class MedicalMenu {
   private renderExamine(): void {
     const s = this.sim;
     const region = this.region;
-    this.section("Body view");
-    this.body.appendChild(
-      buildDoll(s, region, (picked) => {
-        this.hooks.onSelectRegion?.(picked);
-      })
-    );
+    this.note("Body view lives at the upper right now. Click a doll region to open it here.");
     this.section("Blood sweep");
     this.note("A fast 12-second look for immediate wounds, bleeding and tenderness. Region exams still find the rest.");
     this.action("Blood sweep (12s)", () => s.bloodSweep());
@@ -398,49 +431,57 @@ export class MedicalMenu {
       this.note("Select a body region (click the patient or use the chips).");
     } else if (region === "leg_left") {
       this.action("Inspect the thigh", () => {
-        this.findingList([
-          "Bright red pulsatile spurting, timed to the pulse",
-          "Blood pool expanding under the thigh",
-          "Soaked jeans over the left thigh",
-          s.beltTrap ? "Belt cinched mid-thigh, leg purple and swollen below it" : "No belt on the thigh"
-        ]);
+        this.findingList(
+          [
+            "Bright red pulsatile spurting, timed to the pulse",
+            "Blood pool expanding under the thigh",
+            "Soaked jeans over the left thigh",
+            s.beltTrap ? "Belt cinched mid-thigh, leg purple and swollen below it" : "No belt on the thigh"
+          ],
+          region
+        );
         return { ok: true };
       });
       this.action("Expose with shears (10s)", () => s.exposeWound());
       if (s.exposed) {
+        // State-derived, rebuilt every render: never cached, or it doubles.
         this.findingList(["Partial femoral laceration, anterior thigh, spurting arterial blood."]);
       }
       this.action("Palpate distal pulse", () => {
         const gone = (s.tq.applied && s.tq.occluded) || s.vitals.radial === "Absent";
-        this.findingList([
-          gone ? "No distal pulse palpable." : "Distal pulse present (bleed NOT controlled).",
-          s.legCongested() ? "Limb engorged, congested." : "No venous congestion."
-        ]);
+        this.findingList(
+          [
+            gone ? "No distal pulse palpable." : "Distal pulse present (bleed NOT controlled).",
+            s.legCongested() ? "Limb engorged, congested." : "No venous congestion."
+          ],
+          region
+        );
         return { ok: true };
       });
     } else if (region === "back") {
       this.note("Supine patient: log roll with your partner to check the back.");
       this.action("Log roll with partner, check the back", () => {
         const res = s.movePatient("log_roll");
-        if (res.ok) this.findingList(["Back exposed: no wounds, no bleeding found. Spine non-tender."]);
+        if (res.ok) this.findingList(["Back exposed: no wounds, no bleeding found. Spine non-tender."], region);
         return res;
       });
     } else if (region === "arm_right") {
       this.action("Inspect the arm", () => {
-        this.findingList(["Large abraded area with embedded gravel (road rash), oozing."]);
+        this.findingList(["Large abraded area with embedded gravel (road rash), oozing."], region);
         return { ok: true };
       });
     } else {
       const found = this.regionConditions(region);
       this.action(`Inspect ${REGION_LABELS[region]}`, () => {
-        this.findingList(found.inspect.length > 0 ? found.inspect : ["No obvious injury on inspection."]);
+        this.findingList(found.inspect.length > 0 ? found.inspect : ["No obvious injury on inspection."], region);
         return { ok: true };
       });
       this.action(`Palpate ${REGION_LABELS[region]}`, () => {
-        this.findingList(["No deformity, no crepitus, non-tender except as noted."]);
+        this.findingList(["No deformity, no crepitus, non-tender except as noted."], region);
         return { ok: true };
       });
     }
+    if (region !== null) this.replayFindings(region);
 
     this.section("Whole patient");
     this.note("Skin, temp, cap refill, pulse, lungs and GCS are timed procedures on the Monitor tab. F1 is debug only.");
@@ -911,6 +952,73 @@ export class MedicalMenu {
     }
     for (const flag of s.drugs.flags) this.note(`TOXICITY: ${flag}.`);
     this.note(`${catalog.noDose.length + catalog.noMapping.length} of 104 drugs are unusable in this build (no single standard dose or no token mapping). Listed in TODO_CLINICAL, never guessed.`);
+
+    this.section("Before every push");
+    const checks = pushChecks();
+    for (const item of checks.checks) this.note(`Check: ${item}`);
+    this.note(checks.note);
+
+    this.section("Drug reference: this drug");
+    this.drugRefCard(usable.drug);
+
+    this.section("Drug reference: all 104");
+    const all = allDrugs();
+    const ref = all.find((d) => d.id === this.refDrug) ?? usable.drug;
+    if (ref.id !== this.refDrug) this.refDrug = ref.id;
+    this.selects([
+      {
+        id: "refdrug", label: "Look up", current: this.refDrug,
+        options: all.map((d) => ({ value: d.id, label: d.name })),
+        onPick: (value) => {
+          this.refDrug = value;
+        }
+      }
+    ]);
+    this.drugRefCard(ref);
+  }
+
+  /**
+   * Full reference card for one drug, from the existing drug data only:
+   * dose, route, repeat, onset and lasts, body effects, too-much dangers,
+   * do-not-give-if, and the Josh 80 kg worked dose. Any field missing in
+   * the data reads TODO_CLINICAL: never invented, never taken from the
+   * advisor PDF into a data value. Wording only at render.
+   */
+  private drugRefCard(drug: Drug): void {
+    const head = drug.class === undefined ? drug.name : `${drug.name} (${drug.class})`;
+    this.note(head);
+    const first = drug.dosing[0];
+    if (first === undefined) {
+      this.note("Dose: TODO_CLINICAL: no dosing protocol in data.");
+    } else {
+      this.note(`Use: ${first.indication}. Dose: ${doseLine(first)}. Route: ${first.route.join(", ") || "TODO_CLINICAL"}.`);
+      this.note(`Repeat: ${first.repeat ?? "TODO_CLINICAL: no repeat in data"}. Max: ${first.max ?? "TODO_CLINICAL: no max in data"}.`);
+      if (first.notes !== undefined) this.note(first.notes);
+      if (drug.dosing.length > 1) {
+        this.note(`Plus ${drug.dosing.length - 1} more protocol(s): ${drug.dosing.slice(1).map((d) => d.indication).join("; ")}.`);
+      }
+    }
+    const onset = Object.entries(drug.onset ?? {});
+    this.note(
+      onset.length === 0
+        ? "Onset: TODO_CLINICAL: no onset in data."
+        : `Onset: ${onset.map(([route, when]) => `${route} ${when}`).join("; ")}.`
+    );
+    const lasts = Object.entries(drug.duration ?? {});
+    this.note(
+      lasts.length === 0
+        ? "Lasts: TODO_CLINICAL: no duration in data."
+        : `Lasts: ${lasts.map(([route, when]) => `${route} ${when}`).join("; ")}.`
+    );
+    const effects = drugEffectWords(drug);
+    if (effects.length === 0) this.note("Does to the body: TODO_CLINICAL: no effects in data.");
+    else this.findingList([`Does to the body: ${effects.join("; ")}.`]);
+    if ((drug.dangers ?? []).length === 0) this.note("Too much: TODO_CLINICAL: no dangers in data.");
+    else this.findingList([`Too much: ${drug.dangers?.join("; ")}.`]);
+    if ((drug.contraindications ?? []).length === 0) this.note("Do not give if: TODO_CLINICAL: no contraindications in data.");
+    else this.findingList([`Do not give if: ${drug.contraindications?.join("; ")}.`]);
+    this.note(joshWorkedDose(drug));
+    this.note(`Kept in: ${drug.location}.`);
   }
 
   // - Lines and fluids -
@@ -1140,7 +1248,7 @@ export class MedicalMenu {
     this.action("Attach SpO2 probe", () => s.attachSpo2());
     this.action("Read SpO2 (15s)", () => s.readSpo2());
     this.action("Attach waveform EtCO2", () => s.attachEtco2());
-    if (s.defibPadsOn) this.note("Defib pads on.");
+    if (s.defibPadsOn) this.note(defibMonitorLine(s));
     this.action("Stick defib pads (monitor only)", () => s.attachDefibPads());
     this.action("NIBP auto cycle (40s)", () => s.runNibp());
 

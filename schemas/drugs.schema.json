@@ -11,7 +11,13 @@
       "required": ["version", "count"],
       "properties": {
         "version": { "type": "string" },
-        "count": { "type": "integer", "minimum": 0 }
+        "count": { "type": "integer", "minimum": 0 },
+        "pushChecks": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Before-every-push checks, advisor-sourced (First Due Drug Reference, Nov 3)."
+        },
+        "pushChecksNote": { "type": "string" }
       }
     },
     "drugs": {

@@ -6,7 +6,7 @@
 
 import type { FixedCall, DifficultyLevel } from "../data/types";
 import type { Sim } from "../sim/engine";
-import { sayLine, word } from "./wording";
+import { word } from "./wording";
 import { FTO_FRAMING, collectDebrief, fetchDebrief } from "./debrief";
 
 export type Phase = "level" | "dispatch" | "sizeup" | "care" | "package" | "transport" | "radio" | "end";
@@ -31,6 +31,8 @@ export interface RunRecord {
   outcome: Outcome | null;
   outcomeReason: string;
   radioComplete: boolean;
+  /** Player's triage call from the ACM strip, stored for the report only. */
+  triage: string;
 }
 
 export function freshRecord(): RunRecord {
@@ -42,7 +44,8 @@ export function freshRecord(): RunRecord {
     destinationLabel: "not chosen",
     outcome: null,
     outcomeReason: "",
-    radioComplete: false
+    radioComplete: false,
+    triage: "none"
   };
 }
 
@@ -219,7 +222,6 @@ export class RunFlow {
   /** True before accept, during the transport skip, and after handoff. */
   tickingSuspended = true;
   private overlay: HTMLElement;
-  private hintBar: HTMLElement;
   private transportTimer: number | null = null;
   private sizeupLogged = false;
   private lastEnd: { sim: Sim; win: boolean; checks: HandoffCheck[]; report: HTMLElement; pathway: string } | null = null;
@@ -229,9 +231,6 @@ export class RunFlow {
     const overlay = document.getElementById("flow-overlay");
     if (overlay === null) throw new Error("missing #flow-overlay in index.html");
     this.overlay = overlay;
-    const hint = document.getElementById("partner-hint");
-    if (hint === null) throw new Error("missing #partner-hint in index.html");
-    this.hintBar = hint;
   }
 
   private show(node: HTMLElement): void {
@@ -426,24 +425,8 @@ export class RunFlow {
     this.show(card);
   }
 
-  // - L1 partner hints -
-
-  updateHint(sim: Sim): void {
-    if (sim.level !== 1 || this.phase === "end") {
-      this.hintBar.hidden = true;
-      return;
-    }
-    const hint = hintFor(sim);
-    if (hint === null) {
-      this.hintBar.hidden = true;
-      return;
-    }
-    const shown = sayLine(hint);
-    if (this.hintBar.textContent !== shown) {
-      this.hintBar.textContent = shown;
-    }
-    this.hintBar.hidden = false;
-  }
+  // - L1 partner hints live only in the group chat (ChatDock). hintFor
+  // stays the single source; the old top bar is gone, not moved.
 
   // - package and destination -
 
@@ -668,7 +651,6 @@ export class RunFlow {
     const firstEnd = this.phase !== "end";
     this.phase = "end";
     this.tickingSuspended = true;
-    this.hintBar.hidden = true;
     if (this.transportTimer !== null) {
       window.clearTimeout(this.transportTimer);
       this.transportTimer = null;
@@ -689,7 +671,8 @@ export class RunFlow {
     for (const [k, v] of [
       ["Level", this.record.levelLabel],
       ["Destination", this.record.destinationLabel],
-      ["Outcome", win ? "Win" : "Lose"]
+      ["Outcome", win ? "Win" : "Lose"],
+      ["Triage (player call)", this.record.triage]
     ]) {
       info.appendChild(h("dt", "flow-dt", k));
       info.appendChild(h("dd", "flow-dd", v));

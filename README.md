@@ -1,69 +1,144 @@
-# First Due - Oct 29 Kit Depth + Patient Voice
+# First Due: Paramedic Simulator
 
-First-person paramedic sim. Meta Global AI Developer Hackathon 2026, Indie track.
-Source of truth: `MUSE_BRIEF_1.md` (Project Brief v2). When in doubt, the brief wins.
-Clinical source of truth today: `OCT28_MEDICAL_ANSWERS` (sections 1-7 + item 8).
-Values are textbook anchors (ATLS / TCCC / NREMT / PHTLS) and still need
-sign-off from a certified medic before Nov 4.
-Thank you to Wyatt for medical knowledge help and playtesting.
+A training simulation for paramedic decision-making. For education, not for advice to real patients.
 
-This milestone, on top of Oct 28 (commit 6d1074c, untouched curve): Airway and
-Breathing tabs with Josh-exact sizing and failure modes, IV/IO with explicit
-fluid volumes, minimal drug prep loop over 26 of 104 drugs, L2 manual vitals
-with listed times and errors, monitor with lagged SpO2 and waveform EtCO2,
-and the talking patient (Josh) through the server proxy. F1 stays debug-only.
-No Dispatch Engine, no FTO debrief, no destination/radio report, no
-infection/sepsis, no second patient, no art pass, no driving.
+Indie developer track, Build for Your World.
 
-## Oct 30 Bike down end-to-end (clean rebuild, Nov 2)
+Demo video: [link to be added after recording]
 
-Wiring only, no clinical value changed. Full run: level select (L1/L2) ->
-dispatch (fixed Bike down CAD text) -> size-up checklist -> care (the Oct
-28 + Oct 29 loop) -> package + destination (trauma / STEMI / stroke /
-nearest ED, logged not graded) -> 300 s transport skip with the engine
-ticking -> text radio report to the AI charge nurse (MIST follow-ups, same
-model and settings as the talking patient) -> handoff. Win = alive + bleed
-under 30 mL/min + airway patent at handoff; lose = arrest anywhere on your
-watch. The end screen shows transport criteria plus a run report with
-Level / Destination / Outcome rows. G or the Package button ends scene care.
+## What it is
 
-- L1: vitals auto-display, partner hints, deterioration x0.5 (named dial
-  L1_DETERIORATION_SCALE, open TUNE flag). L2: manual vitals, no hints,
-  x1.0 exactly.
-- New files: src/ui/flow.ts, src/flow.css, src/ui/wording.ts,
-  server/routes/radio.ts, server/prompts/radio.txt, scripts/oct30-test.ts
-  (`npm.cmd run sim:test30`).
-- Wording toggle (Wording button in the top bar): Medical shows strings as
-  authored; Plain swaps known clinical words for everyday ones through
-  Shina's own small table in src/ui/wording.ts. Remembered between
-  sessions. Reimplemented in the clean rebuild; no tooltips.
-- No Dispatch Engine (Oct 31), no FTO debrief (Nov 1), no second patient,
-  no driving, no ambulance interior, no art pass.
+One call, one patient: Josh, 28, bike down with a left femoral bleed. Talk to him, follow MARCH, stop the bleed, package him, choose a destination, ride through transport, give the radio report, hand off, and debrief with the FTO. A full run takes 5 to 10 minutes.
 
-Open clinical questions (TUNE, not settled here), in blocker order:
+## How to play
 
-1. Handoff airway bar (patency 0.8+, no esophageal tube) - invented Oct 30.
-2. Transport skip 300 s - scenario param, decides who survives transport.
-3. L1 deterioration x0.5 - the brief gives slow/real with no number.
-4. Destination correctness for a femoral bleed - not graded, needs a rule.
+Dispatch, size-up, talk, care, package, destination, transport, radio, handoff, debrief.
 
-## Oct 30 bag labels and hands (clean rebuild, Nov 2)
+## How to run it
 
-Labels are small HTML pills anchored to the staged kit items, visible only
-in the kit spot. Clicking an item or its label opens that item's existing
-menu tab and shows a static preview card (label, visual-only description,
-jump-to-section button). No motion: the card appears and dismisses
-instantly. First-person gloved hands appear while a procedure runs,
-holding a clone of that procedure's kit item. Labels follow the Medical /
-Plain wording toggle through src/ui/wording.ts.
+Use branch clean-rebuild, not main: https://github.com/starvingartique/FirstDue
 
-- New files: src/ui/kitLabels.ts, src/engine/hands.ts. Kit items carry a
-  kitItem tag plus world-space label anchors; picking walks up from the
-  hit mesh so tagged children resolve.
-- Hands angle fix included: palms face the item, fingers forward and down,
-  thumbs on the inner edge, wrists trailing back toward the viewer.
-- Menu navigation reimplemented for the links: setTab plus openKitAction
-  with an instant jump and a static section highlight.
+Two terminals from the repo root (PowerShell with `npm.cmd` on Windows):
+
+```sh
+# Terminal 1: the server proxy (holds the key, localhost only)
+npm.cmd run dev:server
+# expect: First Due server on http://127.0.0.1:8787
+
+# Terminal 2: the game client
+npm.cmd run dev
+# expect: Local: http://127.0.0.1:5173/
+```
+
+Open http://127.0.0.1:5173/ in a browser. The client calls the server same-origin through the dev proxy, so the key never touches the browser.
+
+Key setup: put your own Meta Model API key in server/.env only, as MODEL_API_KEY (see server/.env.example). Never commit server/.env; only server/.env.example is tracked. Without a key the sim still runs, but patient, radio, debrief, and mic answers fall back or say the key is missing.
+
+Controls, as in this build:
+
+- H opens and closes the ACM medical menu; Esc closes it. Opening never pauses the sim.
+- With the menu open: 1-8 pick categories (Triage, Examine, Bleeding, Airway, Breathing, Meds, Lines, Monitor); W/A/S/D/Z/X pick body parts.
+- With the menu closed: 1/2/3/4 switch camera spots (Patient, Bag, Bystander, Partner).
+- V focuses chat to talk; G packages for transport; F1 shows live engine debug.
+- Ctrl+H with the menu closed peeks a small status card (if the browser passes the keys through).
+- Top bar: Pause/Play, 0.5x/1x/2x speed, Medical / Plain wording toggle, Settings.
+- Paper doll (upper right): click a region to open it. Center progress bar: cancel stops the action. Chat (bottom left): type always works; the mic button is push-to-talk file upload with text fallback.
+
+## How it uses Meta tools
+
+- Muse Spark 1.3 Standard, via the server proxy, voices Josh (the patient), the radio charge nurse, and the FTO debrief. Transcription runs through muse-voice-transcribe-1.0 as file upload; realtime is not built. The key lives in server/.env only and never reaches the browser. The bystander is not LLM-voiced: his lines mirror engine log lines.
+- Muse Code built the game, on the clean-rebuild history.
+- The sim engine is plain code, not LLM: vitals tick, the bleed timer runs, and interventions change numbers in src/sim with no network calls. The LLM only voices people; it never decides vitals or outcomes.
+- Dispatch Engine: seeded generated calls from component data with the persona fix (a generated patient uses its own persona, never Josh). Demo seeds in this build: 44 (overdose in a bathroom) and 143 (allergy at a picnic), both asserted in sim:test31. The demo runs the fixed Bike down call; generated calls are covered by headless tests with a cached-call fallback.
+
+## Features
+
+Only what is in this build:
+
+- Physiology engine: bleed curve, shock classes, vitals tick, arrest window.
+- ACM medical menu, kit actions, and drug prep/push over the 104-drug reference (missing fields show TODO_CLINICAL).
+- Talking patient through the server proxy, with text fallback.
+- Paper doll with engine-state markers, Medical / Plain wording toggle, speed controls, MARCH strip, group chat, blood sweep.
+- Kit depth: blood lines with Y tubing and warmer, sternal IO, truck boxes, kit refund rule.
+- FTO debrief from the run report, with a code-built fallback.
+- Dispatch Engine with seeded generation and persona fix.
+
+Not claimed: AED analysis and shock were never implemented in the clean codebase; mic realtime is not built (file-upload transcribe with text fallback); sound effects from the SFX checklist are not wired.
+
+## What's next
+
+Planned after the hackathon, not built yet:
+
+- Publish First Due after the hackathon, as a training simulation for paramedic decision-making, for education, not for advice to real patients.
+- Finish the features left for after submission: AED analysis and shock, mic realtime, sound effects from the First Due SFX checklist.
+- Grow the Dispatch Engine past its current floor, with more generated conditions, and keep the floor at 3 conditions minimum, with medic review before any new condition is flipped to ready.
+- Get certified medic sign-off on all drug values and effect magnitudes, which are currently textbook anchors from ATLS, TCCC, NREMT, and PHTLS, tagged TUNE or TODO_CLINICAL where they still need review.
+- Keep the game solo indie, one patient and one short run at its core, and add depth in medicine and AI first, before any new scene, driving, or multi-patient work.
+
+## Credits
+
+Thank you to Carlos for medical knowledge help and playtesting.
+
+Shina is the sole participant and Representative, indie track.
+
+## Changelog
+
+Patch notes below are history, not a current feature list. See Features above for what is in the submitted build.
+
+## Nov 2 small pass on clean: paper doll + wording toggle
+
+- Paper doll body view at the top of the Examine tab: front-view outline,
+  all 15 regions clickable (back is a button), opens the same region menu
+  as the scene and chips. Dots and rings mirror engine state only: TQ,
+  packing and dressing on the left thigh (the 3D wound side), sternal on
+  the chest, limb lines on the right by convention (no laterality is
+  tracked), Y set as a dashed ring, warmer as an orange ring.
+- Medical / Plain toggle in the top bar now rewords tabs, chips, region
+  panel, vitals pill, tips bubble, kit labels, menu, doll names, and the
+  end report (fresh build per toggle, both directions). Persists in
+  localStorage (fd.wording). Wording only, nothing clinical changes. Log
+  history, MARCH letters, and talk lines stay verbatim.
+- Tests: `npm.cmd run sim:ui` (doll coverage, markers, plain pairs,
+  second-sweep safety).
+
+## Nov 2 kit pass on clean: blood, IO, boxes (Phases 1-3; Phase 4 cut)
+
+- Kit actions that fail after taking stock now refund the item instead of
+  using it up. Blood counts read "here N, truck M".
+- Sternal IO (FAST1-style): one attempt, 30 s, 95 percent, humeral-range
+  pressure flow (all TUNE, needs medic sign-off), with lidocaine option.
+- Y tubing blood lines: 45 s prime with NS through the warmer, 1-2 units,
+  4-unit/4 h cap (TUNE), LR refused on blood lines, NS 250 with NS 1 L
+  fallback. Warmer rides the Y set. Drip sets stay on the line; rehangs
+  take 20 s.
+- Truck boxes staged by one 50 s partner trip: Narc, cooler, blood kit,
+  RSI, critical care, OB, CBRN. Narc/RSI/CC drugs gated until staged.
+- Stock table rebuilt to ALS levels; belt CAT stays 1 but 5 land at the
+  patient. Pelvic binder, needle decompression, cric, LifeFlow have no
+  action yet. Phase 4 diagram/Body view work cut: clean-rebuild has no
+  diagram or Body view.
+- Tests: `npm.cmd run sim:kit` (refund, sternal, Y set, drip reuse,
+  box gates, staging, fetch landing).
+
+## Nov 2 pass on clean: FTO debrief + feedback fixes
+
+- FTO debrief after handoff, from the run report: timeline, what went
+  right, misses, time to critical intervention, traps, reassessment,
+  destination and radio as logged. Spark FTO through the existing server
+  setup; code-built fallback from the same facts when Spark fails, never
+  blank, never a made-up grade. Destination and the four open clinical
+  questions stay logged and open. Screen carries the sim-only framing.
+- Pulse ox vitals pill: HR plus lagged monitor SpO2 stays in the top bar
+  while the probe or defib pads are on, across all menu tabs. Engine
+  numbers only. Pads are monitor display only, no shock modeled.
+- Chat dock bottom middle: text the patient while working the menu, with
+  push-to-talk mic through the server transcribe proxy
+  (muse-voice-transcribe-1.0, file upload; realtime left for later). Text
+  always works, including when the mic is unavailable.
+- Blood sweep: one 12-second whole-patient look for immediate wounds,
+  bleeding and tenderness, from engine state only. Logged and reported;
+  changes nothing clinical; says a full region exam is still needed.
+- Tests: `npm.cmd run sim:nov02` (sweep, pads, fallback debrief).
 
 ## Oct 31 Dispatch Engine v1 (clean rebuild, Nov 2)
 
@@ -97,60 +172,72 @@ vitals offset), road_rash (ooze plus clot). The 11 conditions.json entries
 are unreviewed stubs and stay generatorReady false. No flag flipped. Floor
 met, target not met.
 
-## Nov 2 pass on clean: FTO debrief + feedback fixes
+## Oct 30 bag labels and hands (clean rebuild, Nov 2)
 
-- FTO debrief after handoff, from the run report: timeline, what went
-  right, misses, time to critical intervention, traps, reassessment,
-  destination and radio as logged. Spark FTO through the existing server
-  setup; code-built fallback from the same facts when Spark fails, never
-  blank, never a made-up grade. Destination and the four open clinical
-  questions stay logged and open. Screen carries the sim-only framing.
-- Pulse ox vitals pill: HR plus lagged monitor SpO2 stays in the top bar
-  while the probe or defib pads are on, across all menu tabs. Engine
-  numbers only. Pads are monitor display only, no shock modeled.
-- Chat dock bottom middle: text the patient while working the menu, with
-  push-to-talk mic through the server transcribe proxy
-  (muse-voice-transcribe-1.0, file upload; realtime left for later). Text
-  always works, including when the mic is unavailable.
-- Blood sweep: one 12-second whole-patient look for immediate wounds,
-  bleeding and tenderness, from engine state only. Logged and reported;
-  changes nothing clinical; says a full region exam is still needed.
-- Tests: `npm.cmd run sim:nov02` (sweep, pads, fallback debrief).
+Labels are small HTML pills anchored to the staged kit items, visible only
+in the kit spot. Clicking an item or its label opens that item's existing
+menu tab and shows a static preview card (label, visual-only description,
+jump-to-section button). No motion: the card appears and dismisses
+instantly. First-person gloved hands appear while a procedure runs,
+holding a clone of that procedure's kit item. Labels follow the Medical /
+Plain wording toggle through src/ui/wording.ts.
 
-## Nov 2 kit pass on clean: blood, IO, boxes (Phases 1-3; Phase 4 cut)
+- New files: src/ui/kitLabels.ts, src/engine/hands.ts. Kit items carry a
+  kitItem tag plus world-space label anchors; picking walks up from the
+  hit mesh so tagged children resolve.
+- Hands angle fix included: palms face the item, fingers forward and down,
+  thumbs on the inner edge, wrists trailing back toward the viewer.
+- Menu navigation reimplemented for the links: setTab plus openKitAction
+  with an instant jump and a static section highlight.
 
-- Kit actions that fail after taking stock now refund the item instead of
-  using it up. Blood counts read "here N, truck M".
-- Sternal IO (FAST1-style): one attempt, 30 s, 95 percent, humeral-range
-  pressure flow (all TUNE, needs medic sign-off), with lidocaine option.
-- Y tubing blood lines: 45 s prime with NS through the warmer, 1-2 units,
-  4-unit/4 h cap (TUNE), LR refused on blood lines, NS 250 with NS 1 L
-  fallback. Warmer rides the Y set. Drip sets stay on the line; rehangs
-  take 20 s.
-- Truck boxes staged by one 50 s partner trip: Narc, cooler, blood kit,
-  RSI, critical care, OB, CBRN. Narc/RSI/CC drugs gated until staged.
-- Stock table rebuilt to ALS levels; belt CAT stays 1 but 5 land at the
-  patient. Pelvic binder, needle decompression, cric, LifeFlow have no
-  action yet. Phase 4 diagram/Body view work cut: clean-rebuild has no
-  diagram or Body view.
-- Tests: `npm.cmd run sim:kit` (refund, sternal, Y set, drip reuse,
-  box gates, staging, fetch landing).
+## Oct 30 Bike down end-to-end (clean rebuild, Nov 2)
 
-## Nov 2 small pass on clean: paper doll + wording toggle
+Wiring only, no clinical value changed. Full run: level select (L1/L2) ->
+dispatch (fixed Bike down CAD text) -> size-up checklist -> care (the Oct
+28 + Oct 29 loop) -> package + destination (trauma / STEMI / stroke /
+nearest ED, logged not graded) -> 300 s transport skip with the engine
+ticking -> text radio report to the AI charge nurse (MIST follow-ups, same
+model and settings as the talking patient) -> handoff. Win = alive + bleed
+under 30 mL/min + airway patent at handoff; lose = arrest anywhere on your
+watch. The end screen shows transport criteria plus a run report with
+Level / Destination / Outcome rows. G or the Package button ends scene care.
 
-- Paper doll body view at the top of the Examine tab: front-view outline,
-  all 15 regions clickable (back is a button), opens the same region menu
-  as the scene and chips. Dots and rings mirror engine state only: TQ,
-  packing and dressing on the left thigh (the 3D wound side), sternal on
-  the chest, limb lines on the right by convention (no laterality is
-  tracked), Y set as a dashed ring, warmer as an orange ring.
-- Medical / Plain toggle in the top bar now rewords tabs, chips, region
-  panel, vitals pill, tips bubble, kit labels, menu, doll names, and the
-  end report (fresh build per toggle, both directions). Persists in
-  localStorage (fd.wording). Wording only, nothing clinical changes. Log
-  history, MARCH letters, and talk lines stay verbatim.
-- Tests: `npm.cmd run sim:ui` (doll coverage, markers, plain pairs,
-  second-sweep safety).
+- L1: vitals auto-display, partner hints, deterioration x0.5 (named dial
+  L1_DETERIORATION_SCALE, open TUNE flag). L2: manual vitals, no hints,
+  x1.0 exactly.
+- New files: src/ui/flow.ts, src/flow.css, src/ui/wording.ts,
+  server/routes/radio.ts, server/prompts/radio.txt, scripts/oct30-test.ts
+  (`npm.cmd run sim:test30`).
+- Wording toggle (Wording button in the top bar): Medical shows strings as
+  authored; Plain swaps known clinical words for everyday ones through
+  Shina's own small table in src/ui/wording.ts. Remembered between
+  sessions. Reimplemented in the clean rebuild; no tooltips.
+- No Dispatch Engine (Oct 31), no FTO debrief (Nov 1), no second patient,
+  no driving, no ambulance interior, no art pass.
+
+Open clinical questions (TUNE, not settled here), in blocker order:
+
+1. Handoff airway bar (patency 0.8+, no esophageal tube) - invented Oct 30.
+2. Transport skip 300 s - scenario param, decides who survives transport.
+3. L1 deterioration x0.5 - the brief gives slow/real with no number.
+4. Destination correctness for a femoral bleed - not graded, needs a rule.
+
+# First Due - Oct 29 Kit Depth + Patient Voice
+
+First-person paramedic sim. Meta Global AI Developer Hackathon 2026, Indie track.
+Source of truth: `MUSE_BRIEF_1.md` (Project Brief v2). When in doubt, the brief wins.
+Clinical source of truth today: `OCT28_MEDICAL_ANSWERS` (sections 1-7 + item 8).
+Values are textbook anchors (ATLS / TCCC / NREMT / PHTLS) and still need
+sign-off from a certified medic before Nov 4.
+Thank you to Carlos for medical knowledge help and playtesting.
+
+This milestone, on top of Oct 28 (commit 6d1074c, untouched curve): Airway and
+Breathing tabs with Josh-exact sizing and failure modes, IV/IO with explicit
+fluid volumes, minimal drug prep loop over 26 of 104 drugs, L2 manual vitals
+with listed times and errors, monitor with lagged SpO2 and waveform EtCO2,
+and the talking patient (Josh) through the server proxy. F1 stays debug-only.
+No Dispatch Engine, no FTO debrief, no destination/radio report, no
+infection/sepsis, no second patient, no art pass, no driving.
 
 ## Prereqs
 

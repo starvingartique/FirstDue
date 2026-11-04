@@ -17,26 +17,6 @@
   display: none;
 }
 
-#partner-hint {
-  position: absolute;
-  top: 108px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 30;
-  max-width: min(640px, calc(100vw - 400px));
-  padding: 7px 14px;
-  background: rgba(20, 32, 18, 0.88);
-  border: 1px solid #5da24a;
-  border-radius: 8px;
-  font-size: 13px;
-  color: #d8ecd0;
-  pointer-events: none;
-}
-
-#partner-hint[hidden] {
-  display: none;
-}
-
 .flow-card {
   width: 560px;
   max-width: 100%;
@@ -307,12 +287,6 @@
 }
 
 @media (max-width: 900px) {
-  #partner-hint {
-    max-width: calc(100vw - 28px);
-    top: auto;
-    bottom: 44px;
-  }
-
   .flow-row {
     flex-direction: column;
   }

@@ -12,7 +12,7 @@ import {
   cannedUnprompted,
   canSpeakUnprompted
 } from "../src/ui/talk";
-import { CHAT_FADE_AFTER_MS, UNPROMPTED_GAP_S, shouldFade } from "../src/ui/chatDock";
+import { CHAT_FADE_AFTER_MS, UNPROMPTED_GAP_S, micDeniedStatus, partnerChatLine, shouldFade, transcribeStatus } from "../src/ui/chatDock";
 import { advanceDebt } from "../src/engine/loop";
 import { MARCH_STEPS, marchProgress } from "../src/ui/marchStrip";
 import { TIP_SHOW_MS, tipFor } from "../src/ui/tipsBubble";
@@ -21,6 +21,21 @@ import { REGION_IDS } from "../src/patient/regions";
 import { DOLL_SHAPES, dollCovers, markersFor } from "../src/ui/bodyDoll";
 import { sayLine, setWording } from "../src/ui/wording";
 import type { LineState } from "../src/sim/types";
+import {
+  bleedLineForTier,
+  bleedTierForRate,
+  bloodStepColor,
+  bloodStepForTier,
+  damageStepColor,
+  fmtBandTime,
+  fmtClockT,
+  painWords,
+  pulseRateWords
+} from "../src/ui/acm/format";
+import { ACM_CATEGORIES, TRIAGE_LEVELS, freshRunState } from "../src/ui/acm/types";
+import { ndcFromClient } from "../src/engine/raycast";
+import { DISCLAIMER_TEXT } from "../src/ui/disclaimer";
+import { KEYBINDING_GROUPS } from "../src/ui/settings";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -199,9 +214,11 @@ function logLine(t_s: number, kind: LogEvent["kind"], text: string): LogEvent {
   fresh.tq.applied = true;
   const tq = markersFor(fresh);
   check("TQ marks the thigh", tq.length === 1 && tq[0]?.kind === "tq", tq[0]?.label ?? "none");
+  // Nov 3 flip: patient left sits on the viewer left (x < 60), matching
+  // the default 3D view. Bounds mirror the old viewer-right ones.
   check(
     "TQ sits inside the left leg shape",
-    (tq[0]?.x ?? 0) >= 62 && (tq[0]?.x ?? 0) <= 80 && (tq[0]?.y ?? 0) >= 125 && (tq[0]?.y ?? 0) <= 180,
+    (tq[0]?.x ?? 0) >= 40 && (tq[0]?.x ?? 0) <= 58 && (tq[0]?.y ?? 0) >= 125 && (tq[0]?.y ?? 0) <= 180,
     `${tq[0]?.x},${tq[0]?.y}`
   );
   fresh.tq.secondApplied = true;
@@ -235,7 +252,7 @@ function logLine(t_s: number, kind: LogEvent["kind"], text: string): LogEvent {
   const iv = marks.find((m) => m.label === "Line 1: iv ac");
   const tib = marks.find((m) => m.label === "Line 2: io tibial");
   const stern = marks.find((m) => m.label === "Line 3: io sternal");
-  check("IV line dots the arm", iv?.kind === "iv" && (iv?.x ?? 99) < 60, `${iv?.x},${iv?.y}`);
+  check("IV line dots the arm", iv?.kind === "iv" && (iv?.x ?? 0) > 60, `${iv?.x},${iv?.y}`);
   check("tibial IO flags Y set and warmer", tib?.kind === "io" && tib.ySet && tib.warmer, "y+heat");
   check("sternal IO sits on the chest center", stern?.x === 60 && stern?.y === 48, "60,48");
 }
@@ -294,7 +311,23 @@ function logLine(t_s: number, kind: LogEvent["kind"], text: string): LogEvent {
     "src/ui/debrief.ts",
     "src/ui/bodyDoll.ts",
     "src/ui/wording.ts",
+    "src/ui/monitorWords.ts",
+    "src/ui/dollPanel.ts",
+    "src/ui/progressBar.ts",
+    "src/ui/heldItem.ts",
+    "src/ui/settings.ts",
+    "src/ui/sound.ts",
+    "src/sim/physiology.ts",
+    "src/ui/kitLabels.ts",
+    "src/engine/camera.ts",
+    "src/engine/input.ts",
+    "src/engine/scene.ts",
+    "server/routes/patient.ts",
+    "server/prompts/patient.txt",
+    "schemas/drugs.schema.json",
+    "scripts/nov03-test.ts",
     "src/engine/loop.ts",
+    "src/engine/raycast.ts",
     "src/main.ts",
     "src/style.css",
     "src/flow.css",
@@ -310,7 +343,22 @@ function logLine(t_s: number, kind: LogEvent["kind"], text: string): LogEvent {
     "src/sim/drugs.ts",
     "src/data/loaders.ts",
     "data/medical/equipment.json",
-    "package.json"
+    "package.json",
+    "src/acm.css",
+    "src/ui/acm/types.ts",
+    "src/ui/acm/format.ts",
+    "src/ui/acm/rows.ts",
+    "src/ui/acm/body.ts",
+    "src/ui/acm/actions.ts",
+    "src/ui/acm/actions2.ts",
+    "src/ui/acm/cards.ts",
+    "src/ui/acm/overview.ts",
+    "src/ui/acm/bottom.ts",
+    "src/ui/acm/monitor.ts",
+    "src/ui/acm/shell.ts",
+    "src/ui/title.ts",
+    "src/ui/disclaimer.ts",
+    "src/title.css"
   ];
   const banned = /[\u2014\u2013]/;
   let clean = 0;
@@ -320,6 +368,163 @@ function logLine(t_s: number, kind: LogEvent["kind"], text: string): LogEvent {
     else console.log(`DASH ${file}`);
   }
   check("no em or en dashes in touched files", clean === touched.length, `${clean}/${touched.length} clean`);
+}
+
+// 12. ACM overlay pure helpers: tiers, clocks, colors, words, run state.
+{
+  check("tier cut at 30", bleedTierForRate(29) === "none" && bleedTierForRate(30) === "slow", "visible cut");
+  check(
+    "tier buckets",
+    bleedTierForRate(0) === "none" &&
+      bleedTierForRate(149) === "slow" &&
+      bleedTierForRate(150) === "moderate" &&
+      bleedTierForRate(399) === "moderate" &&
+      bleedTierForRate(400) === "severe" &&
+      bleedTierForRate(699) === "severe" &&
+      bleedTierForRate(700) === "massive",
+    "slow/moderate/severe/massive"
+  );
+  check(
+    "tier steps",
+    bloodStepForTier("none") === 0 &&
+      bloodStepForTier("slow") === 3 &&
+      bloodStepForTier("moderate") === 5 &&
+      bloodStepForTier("severe") === 8 &&
+      bloodStepForTier("massive") === 10,
+    "0/3/5/8/10"
+  );
+  check("tier line words", bleedLineForTier("massive").text === "Massive bleeding", "words only");
+  check("band clock", fmtBandTime(51) === "0:51", "m:ss");
+  check("overlay clock", fmtClockT(51) === "T+00:51" && fmtClockT(125) === "T+02:05", "T+mm:ss");
+  check("blood scale ends", bloodStepColor(0) === "#232c3d" && bloodStepColor(10) === "#ff0000", "base to red");
+  check("damage scale ends", damageStepColor(0) === "#232c3d" && damageStepColor(10) === "#0000ff", "base to blue");
+  check(
+    "pain words",
+    painWords(0) === "no pain" && painWords(3) === "mild pain" && painWords(6) === "moderate pain" && painWords(8) === "severe pain" && painWords(10) === "worst pain",
+    "0-10 buckets"
+  );
+  check(
+    "pulse words",
+    pulseRateWords(0) === "no pulse" && pulseRateWords(55) === "slow" && pulseRateWords(80) === "steady" && pulseRateWords(120) === "fast" && pulseRateWords(150) === "very fast",
+    "rate buckets"
+  );
+  check("eight categories", ACM_CATEGORIES.length === 8 && ACM_CATEGORIES[0]?.key === "1", "keys 1-8");
+  check("five triage levels", TRIAGE_LEVELS.length === 5 && TRIAGE_LEVELS[3]?.id === "immediate", "none to deceased");
+  const fresh = freshRunState();
+  check("fresh run state", fresh.category === "examine" && fresh.triage === "none" && fresh.drugId === "fentanyl", "examine/none/fentanyl");
+  setWording("plain");
+  check("plain: Triage card", sayLine("Triage card") === "Injury sort card", "injury sort");
+  check("plain: NIBP auto cycle", sayLine("NIBP auto cycle (40s)") === "Pressure cuff auto cycle (40s)", "pressure cuff");
+  check("plain: distal pulse", sayLine("No distal pulse palpable.") === "No far pulse can be felt.", "far/can be felt");
+  check("plain: venous congestion", sayLine("No venous congestion.") === "No vein blood backup.", "vein/blood backup");
+  check("plain: waveform EtCO2", sayLine("Attach waveform EtCO2") === "Attach wave trace Exhaled CO2", "wave trace");
+  check("plain: TOXIC", sayLine("TOXIC") === "Poisonous", "poisonous");
+  check("plain: CPAP", sayLine("CPAP (cabinet)") === "Pressure mask (cabinet)", "pressure mask");
+  check("plain: radial/carotid", sayLine("Pulse: radial/carotid") === "Pulse: wrist/neck", "wrist/neck");
+  setWording("medical");
+}
+
+// 13. Zoom-proof picking: the same visible pixel maps to the same NDC
+// at every text size. Medium 1.0 matches the old window-fraction math
+// exactly; small 0.9, large 1.15, and xl 1.3 scale the canvas box.
+{
+  const W = 1280;
+  const H = 720;
+  const close = (a: number, b: number): boolean => Math.abs(a - b) < 1e-9;
+  const box = (zoom: number): { left: number; top: number; width: number; height: number } => ({
+    left: 0,
+    top: 0,
+    width: W * zoom,
+    height: H * zoom
+  });
+  // Medium: corners and center, exact against the old formula.
+  const center = ndcFromClient(W / 2, H / 2, box(1));
+  const oldCenter = { x: (W / 2 / W) * 2 - 1, y: -((H / 2 / H) * 2 - 1) };
+  check("zoom medium center exact", close(center.x, oldCenter.x) && close(center.y, oldCenter.y), "(0,0)");
+  const corner = ndcFromClient(0, 0, box(1));
+  check("zoom medium corner exact", close(corner.x, -1) && close(corner.y, 1), "(-1,1)");
+  const edge = ndcFromClient(W, H, box(1));
+  check("zoom medium edge exact", close(edge.x, 1) && close(edge.y, -1), "(1,-1)");
+  // Other sizes: the zoomed client point lands on the same NDC.
+  for (const zoom of [0.9, 1.15, 1.3]) {
+    const px = 431;
+    const py = 287;
+    const want = ndcFromClient(px, py, box(1));
+    const got = ndcFromClient(px * zoom, py * zoom, box(zoom));
+    check(`zoom ${zoom} same pixel`, close(got.x, want.x) && close(got.y, want.y), "pick invariant");
+  }
+  // Offset box (letterboxed canvas) still works.
+  const off = ndcFromClient(140, 90, { left: 100, top: 50, width: 200, height: 100 });
+  check("zoom offset box", close(off.x, -0.6) && close(off.y, 0.2), "rect origin honored");
+}
+
+// 14. Mic live-path diagnostics: every failure step names its step, and
+// the no-key line never carries the key.
+{
+  check("mic denied", micDeniedStatus("NotAllowedError") === "Mic blocked - allow the mic or type instead.", "blocked");
+  check("mic missing", micDeniedStatus("NotFoundError") === "No mic found - type instead.", "missing");
+  check("mic unknown", micDeniedStatus("") === "Mic blocked or missing - type instead.", "fallback");
+  const noKey = transcribeStatus(500, "MODEL_API_KEY is missing in server/.env");
+  check("transcribe no key", noKey === "Voice key not set on the server - type instead.", "setup step named");
+  check("transcribe no key leaks nothing", !noKey.includes("MODEL_API_KEY") && !noKey.includes(".env"), "no key material");
+  check("transcribe 500", transcribeStatus(500, "internal server error") === "Mic transcript failed (server error) - type instead.", "server error");
+  check("transcribe 502", transcribeStatus(502, "Meta call failed") === "Voice service failed - type instead.", "upstream fail");
+  check("transcribe 400", transcribeStatus(400, "audio must be 1 byte to 5 MB") === "Mic clip rejected by the server - type instead.", "validation");
+  check("transcribe other", transcribeStatus(503, "") === "Mic transcript failed (server 503) - type instead.", "status fallback");
+}
+
+// 15. Disclaimer exactness and keybindings display data.
+{
+  setWording("medical");
+  check("disclaimer medical exact", sayLine(DISCLAIMER_TEXT) === DISCLAIMER_TEXT, "byte for byte");
+  setWording("plain");
+  check("disclaimer plain exact", sayLine(DISCLAIMER_TEXT) === DISCLAIMER_TEXT, "no table word inside");
+  check("disclaimer three paragraphs", DISCLAIMER_TEXT.split("\n\n").length === 3, "split on blank lines");
+  check("keys eight groups", KEYBINDING_GROUPS.length === 8, "menu/categories/parts/camera/talk/debug/chat/doll");
+  const rows = KEYBINDING_GROUPS.flatMap((g) => g.rows);
+  check("keys every group has rows", KEYBINDING_GROUPS.every((g) => g.rows.length > 0), `${rows.length} rows`);
+  const notes = KEYBINDING_GROUPS.map((g) => g.note ?? "").join(" ");
+  check("keys orientation note", notes.includes("screen-left") && notes.includes("swaps them"), "both orientations");
+  check("keys ctrl note", notes.includes("Ctrl+H") && notes.includes("may not work in all browsers"), "browser risk");
+  const blob = JSON.stringify(KEYBINDING_GROUPS).toLowerCase();
+  check("keys no remap controls", !blob.includes("remap") && !blob.includes("capture") && !blob.includes("reset"), "display only");
+  const keysLiteral = rows.every((r) => sayLine(r.key) === r.key);
+  check("keys render literally in plain", keysLiteral, "chips never reworded");
+  const catRow = KEYBINDING_GROUPS.find((g) => g.group.startsWith("Categories"))?.rows[0]?.does ?? "";
+  check("keys descriptions switch", sayLine(catRow).includes("Injury sort"), "Triage rewords in plain");
+  setWording("medical");
+}
+
+// 16. Partner hints live only in chat, worded at post time like the old
+// top bar showed them. No top-bar or bubble code path remains.
+{
+  const hint = "Partner: crank the tourniquet until the bleeding stops.";
+  setWording("medical");
+  const med = partnerChatLine(hint);
+  check("partner chat medical", med.speaker === "partner" && med.kind === "hint" && med.text === hint, "identical");
+  setWording("plain");
+  const plain = partnerChatLine(hint);
+  check("partner chat plain worded", plain.text.includes("leg band"), "tourniquet rewords");
+  check("partner chat keeps speaker", plain.speaker === "partner" && plain.kind === "hint", "avatar + quiet line");
+  setWording("medical");
+  const source = fs.readFileSync(path.join(root, "src/ui/flow.ts"), "utf8");
+  check("no top hint bar code", !source.includes("hintBar") && !source.includes("updateHint"), "flow.ts clean");
+  const tips = fs.readFileSync(path.join(root, "src/ui/tipsBubble.ts"), "utf8");
+  check("no bubble code", !tips.includes("tips-bubble") && !tips.includes("setTimeout"), "tipsBubble.ts clean");
+  const html = fs.readFileSync(path.join(root, "index.html"), "utf8");
+  check("no top hint divs", !html.includes("partner-hint") && !html.includes("tips-bubble"), "index.html clean");
+}
+
+// 17. Title overlay carries no duplicate words; buttons group bottom.
+{
+  const title = fs.readFileSync(path.join(root, "src/ui/title.ts"), "utf8");
+  check("title no overlay h1", !title.includes("title-h1") && !title.includes("title-framing"), "words live in the video");
+  check("title button group", title.includes("title-btn-group"), "bottom third group");
+  const css = fs.readFileSync(path.join(root, "src/title.css"), "utf8");
+  check("title bottom third css", css.includes("flex-end") && css.includes("title-btn-group"), "flex-end + group");
+  check("title no full dim", !css.includes("title-ui") || !/\.title-ui \{[^}]*background:/s.test(css), "wordmark stays bright");
+  check("title logo wired", title.includes("First_Due__Paramedic_Simulator.png"), "real asset path");
+  check("title logo card + poster", title.includes("title-card-img") && title.includes("video.poster"), "fallback + poster");
 }
 
 if (failures > 0) {

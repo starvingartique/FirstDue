@@ -316,3 +316,182 @@ export function formatDose(mcg: number): string {
   if (mcg >= 1000) return `${(mcg / 1000).toFixed(1)} mg`;
   return `${Math.round(mcg * 100) / 100} mcg`;
 }
+
+// - drug reference display (advisor knowledge, Nov 3) -
+
+/** Effect token key to display words. Formatting only, no clinical change. */
+const EFFECT_DISPLAY_NAMES: Record<string, string> = {
+  heartRate: "heart rate",
+  respRate: "breathing rate",
+  sbp: "SBP",
+  spo2: "SpO2",
+  gcs: "GCS",
+  painScore: "pain",
+  glucose: "glucose",
+  potassium: "potassium",
+  serum_pH: "blood pH",
+  serum_sodium: "serum sodium",
+  coreTemp: "core temp",
+  pupils: "pupils",
+  secretions: "secretions",
+  nausea: "nausea",
+  agitation: "agitation",
+  withdrawal: "withdrawal",
+  muscle_tone: "muscle tone",
+  muscle_weakness: "muscle weakness",
+  urine_output: "urine output",
+  bronchospasm_risk: "bronchospasm risk",
+  bronchodilation: "bronchodilation",
+  airway_reflexes: "airway reflexes",
+  respiratory_depression: "breathing depression",
+  stridor: "stridor",
+  bloodVolume: "blood volume",
+  o2_carrying: "O2 carrying",
+  preload: "preload",
+  contractility: "contractility",
+  myocardial_O2_demand: "heart O2 demand",
+  arrhythmia_risk: "arrhythmia risk",
+  arrhythmia_suppression: "arrhythmia suppression",
+  ventricular_ectopy_suppression: "ventricular ectopy suppression",
+  torsades_suppression: "torsades suppression",
+  qt_interval: "QT interval",
+  qrs_width: "QRS width",
+  av_conduction: "AV conduction",
+  av_node_block: "AV node block",
+  rhythm: "rhythm",
+  rosc_chance: "ROSC chance",
+  acs_outcome: "ACS outcome",
+  stemi_reperfusion: "STEMI reperfusion",
+  chest_pain: "chest pain",
+  dig_toxicity: "digoxin toxicity",
+  coagulation: "coagulation",
+  bleeding_risk: "bleeding risk",
+  platelet_inhibition: "platelet inhibition",
+  clot_stability: "clot stability",
+  postpartum_bleed_rate: "postpartum bleeding",
+  uterine_tone: "uterine tone",
+  infection_growth: "infection growth",
+  infection_progression: "infection progression",
+  infection_risk: "infection risk",
+  inflammation: "inflammation",
+  tetanus_risk: "tetanus risk",
+  wernicke_risk: "Wernicke risk",
+  toxin_absorption: "toxin absorption",
+  lipophilic_drug_effect: "lipophilic drug effect",
+  rocuronium_effect: "rocuronium effect",
+  methemoglobin: "methemoglobin",
+  cellular_oxygen_use: "cellular oxygen use",
+  icp: "brain pressure (ICP)",
+  eye_pain: "eye pain",
+  skin_color: "skin color",
+  deep_tendon_reflexes: "deep tendon reflexes",
+  seizure_stop: "seizure stop",
+  seizure_threshold: "seizure threshold",
+  urticaria: "hives",
+  urticaria_itching: "hives/itching",
+  acidosis: "acidosis",
+  bleedRate_noncompressible: "non-compressible bleeding"
+};
+
+/** Effect token to direction words, per the reference reading guide. */
+export function effectStrengthWords(token: string): string | null {
+  if (token === "+++") return "up a lot";
+  if (token === "++") return "up";
+  if (token === "+") return "up a little";
+  if (token === "-") return "down a little";
+  if (token === "--") return "down";
+  if (token === "---") return "down a lot";
+  return null;
+}
+
+/**
+ * What the drug does to the body, in words, from the existing effects
+ * tokens. Empty when the data carries no effects. Wording only.
+ */
+export function drugEffectWords(drug: Drug): string[] {
+  const out: string[] = [];
+  for (const [key, token] of Object.entries(drug.effects ?? {})) {
+    const name = EFFECT_DISPLAY_NAMES[key] ?? key.replace(/_/g, " ");
+    const dir = effectStrengthWords(token);
+    const words = dir === null ? `${name}: ${token}` : `${name} ${dir}`;
+    out.push(words.charAt(0).toUpperCase() + words.slice(1));
+  }
+  return out;
+}
+
+const DOSE_UNITS: [keyof DrugDosing, string, number][] = [
+  ["dose_mg", "mg", 1],
+  ["dose_mcg", "mcg", 1],
+  ["dose_g", "g", 1],
+  ["dose_mL", "mL", 1],
+  ["dose_mg_per_kg", "mg/kg", ENGINE_WEIGHT_KG],
+  ["dose_mcg_per_kg", "mcg/kg", ENGINE_WEIGHT_KG],
+  ["dose_mL_per_kg", "mL/kg", ENGINE_WEIGHT_KG]
+];
+
+/**
+ * Standard dose line for one dosing protocol, straight from the data.
+ * Numbers print with units; strings (ranges, units, mEq, tabs) print
+ * verbatim. Never invents a number.
+ */
+export function doseLine(protocol: DrugDosing): string {
+  const bits: string[] = [];
+  for (const [key, unit] of DOSE_UNITS) {
+    const v = protocol[key];
+    if (typeof v === "number") bits.push(`${v} ${unit}`);
+    else if (typeof v === "string" && v.trim() !== "") bits.push(v);
+  }
+  if (typeof protocol.dose_mcg_per_min === "string" && protocol.dose_mcg_per_min.trim() !== "") {
+    bits.push(protocol.dose_mcg_per_min);
+  }
+  return bits.length === 0 ? "TODO_CLINICAL: no dose in data" : bits.join("; ");
+}
+
+/**
+ * Josh (80 kg) worked dose for the first protocol. Weight-based numbers
+ * are multiplied out; fixed numbers print as-is; ranges and strings print
+ * verbatim with no single worked dose. Pure data math, no invention.
+ */
+export function joshWorkedDose(drug: Drug): string {
+  const first = drug.dosing[0];
+  if (first === undefined) return "TODO_CLINICAL: no dosing protocol in data.";
+  const bits: string[] = [];
+  let ranged = false;
+  for (const [key, unit, perKg] of DOSE_UNITS) {
+    const v = first[key];
+    if (typeof v === "number") {
+      const worked = v * perKg;
+      const shown = Number.isInteger(worked) ? String(worked) : worked.toFixed(2);
+      bits.push(
+        perKg === 1 ? `${v} ${unit} (fixed)` : `${v} ${unit} x 80 kg = ${shown} ${unit.replace("/kg", "")}`
+      );
+    } else if (typeof v === "string" && v.trim() !== "") {
+      bits.push(`${v} (${unit} range, no single dose)`);
+      ranged = true;
+    }
+  }
+  if (typeof first.dose_mcg_per_min === "string" && first.dose_mcg_per_min.trim() !== "") {
+    bits.push(`${first.dose_mcg_per_min} (infusion)`);
+  }
+  if (bits.length === 0) return "TODO_CLINICAL: no dose in data.";
+  const head = `For Josh (80 kg): ${bits.join("; ")}.`;
+  return ranged ? `${head} TODO_CLINICAL: range protocol, no single worked dose.` : head;
+}
+
+/** Before-every-push checks from the drug data advisor note. */
+export function pushChecks(): { checks: string[]; note: string } {
+  const meta = loadDrugs()._meta as unknown as Record<string, unknown>;
+  const checks = Array.isArray(meta["pushChecks"])
+    ? (meta["pushChecks"] as unknown[]).filter((c): c is string => typeof c === "string")
+    : [];
+  const note = typeof meta["pushChecksNote"] === "string" ? (meta["pushChecksNote"] as string) : "";
+  return {
+    checks,
+    note: note !== "" ? note : "TODO_CLINICAL: push checks missing from data."
+  };
+}
+
+/** Every drug in the data, alphabetically, for the reference browser. */
+export function allDrugs(): Drug[] {
+  return [...loadDrugs().drugs].sort((a, b) => a.name.localeCompare(b.name));
+}

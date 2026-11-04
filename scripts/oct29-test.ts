@@ -177,6 +177,22 @@ function calmAirway(sim: Sim): void {
   c.setBvmMask("small");
   c.squeezeBvm(550);
   check("small BVM mask: leak logged", c.log.some((e) => e.text.includes("x0.5")), "tidal volume x0.5");
+  check("small mask 550 records delivered", c.bvm.breaths.at(-1)?.volume_mL === 275, "275 mL, not 550");
+  check(
+    "small mask 550 ventilates poorly",
+    c.log.some((e) => e.text.includes("ventilates poorly")),
+    "shallow line, not ventilating"
+  );
+
+  const d = newTestSim(44, 0);
+  d.setBvmMask("small");
+  d.squeezeBvm(1200);
+  check("small mask 1200 records delivered", d.bvm.breaths.at(-1)?.volume_mL === 600, "600 mL, not 1200");
+  check("small mask 1200 not overvent", d.bvm.gastric_0_to_10 === 0, "600 delivered is not over 600");
+
+  const e = newTestSim(45, 0);
+  e.squeezeBvm(550);
+  check("large mask 550 unchanged", e.bvm.breaths.at(-1)?.volume_mL === 550, "correct mask delivers all");
 }
 
 // 4. O2: devices, NRB trap, tank math.

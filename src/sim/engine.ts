@@ -499,6 +499,7 @@ export class Sim {
       temp_C: this.temp_C,
       pain_0_to_10: this.pain_0_to_10,
       arrested: this.arrested,
+      tick_s: this.t_s,
       effectiveLoss_mL: this.effectiveLoss_mL(),
       airway: this.airwayDeriveInput(),
       drugs: this.drugDeriveInput()
@@ -651,7 +652,7 @@ export class Sim {
   private start(id: string, label: string, seconds: number, done: () => void): ActionResult {
     if (this.arrested) return { ok: false, reason: "Patient is in arrest." };
     if (this.pending !== null) return { ok: false, reason: `Busy: ${this.pending.label}.` };
-    this.pending = { id, label, total_s: seconds, remaining_s: seconds };
+    this.pending = { id, label, total_s: seconds, remaining_s: seconds, grabbed: [] };
     this.pendingDone = done;
     this.addLog("action", `Start: ${label} (${seconds}s).`);
     return { ok: true };
@@ -660,6 +661,8 @@ export class Sim {
   /**
    * Start an action that already grabbed kit: if the start fails (busy or
    * arrest), every grabbed unit is refunded to its pile instead of used up.
+   * On a clean start the grabbed list rides on the pending action, so a
+   * mid-action cancel refunds the same units.
    */
   private startRefunding(
     id: string,
@@ -671,8 +674,42 @@ export class Sim {
     const res = this.start(id, label, seconds, done);
     if (!res.ok) {
       for (const [itemId, src] of grabbed) this.refund(itemId, src);
+    } else if (this.pending !== null) {
+      this.pending.grabbed = grabbed;
     }
     return res;
+  }
+
+  /**
+   * Stop the running action before it completes. The completion callback is
+   * dropped, so nothing finishes after a cancel. Every kit unit grabbed at
+   * the start is refunded to its pile through the existing refund rule.
+   * Cancelling a player packing hold leaves the wound packed and waiting:
+   * pressure restarts from zero, with no rebleed gamble (that gamble
+   * belongs to the deliberate early-release action, not to a cancel).
+   */
+  cancelPending(): ActionResult {
+    const pending = this.pending;
+    if (pending === null) return { ok: false, reason: "Nothing to cancel." };
+    const refunded: string[] = [];
+    for (const [itemId, src] of pending.grabbed) {
+      if (src !== null && src !== "tool") refunded.push(itemId);
+      this.refund(itemId, src);
+    }
+    if (pending.id === "hold_packing" && this.packing.stage === "holding" && this.packing.holder === "player") {
+      this.packing.stage = "packed_pending_hold";
+      this.packing.holder = null;
+      this.packing.holdRemaining_s = this.packing.holdTotal_s;
+    }
+    this.pending = null;
+    this.pendingDone = null;
+    this.addLog(
+      "action",
+      refunded.length === 0
+        ? `Cancelled: ${pending.label}.`
+        : `Cancelled: ${pending.label}. Kit refunded: ${refunded.join(", ")}.`
+    );
+    return { ok: true };
   }
 
   /** First hands-on M step: the bystander lets go and it spurts. */
@@ -1637,9 +1674,12 @@ export class Sim {
     if (this.arrested) return { ok: false, reason: "Patient is in arrest." };
     if (this.atPatient("bvm_adult") < 1) return { ok: false, reason: "Need the BVM at the patient." };
     const delivered = Math.round(volume_mL * bvmDeliveryFactor(this.bvm.maskSize, this.airway.adjunct));
-    this.bvm.breaths.push({ t_s: this.t_s, volume_mL });
+    // Nov 3 fix: record what the patient got, not what the bag was set
+    // to. A small-mask 550 used to log 550 and ventilate fully; it now
+    // logs 275 and ventilates poorly, matching the x0.5 leak line.
+    this.bvm.breaths.push({ t_s: this.t_s, volume_mL: delivered });
     const rate = bvmRatePerMin(this.bvm, this.t_s);
-    const over = rate > 12 || volume_mL > 600;
+    const over = rate > 12 || delivered > 600;
     if (over) {
       this.bvm.overventBreaths += 1;
       this.bvm.gastric_0_to_10 = Math.min(10, this.bvm.gastric_0_to_10 + 1);
@@ -1652,8 +1692,10 @@ export class Sim {
         this.bvm.gastric_0_to_10 = 4;
         this.vomit("gastric distension from overventilation");
       }
-    } else if (volume_mL < 500) {
+    } else if (delivered < 500) {
       this.addLog("airway", `Shallow BVM breath (${delivered} mL delivered): ventilates poorly.`);
+    } else {
+      this.addLog("airway", `BVM breath (${delivered} mL delivered): ventilating.`);
     }
     return { ok: true };
   }
