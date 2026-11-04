@@ -1,15 +1,16 @@
-// ACM overlay shell, implemented from scratch Nov 3. One full-screen
-// overlay with the 3D scene dimmed behind it: header row, left action
-// column with the 8-category icon bar, center body column with the triage
-// strip, right overview column, and the bottom activity log + quick view
-// row. H toggles, Esc closes, opening never pauses. Number keys pick
-// categories and W/A/S/D/Z/X pick body parts while open; hotkeys never
-// fire while typing. Ctrl+H with the menu closed peeks a small card.
-// Assessment rows arm a pop-up watch: when the check lands in observed,
-// a modal shows only what the player found. The center ACE progress bar
-// with cancel reuses Sim.pending and Sim.cancelPending, the same cancel
-// semantics as the Prompt 10 bar; partner fetch and packing-hold jobs
-// show as the smaller second bar.
+// ACM overlay shell, implemented from scratch Nov 3, narrowed Nov 4. A
+// left-side panel with the scene visible beside it: header row, left
+// action column with the 8-category icon bar, and center body column with
+// the triage strip. No overview column, no activity log, no quick view
+// inside the menu: the top bar pill covers vitals and the scene log
+// covers the log. H toggles, Esc closes, opening never pauses. Number
+// keys pick categories and W/A/S/D/Z/X pick body parts while open;
+// hotkeys never fire while typing. Ctrl+H with the menu closed peeks a
+// small card. Assessment rows arm a pop-up watch: when the check lands in
+// observed, a modal shows only what the player found. The center ACE
+// progress bar with cancel reuses Sim.pending and Sim.cancelPending, the
+// same cancel semantics as the Prompt 10 bar; partner fetch and
+// packing-hold jobs show as the smaller second bar.
 
 import type { RegionId } from "../../patient/regions";
 import type { Sim } from "../../sim/engine";
@@ -18,12 +19,11 @@ import { sayLine } from "../wording";
 import { actionRowsFor, type AcmActionHost } from "./actions";
 import { breathingRows, lineStartRows, manualRows, monitorAttachRows } from "./actions2";
 import { buildAcmBody } from "./body";
-import { buildActivityLog, buildQuickView } from "./bottom";
 import { buildLineCards, buildMeds, buildTriage, type AcmCardHost } from "./cards";
 import { bleedLineForTier, bleedTierForRate, fmtBandTime, fmtClockT, pulseRateWords } from "./format";
 import { buildMonitorScreen } from "./monitor";
-import { buildOverview } from "./overview";
-import { buildRow } from "./rows";
+import { lineAllowed, rowAllowed } from "./regionFilter";
+import { acmNote, buildRow } from "./rows";
 import { ACM_CATEGORIES, freshRunState, type AcmCategory, type AcmRunState, type TriageLevel } from "./types";
 
 export interface AcmHooks {
@@ -87,9 +87,6 @@ export class AcmShell {
   private readonly catbarEl = document.createElement("div");
   private readonly actionsEl = document.createElement("div");
   private readonly bodyEl = document.createElement("div");
-  private readonly overviewEl = document.createElement("div");
-  private readonly logEl = document.createElement("div");
-  private readonly quickEl = document.createElement("div");
   private readonly progressEl = document.createElement("div");
   private readonly modalEl = document.createElement("div");
 
@@ -188,10 +185,7 @@ export class AcmShell {
     const midHead = document.createElement("span");
     midHead.className = "acm-head-mid";
     midHead.dataset["patient"] = "1";
-    const rightHead = document.createElement("span");
-    rightHead.className = "acm-head-right";
-    rightHead.textContent = sayLine("Overview").toUpperCase();
-    heads.append(leftHead, midHead, rightHead);
+    heads.append(leftHead, midHead);
     this.clockEl.className = "acm-clock";
     const close = document.createElement("button");
     close.type = "button";
@@ -213,22 +207,12 @@ export class AcmShell {
     center.className = "acm-center";
     this.bodyEl.className = "acm-bodycol";
     center.appendChild(this.bodyEl);
-    const right = document.createElement("div");
-    right.className = "acm-right";
-    this.overviewEl.className = "acm-overview";
-    right.appendChild(this.overviewEl);
-    main.append(left, center, right);
-
-    const bottom = document.createElement("div");
-    bottom.className = "acm-bottom";
-    this.logEl.className = "acm-log";
-    this.quickEl.className = "acm-quick";
-    bottom.append(this.logEl, this.quickEl);
+    main.append(left, center);
 
     this.progressEl.className = "acm-progress";
     this.modalEl.className = "acm-modal";
     this.modalEl.hidden = true;
-    panel.append(header, main, bottom);
+    panel.append(header, main);
     this.root.append(dim, panel, this.progressEl, this.modalEl);
   }
 
@@ -358,7 +342,7 @@ export class AcmShell {
     }
     const note = document.createElement("div");
     note.className = "acm-modal-note";
-    note.textContent = sayLine("Logged to Quick View.");
+    note.textContent = sayLine("Logged to the scene log.");
     card.appendChild(note);
     const close = document.createElement("button");
     close.type = "button";
@@ -491,34 +475,57 @@ export class AcmShell {
       this.actionsEl.appendChild(div);
     }
     const category = this.state.category;
+    const region = this.hooks.region();
+    const noneForRegion = (): void => {
+      acmNote(this.actionsEl, "No tasks for this region in this category. Tap empty ground to clear the region and see all.");
+    };
     if (category === "triage") {
+      if (region !== null) {
+        noneForRegion();
+        return;
+      }
       buildTriage(this.cardHost(sim), this.actionsEl);
       return;
     }
     if (category === "meds") {
+      if (region !== null) {
+        noneForRegion();
+        return;
+      }
       buildMeds(this.cardHost(sim), this.actionsEl);
       return;
     }
     if (category === "lines") {
       const host = this.actionHost(sim);
-      for (const row of lineStartRows(host)) buildRow(host, this.actionsEl, row);
-      buildLineCards(this.cardHost(sim), this.actionsEl);
+      const starts = lineStartRows(host).filter((row) => rowAllowed(category, row.id, region));
+      for (const row of starts) buildRow(host, this.actionsEl, row);
+      buildLineCards(this.cardHost(sim), this.actionsEl, region);
+      if (region !== null && starts.length === 0 && sim.fluids.lines.filter((l) => lineAllowed(l.site, region)).length === 0) {
+        noneForRegion();
+      }
       return;
     }
     if (category === "monitor") {
       const host = this.actionHost(sim);
-      for (const row of monitorAttachRows(host)) buildRow(host, this.actionsEl, row);
+      const attach = monitorAttachRows(host).filter((row) => rowAllowed(category, row.id, region));
+      for (const row of attach) buildRow(host, this.actionsEl, row);
       buildMonitorScreen(sim, this.actionsEl);
-      for (const row of manualRows(host)) buildRow(host, this.actionsEl, row);
+      const manual = manualRows(host).filter((row) => rowAllowed(category, row.id, region));
+      for (const row of manual) buildRow(host, this.actionsEl, row);
+      if (region !== null && attach.length === 0 && manual.length === 0) noneForRegion();
       return;
     }
     if (category === "breathing") {
       const host = this.actionHost(sim);
-      for (const row of breathingRows(host)) buildRow(host, this.actionsEl, row);
+      const rows = breathingRows(host).filter((row) => rowAllowed(category, row.id, region));
+      for (const row of rows) buildRow(host, this.actionsEl, row);
+      if (region !== null && rows.length === 0) noneForRegion();
       return;
     }
     const host = this.actionHost(sim);
-    for (const row of actionRowsFor(host, category)) buildRow(host, this.actionsEl, row);
+    const rows = actionRowsFor(host, category).filter((row) => rowAllowed(category, row.id, region));
+    for (const row of rows) buildRow(host, this.actionsEl, row);
+    if (region !== null && rows.length === 0) noneForRegion();
   }
 
   private renderBody(sim: Sim): void {
@@ -658,14 +665,5 @@ export class AcmShell {
     this.renderCatbar();
     this.renderActions(sim);
     this.renderBody(sim);
-    this.overviewEl.replaceChildren();
-    buildOverview(
-      { sim, exam: this.state.exam, region: this.hooks.region(), painAsked: this.hooks.painAsked() },
-      this.overviewEl
-    );
-    this.logEl.replaceChildren();
-    buildActivityLog(sim, this.logEl);
-    this.quickEl.replaceChildren();
-    buildQuickView(sim, this.quickEl);
   }
 }

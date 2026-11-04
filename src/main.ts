@@ -29,6 +29,7 @@ import { MarchStrip } from "./ui/marchStrip";
 import { TipsBubble } from "./ui/tipsBubble";
 import { SceneLog } from "./ui/sceneLog";
 import { DollPanel } from "./ui/dollPanel";
+import { QuickActions } from "./ui/quickActions";
 import { ProgressBar } from "./ui/progressBar";
 import { HeldItemPanel } from "./ui/heldItem";
 import { SettingsPanel } from "./ui/settings";
@@ -145,10 +146,13 @@ function main(): void {
   const tips = new TipsBubble({ onTip: (tip) => dock.postPartnerTip(tip) });
   const sceneLog = new SceneLog();
   // Nov 3 rail: doll panel, progress bar, held item card, settings.
+  // Nov 4 quick panel: declared early so region picks refresh it.
+  let quick: QuickActions | null = null;
   const dollPanel = new DollPanel((region: RegionId) => {
     highlight.setSelected(region);
     hud.showRegion(highlight.getSelected());
     dollPanel.setSelected(highlight.getSelected());
+    quick?.refresh();
     shell?.showCategory("examine");
   });
   const progress = new ProgressBar(() => {
@@ -158,6 +162,7 @@ function main(): void {
     sceneLog.refresh();
     dock.refresh();
     progress.refresh(sim);
+    quick?.refresh();
   });
   const heldItem = new HeldItemPanel();
   const rightRail = document.getElementById("right-rail");
@@ -172,6 +177,7 @@ function main(): void {
       highlight.setSelected(region);
       hud.showRegion(highlight.getSelected());
       dollPanel.setSelected(highlight.getSelected());
+      quick?.refresh();
       shell?.refresh();
     },
     onSelectSpot: (spot: SpotId) => {
@@ -189,6 +195,7 @@ function main(): void {
       settingsPanel.reword();
       kitLabels.reword();
       dollPanel.reword();
+      quick?.reword();
       progress.refresh(sim);
       if (sim !== null) heldItem.reword(sim.pending, kitLabels.getSelected());
       if (menu !== null && flow.phase === "end") flow.refreshEndReport(menu.reportElement());
@@ -214,6 +221,7 @@ function main(): void {
       highlight.setSelected(region);
       hud.showRegion(highlight.getSelected());
       dollPanel.setSelected(highlight.getSelected());
+      quick?.refresh();
     },
     mirrored: () => settingsPanel.current.aceOrientation,
     painAsked: () => painAsked,
@@ -225,11 +233,28 @@ function main(): void {
       sceneLog.refresh();
       dock.refresh();
       if (sim !== null) heldItem.refresh(sim.pending, kitLabels.getSelected());
+      quick?.refresh();
     },
     onTriage: (level) => {
       flow.record.triage = TRIAGE_LEVELS.find((t) => t.id === level)?.label ?? level;
     },
     onCategory: (cat) => tips.show(ACM_TO_TAB[cat])
+  });
+  quick = new QuickActions({
+    sim: () => sim,
+    region: () => highlight.getSelected(),
+    onRun: () => {
+      sceneLog.refresh();
+      dock.refresh();
+      if (sim !== null) heldItem.refresh(sim.pending, kitLabels.getSelected());
+      shell?.refresh();
+    },
+    onOpenMenu: () => shell?.setOpen(true),
+    onOpenBag: () => {
+      spotCamera.applySpot("kit");
+      hud.showSpot("kit");
+      kitLabels.setSpot("kit");
+    }
   });
 
   const finishEnd = (win: boolean, checks: HandoffCheck[]): void => {
@@ -325,6 +350,7 @@ function main(): void {
       highlight.setSelected(hit);
       hud.showRegion(highlight.getSelected());
       dollPanel.setSelected(highlight.getSelected());
+      quick?.refresh();
       shell?.refresh();
     },
     onSpotKey: (index) => {
@@ -388,6 +414,7 @@ function main(): void {
         rightRail.hidden = false;
         progress.refresh(s);
         heldItem.refresh(s.pending, kitLabels.getSelected());
+        quick?.refresh();
         // Legacy menu instance kept for the end report only. Its panel
         // is hidden; the ACM overlay is the working menu from here on.
         menu = new MedicalMenu(s);
@@ -422,6 +449,7 @@ function main(): void {
             march.refresh();
             sceneLog.refresh();
             dollPanel.refresh();
+            quick?.refresh();
             // The ACM center bar covers open-overlay runs; the bottom bar
             // covers closed-overlay runs. Never both at once.
             progress.refresh(shell?.isOpen() === true ? null : s);

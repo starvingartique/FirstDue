@@ -5,7 +5,9 @@
 // route and line, and pushes through the same prepPush call. Drug display
 // uses the existing reference data, TODO_CLINICAL where missing.
 
+import type { RegionId } from "../../patient/regions";
 import type { Sim } from "../../sim/engine";
+import { lineAllowed } from "./regionFilter";
 import {
   allDrugs,
   doseLine,
@@ -33,14 +35,15 @@ function running(sim: Sim, id: string): boolean {
   return sim.pending?.id === id;
 }
 
-export function buildLineCards(host: AcmCardHost, parent: HTMLElement): void {
+export function buildLineCards(host: AcmCardHost, parent: HTMLElement, region: RegionId | null = null): void {
   const { sim } = host;
   acmSection(parent, "Lines");
-  if (sim.fluids.lines.length === 0) {
-    acmNote(parent, "No lines yet. In shock, IO beats IV: 95 percent in 30 s.");
+  const lines = region === null ? sim.fluids.lines : sim.fluids.lines.filter((l) => lineAllowed(l.site, region));
+  if (lines.length === 0) {
+    if (region === null) acmNote(parent, "No lines yet. In shock, IO beats IV: 95 percent in 30 s.");
     return;
   }
-  for (const line of sim.fluids.lines) {
+  for (const line of lines) {
     const card = document.createElement("div");
     card.className = "acm-card";
     const head = document.createElement("div");
@@ -156,6 +159,7 @@ export function buildLineCards(host: AcmCardHost, parent: HTMLElement): void {
     });
     parent.appendChild(card);
   }
+  if (region !== null) return;
   if (!sim.stagedBoxes.has("box_blood_kit")) {
     buildRow(host, parent, {
       id: "bloodkit",

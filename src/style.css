@@ -198,6 +198,39 @@ body {
   padding: 12px;
 }
 
+#region-panel[hidden] {
+  display: none;
+}
+
+#quick-panel {
+  flex: 0 0 auto;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+}
+
+#quick-panel[hidden] {
+  display: none;
+}
+
+.quick-head {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 6px;
+}
+
+.quick-btn {
+  margin: 5px 0;
+}
+
+.quick-status {
+  margin-top: 6px;
+}
+
 #region-title {
   font-size: 15px;
   font-weight: 600;
@@ -705,7 +738,8 @@ body {
 }
 
 #chat-dock {
-  flex: 0 0 auto;
+  flex: 1 1 auto;
+  min-height: 0;
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -1332,13 +1366,15 @@ body {
 }
 
 #chat-dock {
-  max-height: 300px;
+  max-height: none;
   display: flex;
   flex-direction: column;
 }
 
 #chat-dock .talk-log {
-  max-height: 150px;
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: 420px;
 }
 
 @media (max-width: 1200px) {

@@ -31,9 +31,13 @@
 
 .acm-panel {
   position: absolute;
-  inset: 10px;
+  top: 10px;
+  left: 10px;
+  bottom: 10px;
+  width: min(760px, 62vw);
+  max-width: calc(100vw - 20px);
   display: grid;
-  grid-template-rows: auto 1fr 25%;
+  grid-template-rows: auto 1fr;
   gap: 8px;
   background: rgba(0, 0, 0, 0.75);
   border: 1px solid rgba(255, 255, 255, 0.55);
@@ -61,7 +65,7 @@
 .acm-heads {
   flex: 1;
   display: grid;
-  grid-template-columns: 32% 30% 1fr;
+  grid-template-columns: 1.2fr 1fr;
   gap: 8px;
   font-weight: 700;
   letter-spacing: 0.12em;
@@ -99,14 +103,13 @@
 
 .acm-main {
   display: grid;
-  grid-template-columns: 32% 30% 1fr;
+  grid-template-columns: 54% 1fr;
   gap: 8px;
   min-height: 0;
 }
 
 .acm-left,
-.acm-center,
-.acm-right {
+.acm-center {
   border: 1px solid rgba(255, 255, 255, 0.35);
   background: rgba(0, 0, 0, 0.55);
   padding: 6px;
