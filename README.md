@@ -4,7 +4,7 @@ A training simulation for paramedic decision-making. For education, not for advi
 
 Indie developer track, Build for Your World.
 
-Demo video: [link to be added after recording]
+Demo video: [Demo Video](https://youtu.be/1SkU-BTa65s)
 
 ## What it is
 
